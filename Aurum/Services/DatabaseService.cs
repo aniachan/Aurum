@@ -320,6 +320,13 @@ public class DatabaseService : IDisposable
                     }
                 }
 
+                // NEW: Update volatile metrics in MarketData if needed
+                // We're already updating velocity and averages in the main upsert above,
+                // but if we calculate volatility elsewhere, we might want to store it here too.
+                // The current schema has 'velocity' but not explicit 'volatility' column.
+                // For now, we rely on MarketAnalysisService to populate the object before upsert.
+
+
                 // 3. Insert SNAPSHOT of current price/listings into PriceHistory
                 // This allows tracking listing price over time, not just sales
                 // We mark these with is_sale = 0
