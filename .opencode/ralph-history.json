@@ -20,9 +20,30 @@
       "exitCode": 0,
       "completionDetected": false,
       "errors": []
+    },
+    {
+      "iteration": 2,
+      "startedAt": "2026-01-20T21:55:56.121Z",
+      "endedAt": "2026-01-20T21:59:33.228Z",
+      "durationMs": 216340,
+      "toolsUsed": {
+        "Bash": 16,
+        "Read": 8,
+        "Todo": 5,
+        "Edit": 7
+      },
+      "filesModified": [
+        "Aurum/Services/RateLimiter.cs",
+        "Aurum/Services/RequestQueue.cs",
+        "Aurum/Services/UniversalisService.cs",
+        "TASKS.md"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": []
     }
   ],
-  "totalDurationMs": 145807,
+  "totalDurationMs": 362147,
   "struggleIndicators": {
     "repeatedErrors": {},
     "noProgressIterations": 0,
