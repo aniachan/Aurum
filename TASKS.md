@@ -49,7 +49,7 @@
   - [x] Store API responses in database
   - [x] Implement cache expiration logic (configurable TTL)
   - [x] Add database query methods (get latest price, get history, etc.)
-  - [ ] Implement bulk insert for batch operations
+  - [x] Implement bulk insert for batch operations
 
 - [ ] **Price history tracking**
   - [ ] Store every API response with timestamp

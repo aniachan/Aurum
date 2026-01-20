@@ -309,6 +309,111 @@ public class DatabaseService : IDisposable
         }
     }
 
+    public void UpsertMarketDataBulk(IEnumerable<MarketData> dataList, int worldId)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                
+                // Prepared statement for MarketData upsert
+                using var marketCmd = connection.CreateCommand();
+                marketCmd.Transaction = transaction;
+                marketCmd.CommandText = @"
+                    INSERT OR REPLACE INTO MarketData (
+                        item_id, world_id, last_updated, min_price, average_price, 
+                        listing_count, velocity, current_listings_json, recent_sales_json
+                    ) VALUES (
+                        @itemId, @worldId, @lastUpdated, @minPrice, @avgPrice,
+                        @listingCount, @velocity, @listingsJson, @salesJson
+                    );
+                ";
+                
+                // Add parameters once
+                var pItemId = marketCmd.Parameters.Add("@itemId", SqliteType.Integer);
+                var pWorldId = marketCmd.Parameters.Add("@worldId", SqliteType.Integer);
+                var pLastUpdated = marketCmd.Parameters.Add("@lastUpdated", SqliteType.Integer);
+                var pMinPrice = marketCmd.Parameters.Add("@minPrice", SqliteType.Integer);
+                var pAvgPrice = marketCmd.Parameters.Add("@avgPrice", SqliteType.Real);
+                var pListingCount = marketCmd.Parameters.Add("@listingCount", SqliteType.Integer);
+                var pVelocity = marketCmd.Parameters.Add("@velocity", SqliteType.Real);
+                var pListingsJson = marketCmd.Parameters.Add("@listingsJson", SqliteType.Text);
+                var pSalesJson = marketCmd.Parameters.Add("@salesJson", SqliteType.Text);
+
+                // Prepared statement for checking last sale
+                using var lastSaleCmd = connection.CreateCommand();
+                lastSaleCmd.Transaction = transaction;
+                lastSaleCmd.CommandText = "SELECT MAX(timestamp) FROM PriceHistory WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 1";
+                var pLastSaleItemId = lastSaleCmd.Parameters.Add("@itemId", SqliteType.Integer);
+                var pLastSaleWorldId = lastSaleCmd.Parameters.Add("@worldId", SqliteType.Integer);
+
+                // Prepared statement for inserting history
+                using var historyCmd = connection.CreateCommand();
+                historyCmd.Transaction = transaction;
+                historyCmd.CommandText = @"
+                    INSERT INTO PriceHistory (item_id, world_id, timestamp, price, quantity, is_sale)
+                    VALUES (@itemId, @worldId, @timestamp, @price, @quantity, 1);
+                ";
+                var pHItemId = historyCmd.Parameters.Add("@itemId", SqliteType.Integer);
+                var pHWorldId = historyCmd.Parameters.Add("@worldId", SqliteType.Integer);
+                var pHTimestamp = historyCmd.Parameters.Add("@timestamp", SqliteType.Integer);
+                var pHPrice = historyCmd.Parameters.Add("@price", SqliteType.Integer);
+                var pHQuantity = historyCmd.Parameters.Add("@quantity", SqliteType.Integer);
+
+                foreach (var data in dataList)
+                {
+                    // 1. Upsert MarketData
+                    pItemId.Value = data.ItemId;
+                    pWorldId.Value = worldId;
+                    pLastUpdated.Value = ((DateTimeOffset)data.LastUploadTime).ToUnixTimeSeconds();
+                    pMinPrice.Value = data.MinPrice;
+                    pAvgPrice.Value = data.CurrentAveragePrice;
+                    pListingCount.Value = data.CurrentListings;
+                    pVelocity.Value = data.SaleVelocity;
+                    pListingsJson.Value = JsonSerializer.Serialize(data.Listings);
+                    pSalesJson.Value = JsonSerializer.Serialize(data.RecentHistory);
+                    
+                    marketCmd.ExecuteNonQuery();
+
+                    // 2. Insert PriceHistory
+                    pLastSaleItemId.Value = data.ItemId;
+                    pLastSaleWorldId.Value = worldId;
+                    
+                    var lastSaleTimestampObj = lastSaleCmd.ExecuteScalar();
+                    long lastSaleTimestamp = 0;
+                    if (lastSaleTimestampObj != DBNull.Value && lastSaleTimestampObj != null)
+                    {
+                        lastSaleTimestamp = (long)lastSaleTimestampObj;
+                    }
+
+                    foreach (var sale in data.RecentHistory.OrderBy(s => s.Timestamp))
+                    {
+                        long saleUnix = ((DateTimeOffset)sale.Timestamp).ToUnixTimeSeconds();
+                        if (saleUnix > lastSaleTimestamp)
+                        {
+                            pHItemId.Value = data.ItemId;
+                            pHWorldId.Value = worldId;
+                            pHTimestamp.Value = saleUnix;
+                            pHPrice.Value = sale.PricePerUnit;
+                            pHQuantity.Value = sale.Quantity;
+                            
+                            historyCmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to perform bulk upsert of market data");
+            }
+        }
+    }
+
     public MarketData? GetMarketData(int itemId, int worldId, TimeSpan maxAge)
     {
         lock (dbLock)
