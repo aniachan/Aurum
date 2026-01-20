@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 // using Dalamud.Plugin.Services;
 using System.Threading.Tasks;
+using System.Text.Json;
+using Aurum.Models;
+using System.Linq;
 
 namespace Aurum.Services;
 
@@ -165,6 +168,137 @@ public class DatabaseService : IDisposable
             {
                 log.Error(ex, $"Database execution failed: {sql}");
             }
+        }
+    }
+
+    public void UpsertMarketData(MarketData data, int worldId)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+
+                // 1. Upsert into MarketData
+                command.CommandText = @"
+                    INSERT OR REPLACE INTO MarketData (
+                        item_id, world_id, last_updated, min_price, average_price, 
+                        listing_count, velocity, current_listings_json, recent_sales_json
+                    ) VALUES (
+                        @itemId, @worldId, @lastUpdated, @minPrice, @avgPrice,
+                        @listingCount, @velocity, @listingsJson, @salesJson
+                    );
+                ";
+
+                command.Parameters.AddWithValue("@itemId", data.ItemId);
+                command.Parameters.AddWithValue("@worldId", worldId);
+                command.Parameters.AddWithValue("@lastUpdated", ((DateTimeOffset)data.LastUploadTime).ToUnixTimeSeconds());
+                command.Parameters.AddWithValue("@minPrice", data.MinPrice);
+                command.Parameters.AddWithValue("@avgPrice", data.CurrentAveragePrice);
+                command.Parameters.AddWithValue("@listingCount", data.CurrentListings);
+                command.Parameters.AddWithValue("@velocity", data.SaleVelocity);
+                command.Parameters.AddWithValue("@listingsJson", JsonSerializer.Serialize(data.Listings));
+                command.Parameters.AddWithValue("@salesJson", JsonSerializer.Serialize(data.RecentHistory));
+                
+                command.ExecuteNonQuery();
+
+                // 2. Insert recent sales into PriceHistory (avoid duplicates logic could be complex, simple append for now)
+                // Note: In a real scenario, we might want to check if the sale already exists
+                // For simplicity, we'll only insert sales that are newer than the latest stored sale for this item/world
+                
+                // Get latest sale timestamp
+                command.CommandText = "SELECT MAX(timestamp) FROM PriceHistory WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 1";
+                var lastSaleTimestampObj = command.ExecuteScalar();
+                long lastSaleTimestamp = 0;
+                if (lastSaleTimestampObj != DBNull.Value && lastSaleTimestampObj != null)
+                {
+                    lastSaleTimestamp = (long)lastSaleTimestampObj;
+                }
+
+                foreach (var sale in data.RecentHistory.OrderBy(s => s.Timestamp))
+                {
+                    long saleUnix = ((DateTimeOffset)sale.Timestamp).ToUnixTimeSeconds();
+                    if (saleUnix > lastSaleTimestamp)
+                    {
+                        using var saleCmd = connection.CreateCommand();
+                        saleCmd.Transaction = transaction;
+                        saleCmd.CommandText = @"
+                            INSERT INTO PriceHistory (item_id, world_id, timestamp, price, quantity, is_sale)
+                            VALUES (@itemId, @worldId, @timestamp, @price, @quantity, 1);
+                        ";
+                        saleCmd.Parameters.AddWithValue("@itemId", data.ItemId);
+                        saleCmd.Parameters.AddWithValue("@worldId", worldId);
+                        saleCmd.Parameters.AddWithValue("@timestamp", saleUnix);
+                        saleCmd.Parameters.AddWithValue("@price", sale.PricePerUnit);
+                        saleCmd.Parameters.AddWithValue("@quantity", sale.Quantity);
+                        saleCmd.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to upsert market data for item {data.ItemId}");
+            }
+        }
+    }
+
+    public MarketData? GetMarketData(int itemId, int worldId, TimeSpan maxAge)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    SELECT last_updated, min_price, average_price, listing_count, velocity, current_listings_json, recent_sales_json
+                    FROM MarketData
+                    WHERE item_id = @itemId AND world_id = @worldId
+                ";
+                command.Parameters.AddWithValue("@itemId", itemId);
+                command.Parameters.AddWithValue("@worldId", worldId);
+
+                using var reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    long lastUpdatedUnix = reader.GetInt64(0);
+                    var lastUpdated = DateTimeOffset.FromUnixTimeSeconds(lastUpdatedUnix).UtcDateTime;
+
+                    if (DateTime.UtcNow - lastUpdated > maxAge)
+                    {
+                        return null; // Cache expired
+                    }
+
+                    var marketData = new MarketData
+                    {
+                        ItemId = (uint)itemId,
+                        LastUploadTime = lastUpdated,
+                        MinPrice = (uint)reader.GetInt64(1),
+                        // AveragePrice is double/real in DB
+                        CurrentAveragePriceNQ = (uint)reader.GetDouble(2), // Simplified mapping
+                        CurrentListings = reader.GetInt32(3),
+                        SaleVelocity = (float)reader.GetDouble(4),
+                        Listings = JsonSerializer.Deserialize<List<MarketListing>>(reader.GetString(5)) ?? new(),
+                        RecentHistory = JsonSerializer.Deserialize<List<SaleRecord>>(reader.GetString(6)) ?? new(),
+                        CachedAt = DateTime.UtcNow // Set to now as it's fresh from DB
+                    };
+
+                    return marketData;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to get market data for item {itemId}");
+            }
+            return null;
         }
     }
     
