@@ -18,6 +18,9 @@ public class RateLimiter : IDisposable
     private readonly double _refillRatePerSecond; // Tokens per second
     private DateTime _lastRefillTime;
 
+    // Endpoint Specific Limits
+    private readonly ConcurrentDictionary<string, EndpointLimiter> _endpointLimiters = new();
+
     // Stats
     public long TotalRequests { get; private set; }
     public long RateLimitedRequests { get; private set; }
@@ -83,23 +86,49 @@ public class RateLimiter : IDisposable
     /// Waits until a token is available to make a request.
     /// Thread-safe.
     /// </summary>
-    public async Task WaitForTokenAsync(CancellationToken cancellationToken = default)
+    public async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default)
     {
         // Simple loop with delay
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            bool globalTokenAcquired = false;
+            
             lock (_lock)
             {
                 RefillTokens();
 
                 if (_tokens >= 1.0)
                 {
-                    _tokens -= 1.0;
-                    TotalRequests++;
-                    TrackRequest();
-                    return; // Token acquired
+                    // Check endpoint limit if applicable
+                    if (endpoint != null)
+                    {
+                        var limit = _endpointLimiters.GetOrAdd(endpoint, ep => 
+                        {
+                            // Default to high limit if not specified (essentially no limit other than global)
+                            // Could implement specific limits per endpoint here
+                            return new EndpointLimiter(1000, 50); 
+                        });
+
+                        if (limit.TryConsume())
+                        {
+                            _tokens -= 1.0;
+                            globalTokenAcquired = true;
+                        }
+                    }
+                    else
+                    {
+                        _tokens -= 1.0;
+                        globalTokenAcquired = true;
+                    }
+
+                    if (globalTokenAcquired)
+                    {
+                        TotalRequests++;
+                        TrackRequest();
+                        return; // Token acquired
+                    }
                 }
             }
 
@@ -189,6 +218,60 @@ public class RateLimiter : IDisposable
     public void UpdateConfiguration()
     {
         // TODO: Allow updating rate from config on the fly
+    }
+
+    private class EndpointLimiter
+    {
+        private readonly object _lock = new();
+        private double _tokens;
+        private readonly double _maxTokens;
+        private readonly double _refillRatePerSecond;
+        private DateTime _lastRefillTime;
+
+        public EndpointLimiter(double requestsPerMinute, double burst)
+        {
+            _refillRatePerSecond = requestsPerMinute / 60.0;
+            _maxTokens = burst;
+            _tokens = _maxTokens;
+            _lastRefillTime = DateTime.UtcNow;
+        }
+
+        public bool TryConsume()
+        {
+            lock (_lock)
+            {
+                RefillTokens();
+                if (_tokens >= 1.0)
+                {
+                    _tokens -= 1.0;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        public double GetWaitTimeSeconds()
+        {
+            // Simple estimation
+            return 1.0 / _refillRatePerSecond;
+        }
+
+        private void RefillTokens()
+        {
+            var now = DateTime.UtcNow;
+            var elapsedSeconds = (now - _lastRefillTime).TotalSeconds;
+
+            if (elapsedSeconds > 0)
+            {
+                var newTokens = elapsedSeconds * _refillRatePerSecond;
+
+                if (newTokens > 0)
+                {
+                    _tokens = Math.Min(_maxTokens, _tokens + newTokens);
+                    _lastRefillTime = now;
+                }
+            }
+        }
     }
 
     public void Dispose()

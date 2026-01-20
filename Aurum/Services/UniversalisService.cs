@@ -363,7 +363,8 @@ public class UniversalisService : IDisposable
                 try
                 {
                     // Wait for rate limit
-                    await rateLimiter.WaitForTokenAsync(disposeCts.Token);
+                    // We can be more granular here if needed. For now, use "api" as the endpoint key for general Universalis calls
+                    await rateLimiter.WaitForTokenAsync("api", disposeCts.Token);
 
                     if (request.ItemIds.Count == 1)
                     {
