@@ -36,19 +36,19 @@
   - [x] API request log table (endpoint, timestamp, response_time, success)
   - [x] Add indexes for performance (item_id+world, timestamp ranges)
 
-- [ ] **Implement DatabaseService**
+- [x] **Implement DatabaseService**
   - [x] Initialize SQLite database on plugin load
   - [x] Create tables if not exist
   - [ ] Add migration system for schema updates
-  - [ ] Implement CRUD operations for all tables
+  - [x] Implement CRUD operations for all tables
   - [ ] Add connection pooling for performance
   - [x] Implement database vacuum/cleanup routine
 
-- [ ] **Integrate database with UniversalisService**
-  - [ ] Check database before making API calls
-  - [ ] Store API responses in database
+- [x] **Integrate database with UniversalisService**
+  - [x] Check database before making API calls
+  - [x] Store API responses in database
   - [ ] Implement cache expiration logic (configurable TTL)
-  - [ ] Add database query methods (get latest price, get history, etc.)
+  - [x] Add database query methods (get latest price, get history, etc.)
   - [ ] Implement bulk insert for batch operations
 
 - [ ] **Price history tracking**
