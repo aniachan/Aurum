@@ -71,12 +71,12 @@
   - [ ] Exponential backoff on failures
   - [ ] Respect HTTP 429 (Too Many Requests) responses
 
-- [ ] **Request queue system**
-  - [ ] FIFO queue for pending requests
-  - [ ] Request deduplication (don't fetch same item twice)
+- [x] **Request queue system**
+  - [x] FIFO queue for pending requests
+  - [x] Request deduplication (don't fetch same item twice)
   - [ ] Batch request optimization (group items for batch API)
-  - [ ] Priority queue (user-requested > background)
-  - [ ] Cancel queued requests on plugin unload
+  - [x] Priority queue (user-requested > background)
+  - [x] Cancel queued requests on plugin unload
 
 - [ ] **API usage monitoring**
   - [ ] Track requests per minute/hour/day

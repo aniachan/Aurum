@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 using Aurum.Models;
@@ -20,6 +21,10 @@ public class UniversalisService : IDisposable
     private readonly DatabaseService database; // Add DatabaseService dependency
     private readonly RateLimiter rateLimiter;
     private readonly Configuration configuration;
+    private readonly RequestQueue requestQueue; // Add RequestQueue
+    private readonly CancellationTokenSource disposeCts = new();
+    private Task? processingTask;
+
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
     
@@ -31,11 +36,16 @@ public class UniversalisService : IDisposable
         this.database = database;
         this.rateLimiter = rateLimiter;
         this.configuration = configuration;
+        this.requestQueue = new RequestQueue();
+        
         httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(10)
         };
         httpClient.DefaultRequestHeaders.Add("User-Agent", "Aurum FFXIV Crafting Calculator/1.0");
+
+        // Start processing loop
+        processingTask = Task.Run(ProcessQueueAsync);
     }
     
     // Method to update world ID (call this when player logs in or changes worlds)
@@ -74,56 +84,27 @@ public class UniversalisService : IDisposable
             }
         }
         
-        try
+        // Queue the request
+        await requestQueue.EnqueueRequestAsync(worldName, itemId, RequestPriority.Normal);
+        
+        // Wait for it to be processed
+        // We need to poll cache again after it's done
+        // Or wait for the specific Task from EnqueueRequestAsync?
+        // EnqueueRequestAsync returns a Task that completes when the request is done.
+        
+        // Check cache again (it should be there now)
+        if (cache.TryGet(cacheKey, out MarketData? freshCached))
         {
-            var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
-            
-            // Respect rate limits
-            await rateLimiter.WaitForTokenAsync();
-            
-            log.Info($"Fetching market data: {url}");
-            
-            var response = await httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            
-            var json = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-            
-            if (apiResponse == null)
-            {
-                log.Warning($"Failed to parse market data for item {itemId}");
-                return null;
-            }
-            
-            var marketData = ConvertToMarketData(apiResponse, worldName, itemId);
-            
-            // 3. Save to Memory Cache
-            cache.Set(cacheKey, marketData);
-            
-            // 4. Save to Database Cache
-            if (currentWorldId != 0)
-            {
-                // Fire and forget or await? Safe to do async but SQLite is sync.
-                // Run in background to not block UI? DatabaseService uses locks so it's thread-safeish but blocking.
-                // Let's just do it synchronously for now to ensure data integrity.
-                database.UpsertMarketData(marketData, currentWorldId);
-            }
-            
-            return marketData;
+            return freshCached;
         }
-        catch (HttpRequestException ex)
+        
+        // If not in memory (maybe it failed?), try DB again
+        if (currentWorldId != 0)
         {
-            log.Error(ex, $"HTTP error fetching market data for {itemId}");
-            return null;
+             return database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
         }
-        catch (Exception ex)
-        {
-            log.Error(ex, $"Unexpected error fetching market data for {itemId}");
-            return null;
-        }
+
+        return null; // Request failed or didn't return data
     }
     
     /// <summary>
@@ -174,53 +155,26 @@ public class UniversalisService : IDisposable
             return results;
         }
         
-        try
+        // Queue batch request
+        // Split into chunks if > 100 (though we took 100 above)
+        // RequestQueue handles one request at a time, but we can submit one batch.
+        // It's already <= 100 items.
+        
+        await requestQueue.EnqueueRequestAsync(worldName, uncachedItems, RequestPriority.Normal);
+        
+        // Re-check cache for the uncached items
+        foreach (var itemId in uncachedItems)
         {
-            var itemList = string.Join(",", uncachedItems);
-            var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
-            
-            // Respect rate limits
-            await rateLimiter.WaitForTokenAsync();
-            
-            log.Info($"Fetching batch market data for {uncachedItems.Count} items");
-            
-            var response = await httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            
-            var json = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonSerializer.Deserialize<UniversalisBatchResponse>(json, new JsonSerializerOptions
+            var cacheKey = $"market_{worldName}_{itemId}";
+            if (cache.TryGet(cacheKey, out MarketData? val))
             {
-                PropertyNameCaseInsensitive = true
-            });
-            
-            if (apiResponse?.Items == null)
-            {
-                log.Warning("Failed to parse batch market data");
-                return results;
+                results[itemId] = val;
             }
-            
-            foreach (var kvp in apiResponse.Items)
+            else if (currentWorldId != 0)
             {
-                var itemId = uint.Parse(kvp.Key);
-                var marketData = ConvertToMarketData(kvp.Value, worldName, itemId);
-                results[itemId] = marketData;
-                
-                // 3. Cache results
-                var cacheKey = $"market_{worldName}_{kvp.Key}";
-                cache.Set(cacheKey, marketData);
-                
-                // 4. Persist to DB
-                if (currentWorldId != 0)
-                {
-                    database.UpsertMarketData(marketData, currentWorldId);
-                }
+                 var dbVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
+                 if (dbVal != null) results[itemId] = dbVal;
             }
-            
-            log.Info($"Successfully fetched {results.Count} items from Universalis");
-        }
-        catch (Exception ex)
-        {
-            log.Error(ex, "Error fetching batch market data");
         }
         
         return results;
@@ -313,7 +267,154 @@ public class UniversalisService : IDisposable
     
     public void Dispose()
     {
+        disposeCts.Cancel();
+        try
+        {
+            processingTask?.Wait(2000); // Wait for cleanup
+        }
+        catch { /* Ignore */ }
+        
+        disposeCts.Dispose();
         httpClient?.Dispose();
+    }
+
+    private async Task ProcessQueueAsync()
+    {
+        log.Info("UniversalisService queue processor started");
+        
+        while (!disposeCts.Token.IsCancellationRequested)
+        {
+            var request = requestQueue.Dequeue();
+            if (request == null)
+            {
+                await Task.Delay(100, disposeCts.Token);
+                continue;
+            }
+
+            try
+            {
+                // Wait for rate limit
+                await rateLimiter.WaitForTokenAsync(disposeCts.Token);
+
+                if (request.ItemIds.Count == 1)
+                {
+                    await FetchSingleItemInternalAsync(request.WorldName, request.ItemIds[0]);
+                }
+                else
+                {
+                    await FetchBatchItemsInternalAsync(request.WorldName, request.ItemIds);
+                }
+                
+                request.CompletionSource.TrySetResult(true);
+            }
+            catch (OperationCanceledException)
+            {
+                request.CompletionSource.TrySetCanceled();
+                break;
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
+                request.CompletionSource.TrySetException(ex);
+            }
+        }
+        
+        log.Info("UniversalisService queue processor stopped");
+    }
+
+    /// <summary>
+    /// Internal method to fetch a single item (bypass queue logic)
+    /// </summary>
+    private async Task<MarketData?> FetchSingleItemInternalAsync(string worldName, uint itemId)
+    {
+        try
+        {
+            var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
+            
+            // Note: Rate limiter wait moved to ProcessQueueAsync
+            
+            log.Info($"Fetching market data: {url}");
+            
+            var response = await httpClient.GetAsync(url, disposeCts.Token);
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
+            var apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            
+            if (apiResponse == null)
+            {
+                log.Warning($"Failed to parse market data for item {itemId}");
+                return null;
+            }
+            
+            var marketData = ConvertToMarketData(apiResponse, worldName, itemId);
+            
+            var cacheKey = $"market_{worldName}_{itemId}";
+            cache.Set(cacheKey, marketData);
+            
+            if (currentWorldId != 0)
+            {
+                database.UpsertMarketData(marketData, currentWorldId);
+            }
+            
+            return marketData;
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, $"Error fetching single item {itemId}");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Internal method to fetch batch items (bypass queue logic)
+    /// </summary>
+    private async Task<Dictionary<uint, MarketData>> FetchBatchItemsInternalAsync(string worldName, List<uint> itemIds)
+    {
+        var results = new Dictionary<uint, MarketData>();
+        try
+        {
+            var itemList = string.Join(",", itemIds);
+            var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
+            
+            log.Info($"Fetching batch market data for {itemIds.Count} items");
+            
+            var response = await httpClient.GetAsync(url, disposeCts.Token);
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
+            var apiResponse = JsonSerializer.Deserialize<UniversalisBatchResponse>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            
+            if (apiResponse?.Items == null) return results;
+            
+            foreach (var kvp in apiResponse.Items)
+            {
+                var itemId = uint.Parse(kvp.Key);
+                var marketData = ConvertToMarketData(kvp.Value, worldName, itemId);
+                results[itemId] = marketData;
+                
+                var cacheKey = $"market_{worldName}_{kvp.Key}";
+                cache.Set(cacheKey, marketData);
+                
+                if (currentWorldId != 0)
+                {
+                    database.UpsertMarketData(marketData, currentWorldId);
+                }
+            }
+            
+            return results;
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, "Error fetching batch items");
+            throw;
+        }
     }
 }
 
