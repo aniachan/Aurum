@@ -213,7 +213,7 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.Button(">") && currentPage < totalPages) currentPage++;
         
         // Table header
-        if (ImGui.BeginTable("ProfitTable", 8, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        if (ImGui.BeginTable("ProfitTable", 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthFixed, 250);
@@ -224,6 +224,7 @@ public class DashboardWindow : Window, IDisposable
             ImGui.TableSetupColumn("Demand", ImGuiTableColumnFlags.WidthFixed, 80);
             ImGui.TableSetupColumn("Risk", ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableSetupColumn("Score", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 50);
             ImGui.TableHeadersRow();
             
             // Draw rows
@@ -330,11 +331,25 @@ public class DashboardWindow : Window, IDisposable
         
         ImGui.TextColored(riskColor, $"{riskIcon} {profit.RiskLevel}");
         
-        // Score (stars)
+            // Score (stars)
         ImGui.TableNextColumn();
         var stars = profit.RecommendationScore / 20; // 0-100 -> 0-5 stars
         var starText = new string('⭐', Math.Clamp(stars, 0, 5));
         ImGui.Text($"{starText} {profit.RecommendationScore}");
+
+        // Chart Button
+        ImGui.TableNextColumn();
+        if (profit.MarketData != null)
+        {
+            if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
+            {
+                plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("View Price History");
+            }
+        }
     }
     
     private async Task RefreshDataAsync()

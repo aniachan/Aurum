@@ -198,10 +198,10 @@
 ---
 
 ### UI Components - Price History Charts (ImPlot)
-- [ ] **Design chart window**
-  - [ ] Create new ImGui window for charts
-  - [ ] Integrate ImPlot library (already in Dalamud)
-  - [ ] Add window open/close button in dashboard
+- [x] **Design chart window**
+  - [x] Create new ImGui window for charts
+  - [x] Integrate ImPlot library (already in Dalamud)
+  - [x] Add window open/close button in dashboard
 
 - [ ] **Price history chart**
   - [ ] Line chart showing price over time
