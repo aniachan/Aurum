@@ -63,8 +63,8 @@
 ---
 
 ### Rate Limiting & API Etiquette
-- [ ] **Implement RateLimiter class**
-  - [ ] Token bucket algorithm (configurable requests/minute)
+- [x] **Implement RateLimiter class**
+  - [x] Token bucket algorithm (configurable requests/minute)
   - [ ] Per-endpoint rate limits
   - [ ] Global API request counter
   - [ ] Request queue with priority levels
