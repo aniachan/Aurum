@@ -24,8 +24,14 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/aurum";
     private const string ConfigCommandName = "/aurum config";
     private const string HealthCheckCommand = "/aurum health";
+    
+    // DEV MODE: Set to true to auto-run tests on plugin load
+    private const bool DEV_MODE = true;
 
     public Configuration Configuration { get; init; }
+    
+    // File logger for easier debugging
+    private FileLogger? FileLog { get; set; }
     
     // Services
     public CacheService CacheService { get; init; }
@@ -41,6 +47,12 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+
+        // Initialize file logging
+        var pluginDir = PluginInterface.AssemblyLocation.DirectoryName ?? Directory.GetCurrentDirectory();
+        FileLog = new FileLogger(Log, pluginDir);
+        Log.Information($"Plugin directory: {pluginDir}");
+        Log.Information($"Log file: {FileLog.GetLogFilePath()}");
 
         // Initialize services
         Log.Information("Initializing Aurum services...");
@@ -81,7 +93,16 @@ public sealed class Plugin : IDalamudPlugin
         // Adds another button doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
-        Log.Information($"Aurum v{PluginInterface.Manifest.AssemblyVersion} (DEBUG BUILD) initialized successfully!");
+        Log.Information($"Aurum v{PluginInterface.Manifest.AssemblyVersion} initialized successfully!");
+        
+        // DEV MODE: Auto-run tests
+        if (DEV_MODE)
+        {
+            Log.Information("========================================");
+            Log.Information("DEV MODE ENABLED - Auto-running tests");
+            Log.Information("========================================");
+            _ = RunDevModeTests();
+        }
     }
 
     public void Dispose()
@@ -102,6 +123,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(CommandName);
         
         Log.Information("Aurum disposed");
+        FileLog?.Dispose();
     }
 
     private void OnCommand(string command, string args)
@@ -117,11 +139,17 @@ public sealed class Plugin : IDalamudPlugin
         {
             var healthCheck = new HealthCheck(this, Log);
             healthCheck.RunAll();
-            Log.Information("Health check complete. Check Dalamud log for details.");
+            Log.Information("Health check complete. Check log file for details.");
         }
         else if (argsTrimmed == "test")
         {
             _ = RunIntegrationTest();
+        }
+        else if (argsTrimmed == "log")
+        {
+            var logPath = FileLog?.GetLogFilePath() ?? "Unknown";
+            Log.Information($"Log file location: {logPath}");
+            Log.Information("You can read this file to see all plugin output.");
         }
         else
         {
@@ -187,6 +215,29 @@ public sealed class Plugin : IDalamudPlugin
         catch (Exception ex)
         {
             Log.Error(ex, "Integration test failed");
+        }
+    }
+    
+    private async System.Threading.Tasks.Task RunDevModeTests()
+    {
+        try
+        {
+            // Wait a bit for services to fully initialize
+            await System.Threading.Tasks.Task.Delay(2000);
+            
+            Log.Information("Starting DEV MODE automated tests...");
+            Log.Information("");
+            
+            // Run integration test
+            await RunIntegrationTest();
+            
+            Log.Information("");
+            Log.Information("DEV MODE tests complete!");
+            Log.Information($"Full log available at: {FileLog?.GetLogFilePath()}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "DEV MODE tests failed");
         }
     }
     
