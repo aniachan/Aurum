@@ -22,9 +22,14 @@ public class DashboardWindow : Window, IDisposable
     private string selectedClass = "All";
     private int minLevel = 1;
     private int maxLevel = 100;
+    private int minProfit = 0;
     private SortMode currentSort = SortMode.RecommendationScore;
     private bool showOnlyProfitable = true;
     private DateTime lastRefresh = DateTime.MinValue;
+    
+    // Pagination
+    private int currentPage = 1;
+    private int itemsPerPage = 50;
     
     private readonly string[] craftingClasses = { "All", "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
     
@@ -146,6 +151,18 @@ public class DashboardWindow : Window, IDisposable
         }
         
         ImGui.SameLine();
+
+        // Min Profit
+        ImGui.Text("Min Profit:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(80);
+        if (ImGui.InputInt("##minprofit", ref minProfit, 1000))
+        {
+            minProfit = Math.Max(0, minProfit);
+            ApplyFilters();
+        }
+        
+        ImGui.SameLine();
         
         // Profitable only
         if (ImGui.Checkbox("Profitable Only", ref showOnlyProfitable))
@@ -184,6 +201,16 @@ public class DashboardWindow : Window, IDisposable
             }
             return;
         }
+
+        // Pagination controls
+        int totalPages = (int)Math.Ceiling(filteredResults.Count / (double)itemsPerPage);
+        currentPage = Math.Clamp(currentPage, 1, totalPages);
+        
+        ImGui.Text($"Page {currentPage} of {totalPages} ({filteredResults.Count} items)");
+        ImGui.SameLine();
+        if (ImGui.Button("<") && currentPage > 1) currentPage--;
+        ImGui.SameLine();
+        if (ImGui.Button(">") && currentPage < totalPages) currentPage++;
         
         // Table header
         if (ImGui.BeginTable("ProfitTable", 8, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
@@ -200,17 +227,16 @@ public class DashboardWindow : Window, IDisposable
             ImGui.TableHeadersRow();
             
             // Draw rows
-            foreach (var profit in filteredResults.Take(100)) // Limit to 100 for performance
+            var pageItems = filteredResults
+                .Skip((currentPage - 1) * itemsPerPage)
+                .Take(itemsPerPage);
+                
+            foreach (var profit in pageItems)
             {
                 DrawProfitRow(profit);
             }
             
             ImGui.EndTable();
-        }
-        
-        if (filteredResults.Count > 100)
-        {
-            ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), $"Showing first 100 of {filteredResults.Count} results. Use filters to narrow down.");
         }
     }
     
@@ -372,9 +398,16 @@ public class DashboardWindow : Window, IDisposable
             // Profitable only
             if (showOnlyProfitable && p.RawProfit <= 0)
                 return false;
+
+            // Min profit filter
+            if (p.RawProfit < minProfit)
+                return false;
             
             return true;
         }).ToList();
+        
+        // Reset page on filter change
+        currentPage = 1;
         
         // Apply sorting
         filteredResults = currentSort switch
