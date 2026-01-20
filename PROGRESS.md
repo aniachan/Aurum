@@ -217,28 +217,65 @@ The following issues were FIXED in this session:
 
 ## 📝 Next Steps (Priority Order)
 
+**See TASKS.md for comprehensive 95-task breakdown**
+
 ### CRITICAL (Before Public Release)
 1. ✅ ~~Fix JSON parsing~~ → DONE
 2. ✅ ~~Fix file logging~~ → DONE
-3. 🔄 **Implement local database** (SQLite for price history)
-   - Cache market data locally
-   - Persist across plugin reloads
+3. 🔴 **Implement SQLite database** (27 subtasks in TASKS.md)
+   - Design schema (market data, price history, recipe cache, item metadata)
+   - Create DatabaseService with CRUD operations
+   - Integrate with UniversalisService for caching
    - Reduce API calls by 90%+
    
-4. 🔄 **Implement rate limiting**
-   - Max requests per minute
-   - Request queue system
-   - Respect Universalis API limits
+4. 🔴 **Implement smart item filtering** (15 subtasks in TASKS.md)
+   - Item level heuristics (current expansion priority)
+   - Market activity heuristics (sale velocity, volatility)
+   - Recipe value heuristics (high-value crafts, leve items)
+   - Category-based filtering (gear, consumables, furniture)
+   - User preference learning
+   - **Goal:** Only fetch relevant items, reduce API calls by 80%
+   
+5. 🔴 **Implement rate limiting** (9 subtasks in TASKS.md)
+   - Token bucket algorithm
+   - Request queue with priority
+   - Exponential backoff on failures
+   - API usage monitoring
+   - **Goal:** Respectful API usage, prevent abuse
 
-### OPTIMIZATION (Performance)
-5. 🔄 Implement batch API requests
-6. 🔄 Add request deduplication
-7. 🔄 Optimize cache expiration logic
+### HIGH PRIORITY (Performance & UX)
+6. 🟡 **Batch optimization** (4 subtasks)
+   - Use Universalis batch endpoint
+   - Request deduplication
+   - Parallel processing with rate limits
+   - **Goal:** 10x faster for large recipe lists
 
-### FEATURES (Nice to Have)
-8. 🔄 UI testing (Dashboard, Config windows)
-9. 🔄 Advanced filtering
-10. 🔄 Price history charts (ImPlot)
+7. 🟡 **UI Testing & Polish** (35 subtasks)
+   - Test dashboard table rendering
+   - Implement price history charts (ImPlot)
+   - Create DetailWindow for item deep-dive
+   - Add chart export functionality
+   - **Goal:** Rich visual analysis tools
+
+### MEDIUM PRIORITY (Advanced Features)
+8. 🟢 **Advanced profit analysis** (14 subtasks)
+   - Opportunity cost (gil/hour)
+   - Market timing recommendations
+   - Shopping list generation
+   - Crafting queue optimizer
+
+9. 🟢 **Error handling & resilience** (9 subtasks)
+   - Retry logic with exponential backoff
+   - Graceful degradation (use cache when offline)
+   - User-friendly error messages
+
+### LOW PRIORITY (Nice to Have)
+10. 🔵 **Multi-world analysis** (8+ subtasks)
+11. 🔵 **Social features** (sharing, screenshots)
+12. 🔵 **Testing & documentation**
+
+**Task Summary:** 95 total tasks, 11 completed (11.6%)  
+**See:** TASKS.md for complete breakdown with implementation sprints
 
 ---
 
