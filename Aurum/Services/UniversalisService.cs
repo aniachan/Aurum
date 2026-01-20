@@ -17,12 +17,16 @@ public class UniversalisService : IDisposable
     private readonly HttpClient httpClient;
     private readonly IPluginLog log;
     private readonly CacheService cache;
+    private readonly DatabaseService database; // Add DatabaseService dependency
     private const string BaseUrl = "https://universalis.app/api/v2";
+    private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
     
-    public UniversalisService(IPluginLog log, CacheService cache)
+    // Updated constructor to accept DatabaseService
+    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database)
     {
         this.log = log;
         this.cache = cache;
+        this.database = database;
         httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(10)
@@ -30,6 +34,12 @@ public class UniversalisService : IDisposable
         httpClient.DefaultRequestHeaders.Add("User-Agent", "Aurum FFXIV Crafting Calculator/1.0");
     }
     
+    // Method to update world ID (call this when player logs in or changes worlds)
+    public void SetCurrentWorld(int worldId)
+    {
+        this.currentWorldId = worldId;
+    }
+
     /// <summary>
     /// Fetch market data for a single item
     /// </summary>
@@ -37,10 +47,27 @@ public class UniversalisService : IDisposable
     {
         var cacheKey = $"market_{worldName}_{itemId}";
         
-        // Check cache first
-        if (cache.TryGet(cacheKey, out MarketData? cached))
+        // 1. Check Memory Cache first (fastest)
+        if (cache.TryGet(cacheKey, out MarketData? memCached))
         {
-            return cached;
+            return memCached;
+        }
+        
+        // 2. Check Database Cache (persistent)
+        // Note: We need worldId. If not set, we might miss DB hits.
+        // Assuming worldName matches currentWorldId logic or we need to lookup WorldId from WorldName
+        // For now, we'll skip DB read if we don't have a reliable WorldId, or rely on caller to set it.
+        // To be safe, if we have a currentWorldId, we use it.
+        
+        if (currentWorldId != 0) // Basic check
+        {
+            var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromMinutes(30)); // 30 min expiration?
+            if (dbCached != null)
+            {
+                // Re-hydrate memory cache
+                cache.Set(cacheKey, dbCached);
+                return dbCached;
+            }
         }
         
         try
@@ -65,8 +92,17 @@ public class UniversalisService : IDisposable
             
             var marketData = ConvertToMarketData(apiResponse, worldName, itemId);
             
-            // Cache the result
+            // 3. Save to Memory Cache
             cache.Set(cacheKey, marketData);
+            
+            // 4. Save to Database Cache
+            if (currentWorldId != 0)
+            {
+                // Fire and forget or await? Safe to do async but SQLite is sync.
+                // Run in background to not block UI? DatabaseService uses locks so it's thread-safeish but blocking.
+                // Let's just do it synchronously for now to ensure data integrity.
+                database.UpsertMarketData(marketData, currentWorldId);
+            }
             
             return marketData;
         }
@@ -98,9 +134,25 @@ public class UniversalisService : IDisposable
         foreach (var itemId in items)
         {
             var cacheKey = $"market_{worldName}_{itemId}";
-            if (cache.TryGet(cacheKey, out MarketData? cached) && cached != null)
+            
+            // 1. Memory Cache
+            if (cache.TryGet(cacheKey, out MarketData? memCached) && memCached != null)
             {
-                results[itemId] = cached;
+                results[itemId] = memCached;
+            }
+            // 2. Database Cache
+            else if (currentWorldId != 0)
+            {
+                 var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromMinutes(30));
+                 if (dbCached != null)
+                 {
+                     results[itemId] = dbCached;
+                     cache.Set(cacheKey, dbCached); // Re-hydrate memory
+                 }
+                 else
+                 {
+                     uncachedItems.Add(itemId);
+                 }
             }
             else
             {
@@ -137,12 +189,19 @@ public class UniversalisService : IDisposable
             
             foreach (var kvp in apiResponse.Items)
             {
-                var marketData = ConvertToMarketData(kvp.Value, worldName, uint.Parse(kvp.Key));
-                results[uint.Parse(kvp.Key)] = marketData;
+                var itemId = uint.Parse(kvp.Key);
+                var marketData = ConvertToMarketData(kvp.Value, worldName, itemId);
+                results[itemId] = marketData;
                 
-                // Cache each result
+                // 3. Cache results
                 var cacheKey = $"market_{worldName}_{kvp.Key}";
                 cache.Set(cacheKey, marketData);
+                
+                // 4. Persist to DB
+                if (currentWorldId != 0)
+                {
+                    database.UpsertMarketData(marketData, currentWorldId);
+                }
             }
             
             log.Info($"Successfully fetched {results.Count} items from Universalis");
