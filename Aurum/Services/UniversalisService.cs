@@ -291,31 +291,57 @@ public class UniversalisService : IDisposable
                 continue;
             }
 
-            try
-            {
-                // Wait for rate limit
-                await rateLimiter.WaitForTokenAsync(disposeCts.Token);
+            int retryCount = 0;
+            const int maxRetries = 3;
+            bool success = false;
 
-                if (request.ItemIds.Count == 1)
-                {
-                    await FetchSingleItemInternalAsync(request.WorldName, request.ItemIds[0]);
-                }
-                else
-                {
-                    await FetchBatchItemsInternalAsync(request.WorldName, request.ItemIds);
-                }
-                
-                request.CompletionSource.TrySetResult(true);
-            }
-            catch (OperationCanceledException)
+            while (!success && retryCount <= maxRetries && !disposeCts.Token.IsCancellationRequested)
             {
-                request.CompletionSource.TrySetCanceled();
-                break;
-            }
-            catch (Exception ex)
-            {
-                log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
-                request.CompletionSource.TrySetException(ex);
+                try
+                {
+                    // Wait for rate limit
+                    await rateLimiter.WaitForTokenAsync(disposeCts.Token);
+
+                    if (request.ItemIds.Count == 1)
+                    {
+                        await FetchSingleItemInternalAsync(request.WorldName, request.ItemIds[0]);
+                    }
+                    else
+                    {
+                        await FetchBatchItemsInternalAsync(request.WorldName, request.ItemIds);
+                    }
+                    
+                    success = true;
+                    request.CompletionSource.TrySetResult(true);
+                }
+                catch (OperationCanceledException)
+                {
+                    request.CompletionSource.TrySetCanceled();
+                    break;
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)
+                {
+                    // Retry on 429 and 5xx errors
+                    retryCount++;
+                    if (retryCount > maxRetries)
+                    {
+                        log.Error(ex, $"Failed to process request after {maxRetries} retries. Giving up.");
+                        request.CompletionSource.TrySetException(ex);
+                        break;
+                    }
+
+                    // Exponential backoff: 1s, 2s, 4s
+                    var delaySeconds = Math.Pow(2, retryCount - 1);
+                    log.Warning($"API request failed (Attempt {retryCount}/{maxRetries}). Retrying in {delaySeconds}s...");
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), disposeCts.Token);
+                }
+                catch (Exception ex)
+                {
+                    // Non-retriable error
+                    log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
+                    request.CompletionSource.TrySetException(ex);
+                    break;
+                }
             }
         }
         
