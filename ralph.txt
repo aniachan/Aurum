@@ -1,0 +1,6 @@
+1. Open TASKS.md and list the available tasks.
+2. Select exactly one task.
+3. Implement the selected task in code.
+4. Run or describe concrete verification steps.
+5. Commit the change to git.
+Do NOT stop early. Do NOT mark the task complete unless a commit exists.
