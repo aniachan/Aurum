@@ -142,10 +142,10 @@
 ---
 
 ### Batch Optimization
-- [ ] **Implement batch request system**
-  - [ ] Group items by world for batch API call
-  - [ ] Use Universalis batch endpoint (/api/v2/{world}/{ids})
-  - [ ] Max 100 items per batch (API limit)
+- [x] **Implement batch request system**
+  - [x] Group items by world for batch API call
+  - [x] Use Universalis batch endpoint (/api/v2/{world}/{ids})
+  - [x] Max 100 items per batch (API limit)
   - [ ] Split large requests into multiple batches
   - [ ] Parallel batch processing with rate limiting
 

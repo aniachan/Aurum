@@ -466,7 +466,8 @@ public class UniversalisService : IDisposable
                 
                 if (currentWorldId != 0)
                 {
-                    database.UpsertMarketData(marketData, currentWorldId);
+                    // Use bulk upsert for better performance
+                    database.UpsertMarketDataBulk(results.Values, currentWorldId);
                 }
             }
             
