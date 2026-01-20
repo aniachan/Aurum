@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     public readonly WindowSystem WindowSystem = new("Aurum");
     private ConfigWindow ConfigWindow { get; init; }
     private DashboardWindow DashboardWindow { get; init; }
+    public DetailWindow DetailWindow { get; init; }
 
     public Plugin()
     {
@@ -81,9 +82,11 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize windows
         ConfigWindow = new ConfigWindow(this);
         DashboardWindow = new DashboardWindow(this);
+        DetailWindow = new DetailWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(DashboardWindow);
+        WindowSystem.AddWindow(DetailWindow);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -130,6 +133,7 @@ public sealed class Plugin : IDalamudPlugin
 
         ConfigWindow.Dispose();
         DashboardWindow.Dispose();
+        DetailWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         
