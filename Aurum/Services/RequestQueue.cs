@@ -74,15 +74,40 @@ public class RequestQueue
                 // Upgrade priority if new request is higher
                 if (priority > existing.Priority)
                 {
-                    // This is tricky with a list, we'd need to re-sort or update the object.
-                    // Since the object is ref, updating a property is visible, but we need to re-sort the queue on dequeue.
-                    // However, our QueuedRequest is immutable-ish. Let's not mutate Priority for now to keep it simple,
-                    // or just accept the existing priority.
-                    // For now: First come wins, but maybe we should allow priority upgrade?
-                    // Let's just return the existing task.
+                     // Remove from queue, upgrade priority, re-insert
+                     _queue.Remove(existing);
+                     
+                     // Create new request wrapper with same completion source but higher priority
+                     // Note: We can't mutate records/init-only easily, so we replace the object in the list
+                     // but keep the same CompletionSource so original waiter is notified.
+                     var upgraded = new QueuedRequest(worldName, sortedIds, priority)
+                     {
+                         CompletionSource = existing.CompletionSource,
+                         Timestamp = existing.Timestamp // Keep original timestamp to maintain queue position within new priority
+                     };
+                     
+                     _pendingRequests[key] = upgraded;
+                     _queue.Add(upgraded);
+                     
+                     // Re-sort
+                     _queue.Sort((a, b) =>
+                     {
+                         int p = b.Priority.CompareTo(a.Priority);
+                         if (p != 0) return p;
+                         return a.Timestamp.CompareTo(b.Timestamp);
+                     });
+                     
+                     return upgraded.CompletionSource.Task;
                 }
                 return existing.CompletionSource.Task;
             }
+
+            // Dedup partial: Check if single item requests already cover this batch
+            // For now, complex partial dedup is hard (e.g. batch 1,2,3 requested, but 1,2 is pending).
+            // We only do exact match or exact subset match if trivial? 
+            // Actually, we can check if any *subset* is pending, but waiting for a subset doesn't satisfy the superset.
+            // But if we request {1}, and {1,2} is pending... we could hook into {1,2}?
+            // Too complex for now. Exact match is good 80/20 rule.
 
             var request = new QueuedRequest(worldName, sortedIds, priority);
             _pendingRequests[key] = request;
