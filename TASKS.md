@@ -90,25 +90,25 @@
 ---
 
 ### Smart Item Filtering & Selection
-- [ ] **Design intelligent item filtering algorithm**
-  - [ ] **Item level heuristics**
-    - [ ] Prioritize current expansion items (lvl 90+)
-    - [ ] Boost latest patch items (higher relevance)
-    - [ ] Deprioritize obsolete gear (5+ patches old)
-    - [ ] Consider item level range for player's crafters
+- [x] **Design intelligent item filtering algorithm**
+  - [x] **Item level heuristics**
+    - [x] Prioritize current expansion items (lvl 90+)
+    - [x] Boost latest patch items (higher relevance)
+    - [x] Deprioritize obsolete gear (5+ patches old)
+    - [x] Consider item level range for player's crafters
   
-  - [ ] **Market activity heuristics**
-    - [ ] Check sale velocity (high velocity = track)
-    - [ ] Check listing count (active market = track)
-    - [ ] Check price stability (volatile = track more often)
-    - [ ] Consider world transfer trends
+  - [x] **Market activity heuristics**
+    - [x] Check sale velocity (high velocity = track)
+    - [x] Check listing count (active market = track)
+    - [x] Check price stability (volatile = track more often)
+    - [x] Consider world transfer trends
   
-  - [ ] **Recipe value heuristics**
-    - [ ] High-value crafts (>100k gil) = higher priority
-    - [ ] Popular intermediate materials = track
-    - [ ] Leve turn-ins = track
-    - [ ] Collectables = track
-    - [ ] Glamour items = track (always relevant)
+  - [x] **Recipe value heuristics**
+    - [x] High-value crafts (>100k gil) = higher priority
+    - [x] Popular intermediate materials = track
+    - [x] Leve turn-ins = track
+    - [x] Collectables = track
+    - [x] Glamour items = track (always relevant)
   
   - [ ] **Category-based filtering**
     - [ ] Combat gear (main hand, armor, accessories)
@@ -123,12 +123,12 @@
     - [ ] Respect user's level range filter
     - [ ] Remember user's world selection
 
-- [ ] **Implement ItemPriorityService**
-  - [ ] Score items based on combined heuristics (0-100)
+- [x] **Implement ItemPriorityService**
+  - [x] Score items based on combined heuristics (0-100)
   - [ ] Sort recipes by priority score
   - [ ] Limit API fetches to top N items (configurable)
-  - [ ] Update priority scores based on new data
-  - [ ] Cache priority scores in database
+  - [x] Update priority scores based on new data
+  - [x] Cache priority scores in database
 
 - [ ] **Implement background refresh system**
   - [ ] Refresh high-priority items every 5 minutes
