@@ -18,15 +18,17 @@ public class UniversalisService : IDisposable
     private readonly IPluginLog log;
     private readonly CacheService cache;
     private readonly DatabaseService database; // Add DatabaseService dependency
+    private readonly RateLimiter rateLimiter;
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
     
     // Updated constructor to accept DatabaseService
-    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database)
+    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter)
     {
         this.log = log;
         this.cache = cache;
         this.database = database;
+        this.rateLimiter = rateLimiter;
         httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(10)
@@ -73,6 +75,10 @@ public class UniversalisService : IDisposable
         try
         {
             var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
+            
+            // Respect rate limits
+            await rateLimiter.WaitForTokenAsync();
+            
             log.Info($"Fetching market data: {url}");
             
             var response = await httpClient.GetAsync(url);
@@ -170,6 +176,10 @@ public class UniversalisService : IDisposable
         {
             var itemList = string.Join(",", uncachedItems);
             var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
+            
+            // Respect rate limits
+            await rateLimiter.WaitForTokenAsync();
+            
             log.Info($"Fetching batch market data for {uncachedItems.Count} items");
             
             var response = await httpClient.GetAsync(url);

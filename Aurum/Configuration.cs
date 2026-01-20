@@ -19,6 +19,7 @@ public class Configuration : IPluginConfiguration
     public string PreferredWorld { get; set; } = "Auto";  // or specific world name
     public int MarketDataCacheDurationSeconds { get; set; } = 300;  // 5 minutes
     public int MaxConcurrentApiRequests { get; set; } = 5;
+    public int ApiRateLimitPerMinute { get; set; } = 900; // 15 requests/second * 60 = 900
     
     // Calculation Settings
     public CostMode DefaultCostMode { get; set; } = CostMode.Cheapest;
