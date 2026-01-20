@@ -68,8 +68,8 @@
   - [x] Per-endpoint rate limits
   - [x] Global API request counter
   - [ ] Request queue with priority levels
-  - [ ] Exponential backoff on failures
-  - [ ] Respect HTTP 429 (Too Many Requests) responses
+  - [x] Exponential backoff on failures
+  - [x] Respect HTTP 429 (Too Many Requests) responses
 
 - [x] **Request queue system**
   - [x] FIFO queue for pending requests
