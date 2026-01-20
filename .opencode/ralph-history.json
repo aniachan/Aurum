@@ -148,11 +148,35 @@
       "exitCode": 0,
       "completionDetected": false,
       "errors": []
+    },
+    {
+      "iteration": 8,
+      "startedAt": "2026-01-20T21:00:26.030Z",
+      "endedAt": "2026-01-20T21:03:01.746Z",
+      "durationMs": 154884,
+      "toolsUsed": {
+        "Read": 4,
+        "Glob": 1,
+        "Todo": 4,
+        "Edit": 5,
+        "Bash": 5
+      },
+      "filesModified": [
+        "Aurum/Services/UniversalisService.cs",
+        "TASKS.md"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": [
+        "+            log.Warning($\"Batch API request failed: {ex.Message}. Attempting to fallback to stale cache.\");"
+      ]
     }
   ],
-  "totalDurationMs": 866252,
+  "totalDurationMs": 1021136,
   "struggleIndicators": {
-    "repeatedErrors": {},
+    "repeatedErrors": {
+      "+            log.Warning($\"Batch API request failed: {ex.Message}. Attempting to fallback to stale c": 1
+    },
     "noProgressIterations": 0,
     "shortIterations": 0
   }
