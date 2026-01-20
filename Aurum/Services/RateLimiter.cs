@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using Aurum.Services; // Ensure RequestPriority is visible
+using Aurum.Models;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
@@ -106,7 +108,7 @@ public class RateLimiter : IDisposable
     /// Waits until a token is available to make a request.
     /// Thread-safe.
     /// </summary>
-    public async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default)
+    public async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default, RequestPriority priority = RequestPriority.Normal)
     {
         // Simple loop with delay
         while (true)
@@ -138,6 +140,15 @@ public class RateLimiter : IDisposable
             {
                 RefillTokens();
 
+                // Simple priority handling:
+                // High priority requests can consume tokens even if low
+                // Low priority requests might need to wait for a "surplus" or just standard FIFO
+                // For now, let's just let High priority skip checks or reserve tokens?
+                // Actually, simple token bucket doesn't discriminate. 
+                // The discrimination happens in the RequestQueue usually.
+                // But we can implement a "reserve" system or check queue depth here if we wanted.
+                // Given the RequestQueue handles ordering, RateLimiter just needs to gate.
+                
                 if (_tokens >= 1.0)
                 {
                     // Check endpoint limit if applicable

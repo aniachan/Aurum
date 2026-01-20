@@ -126,6 +126,111 @@ public class RequestQueue
     }
 
     /// <summary>
+    /// Dequeues a batch of requests for the same world, up to maxItems.
+    /// This allows grouping multiple small requests into one API call.
+    /// </summary>
+    public QueuedRequest? DequeueBatch(int maxItems = 100)
+    {
+        lock (_queueLock)
+        {
+            if (_queue.Count == 0) return null;
+
+            // Take the highest priority item first
+            var primary = _queue[0];
+            
+            // If it's already big enough, just return it
+            if (primary.ItemIds.Count >= maxItems)
+            {
+                RemoveRequest(primary);
+                return primary;
+            }
+
+            // Otherwise, try to find other requests for the same world to piggyback
+            var batchIds = new HashSet<uint>(primary.ItemIds);
+            var mergedRequests = new List<QueuedRequest> { primary };
+            
+            // Scan the rest of the queue
+            // We can only merge if same WorldName
+            // We should respect priority somewhat, but batching efficiency overrides strict priority ordering for lower prio items
+            // i.e. if we are fetching High prio for World A, and there is Low prio for World A, we should include it to save an API call.
+            
+            for (int i = 1; i < _queue.Count; i++)
+            {
+                var candidate = _queue[i];
+                
+                if (candidate.WorldName != primary.WorldName) continue;
+                
+                // Check if adding this would exceed limit
+                if (batchIds.Count + candidate.ItemIds.Count > maxItems) continue;
+                
+                // Merge it
+                foreach (var id in candidate.ItemIds) batchIds.Add(id);
+                mergedRequests.Add(candidate);
+                
+                if (batchIds.Count >= maxItems) break;
+            }
+            
+            // If we only found the primary, just return it
+            if (mergedRequests.Count == 1)
+            {
+                RemoveRequest(primary);
+                return primary;
+            }
+            
+            // We found multiple! Create a combined request
+            // We need a way to notify ALL completion sources when this combined request finishes.
+            // The cleanest way is to return a special QueuedRequest that wraps them, 
+            // OR returns a "Compound" request that the processor handles.
+            // But the processor expects a single QueuedRequest with a single CompletionSource.
+            
+            // Let's create a new "Super Request".
+            // Its completion source will propagate result to all children.
+            
+            var combinedIds = batchIds.ToList();
+            var superRequest = new QueuedRequest(primary.WorldName, combinedIds, primary.Priority);
+            
+            // Hook up completion
+            _ = superRequest.CompletionSource.Task.ContinueWith(t => 
+            {
+                foreach (var req in mergedRequests)
+                {
+                    if (t.Status == TaskStatus.RanToCompletion && t.Result)
+                    {
+                        req.CompletionSource.TrySetResult(true);
+                    }
+                    else if (t.Status == TaskStatus.Canceled)
+                    {
+                        req.CompletionSource.TrySetCanceled();
+                    }
+                    else if (t.Exception != null)
+                    {
+                        req.CompletionSource.TrySetException(t.Exception);
+                    }
+                    else
+                    {
+                         req.CompletionSource.TrySetResult(false); // Should not happen if logic is correct
+                    }
+                }
+            });
+
+            // Remove all merged requests from queue
+            foreach (var req in mergedRequests)
+            {
+                RemoveRequest(req);
+            }
+            
+            return superRequest;
+        }
+    }
+
+    private void RemoveRequest(QueuedRequest req)
+    {
+        _queue.Remove(req);
+        var key = $"{req.WorldName}:{string.Join(",", req.ItemIds)}";
+        _pendingRequests.TryRemove(key, out _);
+    }
+
+    /// <summary>
     /// Dequeues the next highest priority request.
     /// </summary>
     public QueuedRequest? Dequeue()
@@ -135,11 +240,7 @@ public class RequestQueue
             if (_queue.Count == 0) return null;
 
             var item = _queue[0];
-            _queue.RemoveAt(0);
-
-            var key = $"{item.WorldName}:{string.Join(",", item.ItemIds)}";
-            _pendingRequests.TryRemove(key, out _);
-
+            RemoveRequest(item);
             return item;
         }
     }

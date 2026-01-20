@@ -347,7 +347,8 @@ public class UniversalisService : IDisposable
         
         while (!disposeCts.Token.IsCancellationRequested)
         {
-            var request = requestQueue.Dequeue();
+            // Use DequeueBatch to get optimized requests
+            var request = requestQueue.DequeueBatch(maxItems: 100);
             if (request == null)
             {
                 await Task.Delay(100, disposeCts.Token);
