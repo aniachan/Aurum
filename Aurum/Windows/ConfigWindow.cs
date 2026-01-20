@@ -62,5 +62,12 @@ public class ConfigWindow : Window, IDisposable
             configuration.EnableAnimatedCharts = enableCharts;
             configuration.Save();
         }
+
+        var cacheDuration = configuration.MarketDataCacheDurationSeconds;
+        if (ImGui.InputInt("Market Data Cache Duration (Seconds)", ref cacheDuration))
+        {
+            configuration.MarketDataCacheDurationSeconds = cacheDuration;
+            configuration.Save();
+        }
     }
 }

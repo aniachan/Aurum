@@ -19,16 +19,18 @@ public class UniversalisService : IDisposable
     private readonly CacheService cache;
     private readonly DatabaseService database; // Add DatabaseService dependency
     private readonly RateLimiter rateLimiter;
+    private readonly Configuration configuration;
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
     
     // Updated constructor to accept DatabaseService
-    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter)
+    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter, Configuration configuration)
     {
         this.log = log;
         this.cache = cache;
         this.database = database;
         this.rateLimiter = rateLimiter;
+        this.configuration = configuration;
         httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(10)
@@ -63,7 +65,7 @@ public class UniversalisService : IDisposable
         
         if (currentWorldId != 0) // Basic check
         {
-            var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromMinutes(30)); // 30 min expiration?
+            var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds)); // Use configurable TTL
             if (dbCached != null)
             {
                 // Re-hydrate memory cache
@@ -149,7 +151,7 @@ public class UniversalisService : IDisposable
             // 2. Database Cache
             else if (currentWorldId != 0)
             {
-                 var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromMinutes(30));
+                 var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
                  if (dbCached != null)
                  {
                      results[itemId] = dbCached;

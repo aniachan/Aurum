@@ -63,7 +63,7 @@ public sealed class Plugin : IDalamudPlugin
         DatabaseService = new DatabaseService(Log, pluginDir);
         RateLimiter = new RateLimiter(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);
-        UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter);
+        UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
         ProfitService = new ProfitService(Log, Configuration, RecipeService, UniversalisService, MarketAnalysisService);
         
