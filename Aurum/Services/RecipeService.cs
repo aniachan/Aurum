@@ -20,18 +20,19 @@ public class RecipeService
     private Dictionary<uint, uint> itemIconCache = new();
     private bool isInitialized = false;
     
-    // Crafting class job IDs
-    private static readonly uint[] CraftingJobIds = { 8, 9, 10, 11, 12, 13, 14, 15 };
+    // Crafting class IDs from CraftType sheet (NOT job IDs)
+    // CraftType indices: 0=CRP, 1=BSM, 2=ARM, 3=GSM, 4=LTW, 5=WVR, 6=ALC, 7=CUL
+    private static readonly uint[] CraftingJobIds = { 0, 1, 2, 3, 4, 5, 6, 7 };
     private static readonly Dictionary<uint, string> JobNames = new()
     {
-        { 8, "CRP" },   // Carpenter
-        { 9, "BSM" },   // Blacksmith
-        { 10, "ARM" },  // Armorer
-        { 11, "GSM" },  // Goldsmith
-        { 12, "LTW" },  // Leatherworker
-        { 13, "WVR" },  // Weaver
-        { 14, "ALC" },  // Alchemist
-        { 15, "CUL" }   // Culinarian
+        { 0, "CRP" },   // Carpenter
+        { 1, "BSM" },   // Blacksmith
+        { 2, "ARM" },  // Armorer
+        { 3, "GSM" },  // Goldsmith
+        { 4, "LTW" },  // Leatherworker
+        { 5, "WVR" },  // Weaver
+        { 6, "ALC" },  // Alchemist
+        { 7, "CUL" }   // Culinarian
     };
     
     public RecipeService(IDataManager dataManager, IPluginLog log)
@@ -99,18 +100,40 @@ public class RecipeService
             return;
         }
         
+        int totalRecipes = 0;
+        int skippedNonCrafting = 0;
+        int skippedNoResult = 0;
+        int failed = 0;
+        
+        // Debug: Check first few recipes
+        bool debugged = false;
+        
         foreach (var recipe in recipeSheet)
         {
+            totalRecipes++;
+            
+            if (!debugged && recipe.RowId > 0)
+            {
+                log.Info($"DEBUG First recipe: ID={recipe.RowId}, CraftType={recipe.CraftType.RowId}, ItemResult={recipe.ItemResult.RowId}");
+                debugged = true;
+            }
+            
             if (recipe.RowId == 0)
                 continue;
             
             // Skip non-crafting recipes
             if (!CraftingJobIds.Contains(recipe.CraftType.RowId))
+            {
+                skippedNonCrafting++;
                 continue;
+            }
             
             // Skip recipes with no result
             if (recipe.ItemResult.RowId == 0)
+            {
+                skippedNoResult++;
                 continue;
+            }
             
             try
             {
@@ -119,11 +142,15 @@ public class RecipeService
             }
             catch (Exception ex)
             {
-                log.Error(ex, $"Failed to convert recipe {recipe.RowId}");
+                failed++;
+                if (failed <= 5) // Only log first 5 errors to avoid spam
+                {
+                    log.Error(ex, $"Failed to convert recipe {recipe.RowId}: {ex.Message}");
+                }
             }
         }
         
-        log.Info($"Loaded {recipeCache.Count} crafting recipes");
+        log.Info($"Loaded {recipeCache.Count} crafting recipes (scanned {totalRecipes}, skipped {skippedNonCrafting} non-crafting, {skippedNoResult} no-result, {failed} failed)");
     }
     
     /// <summary>
@@ -131,7 +158,6 @@ public class RecipeService
     /// </summary>
     private RecipeData ConvertToRecipeData(Recipe recipe)
     {
-        var resultItem = recipe.ItemResult.Value;
         var jobId = recipe.CraftType.RowId;
         
         var recipeData = new RecipeData

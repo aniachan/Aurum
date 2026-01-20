@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Aurum.Models;
 
@@ -72,6 +73,13 @@ public class MarketData
     public uint MinPriceHQ { get; set; }
     public uint MaxPriceNQ { get; set; }
     public uint MaxPriceHQ { get; set; }
+    
+    // Computed convenience properties
+    public uint CurrentAveragePrice => CurrentAveragePriceHQ > 0 ? CurrentAveragePriceHQ : CurrentAveragePriceNQ;
+    public uint CurrentMinPrice => MinPriceHQ > 0 ? MinPriceHQ : MinPriceNQ;
+    public uint LastSalePrice => RecentHistory.Any() ? RecentHistory.First().PricePerUnit : 0;
+    public int RecentSales => RecentHistory.Count;
+    public List<SaleRecord> SaleHistory => RecentHistory; // Alias for compatibility
     
     // Demand metrics (calculated)
     public float SaleVelocity { get; set; }              // sales per day

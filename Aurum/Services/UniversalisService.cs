@@ -190,7 +190,7 @@ public class UniversalisService : IDisposable
                 Quantity = l.Quantity,
                 Total = l.Total,
                 RetainerName = l.RetainerName ?? string.Empty,
-                RetainerCity = l.RetainerCity ?? string.Empty,
+                RetainerCity = GetCityName(l.RetainerCity),
                 ListingTime = DateTimeOffset.FromUnixTimeSeconds(l.LastReviewTime).UtcDateTime,
                 OnMannequin = l.OnMannequin,
                 SellerName = l.SellerID ?? string.Empty
@@ -218,6 +218,25 @@ public class UniversalisService : IDisposable
         }
         
         return marketData;
+    }
+    
+    /// <summary>
+    /// Convert city ID to city name
+    /// </summary>
+    private static string GetCityName(int cityId)
+    {
+        return cityId switch
+        {
+            1 => "Limsa Lominsa",
+            2 => "Gridania",
+            3 => "Ul'dah",
+            4 => "Ishgard",
+            7 => "Kugane",
+            10 => "Crystarium",
+            12 => "Old Sharlayan",
+            13 => "Radz-at-Han",
+            _ => $"City {cityId}"
+        };
     }
     
     public void Dispose()
@@ -255,7 +274,7 @@ public class UniversalisListing
     public uint Total { get; set; }
     public bool Hq { get; set; }
     public string? RetainerName { get; set; }
-    public string? RetainerCity { get; set; }
+    public int RetainerCity { get; set; }  // City ID, not name
     public long LastReviewTime { get; set; }
     public string? SellerID { get; set; }
     public bool OnMannequin { get; set; }

@@ -1,0 +1,53 @@
+=== Aurum Universalis API Integration Tests ===
+
+Test 1: Fetching single item market data
+-------------------------------------------
+GET https://universalis.app/api/v2/Gilgamesh/36112
+✓ Item ID: 36112
+✓ World: Gilgamesh
+✓ Current Listings: 14
+✓ Current Avg Price: 878 gil
+✓ Current Min Price: 300 gil
+✓ Recent Sales: 5
+
+Recent sales:
+  - Sold 2x at 350 gil (HQ) (2026-01-03 22:21)
+  - Sold 4x at 398 gil (HQ) (2025-12-28 21:54)
+  - Sold 3x at 397 gil (HQ) (2025-12-28 21:54)
+  - Sold 25x at 500 gil (HQ) (2025-12-28 21:54)
+  - Sold 54x at 380 gil (HQ) (2025-12-28 10:13)
+✓ PASS
+
+Test 2: Fetching bulk market data
+-----------------------------------
+GET https://universalis.app/api/v2/Gilgamesh/5114,5116,5335,36112
+✓ Item 5114: 25 listings, avg 452 gil, 5 recent sales
+✓ Item 5116: 41 listings, avg 25 028 gil, 5 recent sales
+✓ Item 5335: 17 listings, avg 1 316 gil, 5 recent sales
+✓ Item 36112: 7 listings, avg 878 gil, 5 recent sales
+✓ PASS - Fetched all 4 items
+
+Test 3: Handling invalid item ID
+----------------------------------
+GET https://universalis.app/api/v2/Gilgamesh/999999999
+✓ Got expected error status: NotFound
+✓ PASS
+
+Test 4: Fetching from different worlds
+----------------------------------------
+✓ Gilgamesh: 25 listings at avg 452 gil
+✓ Cactuar: 31 listings at avg 387 gil
+✓ Faerie: 27 listings at avg 3 292 gil
+✓ PASS
+
+Test 5: Data center-wide query
+--------------------------------
+GET https://universalis.app/api/v2/Aether/36112
+✓ Data Center: Aether
+✓ Total Listings: 62
+✓ Average Price: 1 778 gil
+✓ Recent Sales: 5
+✓ PASS
+
+
+=== All Tests Complete ===

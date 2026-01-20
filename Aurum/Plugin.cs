@@ -2,6 +2,7 @@ using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using System;
+using System.Linq;
 using System.IO;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -22,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private const string CommandName = "/aurum";
     private const string ConfigCommandName = "/aurum config";
+    private const string HealthCheckCommand = "/aurum health";
 
     public Configuration Configuration { get; init; }
     
@@ -52,8 +54,9 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize recipe service asynchronously
         RecipeService.Initialize();
         
-        var stats = RecipeService.GetStats();
-        Log.Information($"Loaded {stats.TotalRecipes} recipes from game data");
+        // Run health check
+        var healthCheck = new HealthCheck(this, Log);
+        healthCheck.RunAll();
 
         // Initialize windows
         ConfigWindow = new ConfigWindow(this);
@@ -78,7 +81,7 @@ public sealed class Plugin : IDalamudPlugin
         // Adds another button doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
-        Log.Information($"Aurum v{PluginInterface.Manifest.AssemblyVersion} initialized successfully!");
+        Log.Information($"Aurum v{PluginInterface.Manifest.AssemblyVersion} (DEBUG BUILD) initialized successfully!");
     }
 
     public void Dispose()
@@ -104,14 +107,86 @@ public sealed class Plugin : IDalamudPlugin
     private void OnCommand(string command, string args)
     {
         // Handle subcommands
-        if (args.Trim().Equals("config", StringComparison.OrdinalIgnoreCase))
+        var argsTrimmed = args.Trim().ToLower();
+        
+        if (argsTrimmed == "config")
         {
             ToggleConfigUi();
+        }
+        else if (argsTrimmed == "health")
+        {
+            var healthCheck = new HealthCheck(this, Log);
+            healthCheck.RunAll();
+            Log.Information("Health check complete. Check Dalamud log for details.");
+        }
+        else if (argsTrimmed == "test")
+        {
+            _ = RunIntegrationTest();
         }
         else
         {
             // Default: toggle main window
             ToggleMainUi();
+        }
+    }
+    
+    private async System.Threading.Tasks.Task RunIntegrationTest()
+    {
+        Log.Information("========================================");
+        Log.Information("RUNNING INTEGRATION TEST");
+        Log.Information("========================================");
+        
+        try
+        {
+            // Test 1: Fetch market data for a known item
+            Log.Information("Test 1: Fetching market data for Darksteel Ore (ID: 5114)");
+            var marketData = await UniversalisService.GetMarketDataAsync("Gilgamesh", 5114);
+            
+            if (marketData != null)
+            {
+                Log.Information($"  ✓ Current Listings: {marketData.CurrentListings}");
+                Log.Information($"  ✓ Current Avg Price: {marketData.CurrentAveragePrice}");
+                Log.Information($"  ✓ Recent Sales: {marketData.RecentSales}");
+                Log.Information($"  ✓ Sale Velocity: {marketData.SaleVelocity:F2} sales/day");
+            }
+            else
+            {
+                Log.Error("  ✗ Failed to fetch market data");
+            }
+            
+            // Test 2: Calculate profit for a recipe
+            Log.Information("Test 2: Calculating profit for level 90 recipe");
+            var recipes = RecipeService.GetRecipesByLevel(90, 90).Take(1).ToList();
+            if (recipes.Any())
+            {
+                var recipe = recipes[0];
+                Log.Information($"  Testing recipe: {recipe.ItemName}");
+                
+                var profit = await ProfitService.CalculateProfitAsync(recipe, "Gilgamesh");
+                if (profit != null)
+                {
+                    Log.Information($"  ✓ Raw Profit: {profit.RawProfit} gil");
+                    Log.Information($"  ✓ Profit Margin: {profit.ProfitMargin:F1}%");
+                    Log.Information($"  ✓ Risk Score: {profit.RiskScore}");
+                    Log.Information($"  ✓ Recommendation Score: {profit.RecommendationScore}");
+                }
+                else
+                {
+                    Log.Error("  ✗ Failed to calculate profit");
+                }
+            }
+            else
+            {
+                Log.Error("  ✗ No level 90 recipes found");
+            }
+            
+            Log.Information("========================================");
+            Log.Information("INTEGRATION TEST COMPLETE");
+            Log.Information("========================================");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Integration test failed");
         }
     }
     
