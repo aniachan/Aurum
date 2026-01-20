@@ -256,7 +256,7 @@
   - [x] Current listings (price, quantity, retainer)
   - [ ] Recent sales (price, quantity, buyer)
   - [x] Min/max/average prices
-  - [ ] Market board URL (Universalis)
+  - [x] Market board URL (Universalis)
 
 - [x] **Profit breakdown**
   - [x] Sale price (current avg)
