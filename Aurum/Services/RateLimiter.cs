@@ -32,6 +32,8 @@ public class RateLimiter : IDisposable
     private long _dailyCount;
     private DateTime _lastDailyReset = DateTime.UtcNow.Date;
 
+    private DateTime _pausedUntil = DateTime.MinValue;
+
     public long TotalErrors { get; private set; }
     public long TotalRetries { get; private set; }
 
@@ -85,6 +87,22 @@ public class RateLimiter : IDisposable
     }
 
     /// <summary>
+    /// Pauses all requests until the specified time.
+    /// Used when encountering HTTP 429 Too Many Requests.
+    /// </summary>
+    public void PauseRequestsUntil(DateTime until)
+    {
+        lock (_lock)
+        {
+            if (until > _pausedUntil)
+            {
+                _pausedUntil = until;
+                log.Warning($"Rate limiter paused until {_pausedUntil} (UTC)");
+            }
+        }
+    }
+
+    /// <summary>
     /// Waits until a token is available to make a request.
     /// Thread-safe.
     /// </summary>
@@ -94,6 +112,25 @@ public class RateLimiter : IDisposable
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Check if paused (e.g. due to 429)
+            DateTime pausedUntil;
+            lock (_lock)
+            {
+                pausedUntil = _pausedUntil;
+            }
+
+            if (DateTime.UtcNow < pausedUntil)
+            {
+                var waitMs = (int)(pausedUntil - DateTime.UtcNow).TotalMilliseconds;
+                if (waitMs > 0)
+                {
+                    // Cap wait time to avoid excessively long sleeps blocking cancellation
+                    var sleepMs = Math.Min(waitMs, 1000); 
+                    await Task.Delay(sleepMs, cancellationToken);
+                    continue; 
+                }
+            }
 
             bool globalTokenAcquired = false;
             

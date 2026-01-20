@@ -383,9 +383,36 @@ public class UniversalisService : IDisposable
                     request.CompletionSource.TrySetCanceled();
                     break;
                 }
-                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests || (int)ex.StatusCode >= 500)
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
-                    // Retry on 429 and 5xx errors
+                    // Handle 429 explicitly
+                    retryCount++;
+                    rateLimiter.RecordRetry();
+                    
+                    // Default backoff if no Retry-After header
+                    var retryAfterSeconds = 60; // Default to 1 minute for 429 if header missing
+                    
+                    // Note: HttpRequestException doesn't expose headers easily in all versions.
+                    // We can rely on the default backoff or just wait a safe amount.
+                    // If we need precise Retry-After, we'd need to inspect the HttpResponseMessage which isn't available in the exception directly without custom handling.
+                    // For now, 60s is a safe default for Universalis 429s.
+                    
+                    log.Warning($"Universalis API returned 429 (Too Many Requests). Pausing for {retryAfterSeconds} seconds.");
+                    rateLimiter.PauseRequestsUntil(DateTime.UtcNow.AddSeconds(retryAfterSeconds));
+                    
+                    if (retryCount > maxRetries)
+                    {
+                        rateLimiter.RecordError();
+                        log.Error(ex, $"Failed to process request after {maxRetries} retries (including 429s). Giving up.");
+                        request.CompletionSource.TrySetException(ex);
+                        break;
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
+                }
+                catch (HttpRequestException ex) when ((int)ex.StatusCode >= 500)
+                {
+                    // Retry on 5xx errors
                     retryCount++;
                     rateLimiter.RecordRetry();
                     if (retryCount > maxRetries)
