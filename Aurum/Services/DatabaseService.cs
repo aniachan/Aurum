@@ -191,10 +191,18 @@ public class DatabaseService : IDisposable
 
     private void Migration_2_AddHistoryMetrics(SqliteConnection connection, SqliteTransaction transaction)
     {
-        // This migration is reserved for future metrics if needed.
-        // Currently PriceHistory schema in Migration 1 covers the basics.
-        // We might add volatility or other computed metrics here later.
-        // For now, it ensures we have a slot for schema evolution.
+        // Add Sale Velocity History table
+        // This allows tracking how fast items are selling over time
+        var createVelocityHistoryTable = @"
+            CREATE TABLE IF NOT EXISTS VelocityHistory (
+                item_id INTEGER NOT NULL,
+                world_id INTEGER NOT NULL,
+                timestamp INTEGER NOT NULL,
+                velocity REAL NOT NULL, -- sales per day
+                PRIMARY KEY (item_id, world_id, timestamp)
+            );
+        ";
+        ExecuteNonQuery(connection, createVelocityHistoryTable, transaction);
     }
 
     private void Migration_3_AddPriorityScores(SqliteConnection connection, SqliteTransaction transaction)
@@ -289,6 +297,47 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@salesJson", JsonSerializer.Serialize(data.RecentHistory));
                 
                 command.ExecuteNonQuery();
+
+                // 1.5. Record Sale Velocity History (once per update if significantly changed or old)
+                // We check if we need to insert a new velocity record
+                command.CommandText = "SELECT velocity, timestamp FROM VelocityHistory WHERE item_id = @itemId AND world_id = @worldId ORDER BY timestamp DESC LIMIT 1";
+                using (var velocityReader = command.ExecuteReader())
+                {
+                    bool shouldInsertVelocity = true;
+                    if (velocityReader.Read())
+                    {
+                        double lastVelocity = velocityReader.GetDouble(0);
+                        long lastTimestamp = velocityReader.GetInt64(1);
+                        long currentTs = ((DateTimeOffset)data.LastUploadTime).ToUnixTimeSeconds();
+                        
+                        // Only insert if > 24 hours since last record OR velocity changed by > 10%
+                        if (currentTs - lastTimestamp < 86400) // 24 hours
+                        {
+                            double change = Math.Abs(data.SaleVelocity - lastVelocity);
+                            if (lastVelocity > 0 && change / lastVelocity < 0.1) // < 10% change
+                            {
+                                shouldInsertVelocity = false;
+                            }
+                        }
+                    }
+                    
+                    velocityReader.Close(); // Close before reusing command
+                    
+                    if (shouldInsertVelocity)
+                    {
+                        using var velocityCmd = connection.CreateCommand();
+                        velocityCmd.Transaction = transaction;
+                        velocityCmd.CommandText = @"
+                            INSERT OR REPLACE INTO VelocityHistory (item_id, world_id, timestamp, velocity)
+                            VALUES (@itemId, @worldId, @timestamp, @velocity);
+                        ";
+                        velocityCmd.Parameters.AddWithValue("@itemId", data.ItemId);
+                        velocityCmd.Parameters.AddWithValue("@worldId", worldId);
+                        velocityCmd.Parameters.AddWithValue("@timestamp", ((DateTimeOffset)data.LastUploadTime).ToUnixTimeSeconds());
+                        velocityCmd.Parameters.AddWithValue("@velocity", data.SaleVelocity);
+                        velocityCmd.ExecuteNonQuery();
+                    }
+                }
 
                 // 2. Insert recent sales into PriceHistory
                 // Get latest sale timestamp
@@ -456,6 +505,25 @@ public class DatabaseService : IDisposable
                     pSalesJson.Value = JsonSerializer.Serialize(data.RecentHistory);
                     
                     marketCmd.ExecuteNonQuery();
+
+                    // 1.5 Insert Velocity History
+                    // Simplified logic for bulk: just insert if we have data, let SQLite handle PK collisions?
+                    // Actually, let's just insert one record per day max effectively by PK (item, world, timestamp)
+                    // But timestamp is last_upload_time, which changes.
+                    // For bulk, let's just insert it. It's historical data.
+                    using (var velocityCmd = connection.CreateCommand())
+                    {
+                        velocityCmd.Transaction = transaction;
+                        velocityCmd.CommandText = @"
+                            INSERT OR IGNORE INTO VelocityHistory (item_id, world_id, timestamp, velocity)
+                            VALUES (@itemId, @worldId, @timestamp, @velocity);
+                        ";
+                        velocityCmd.Parameters.AddWithValue("@itemId", data.ItemId);
+                        velocityCmd.Parameters.AddWithValue("@worldId", worldId);
+                        velocityCmd.Parameters.AddWithValue("@timestamp", ((DateTimeOffset)data.LastUploadTime).ToUnixTimeSeconds());
+                        velocityCmd.Parameters.AddWithValue("@velocity", data.SaleVelocity);
+                        velocityCmd.ExecuteNonQuery();
+                    }
 
                     // 2. Insert PriceHistory (Sales)
                     pLastSaleItemId.Value = data.ItemId;
