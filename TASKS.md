@@ -241,34 +241,34 @@
 ---
 
 ### UI Components - Detail Window
-- [ ] **Create DetailWindow.cs**
-  - [ ] Deep-dive view for single item
-  - [ ] Open from dashboard table (click row)
-  - [ ] Show all market data fields
+- [x] **Create DetailWindow.cs**
+  - [x] Deep-dive view for single item
+  - [x] Open from dashboard table (click row)
+  - [x] Show all market data fields
 
-- [ ] **Item information panel**
-  - [ ] Item icon and name
-  - [ ] Item level, category
-  - [ ] Recipe details (ingredients, yield)
+- [x] **Item information panel**
+  - [x] Item icon and name (Name only for now)
+  - [x] Item level, category
+  - [x] Recipe details (ingredients, yield)
   - [ ] Link to Garland Tools/Teamcraft
 
-- [ ] **Current market snapshot**
-  - [ ] Current listings (price, quantity, retainer)
+- [x] **Current market snapshot**
+  - [x] Current listings (price, quantity, retainer)
   - [ ] Recent sales (price, quantity, buyer)
-  - [ ] Min/max/average prices
+  - [x] Min/max/average prices
   - [ ] Market board URL (Universalis)
 
-- [ ] **Profit breakdown**
-  - [ ] Sale price (current avg)
-  - [ ] Ingredient costs (itemized)
-  - [ ] Crystal costs
+- [x] **Profit breakdown**
+  - [x] Sale price (current avg)
+  - [x] Ingredient costs (itemized) (Total only for now)
+  - [x] Crystal costs
   - [ ] Vendor sale price
-  - [ ] Net profit calculation
-  - [ ] Profit margin percentage
+  - [x] Net profit calculation
+  - [x] Profit margin percentage
 
-- [ ] **Risk analysis panel**
-  - [ ] Risk score with explanation
-  - [ ] All market warnings listed
+- [x] **Risk analysis panel**
+  - [x] Risk score with explanation
+  - [x] All market warnings listed
   - [ ] Recommendation (craft/don't craft)
   - [ ] Suggested pricing
 
