@@ -84,8 +84,15 @@ public class UniversalisService : IDisposable
             }
         }
         
-        // Queue the request
-        await requestQueue.EnqueueRequestAsync(worldName, itemId, RequestPriority.Normal);
+        try
+        {
+            // Queue the request
+            await requestQueue.EnqueueRequestAsync(worldName, itemId, RequestPriority.Normal);
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"API request failed for item {itemId}: {ex.Message}. Attempting to fallback to stale cache.");
+        }
         
         // Wait for it to be processed
         // We need to poll cache again after it's done
@@ -101,7 +108,17 @@ public class UniversalisService : IDisposable
         // If not in memory (maybe it failed?), try DB again
         if (currentWorldId != 0)
         {
-             return database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
+             // Try fresh DB first
+             var dbVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
+             if (dbVal != null) return dbVal;
+
+             // Fallback to stale DB data if available
+             var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+             if (staleVal != null)
+             {
+                 log.Info($"Returning stale data for item {itemId} (Last updated: {staleVal.LastUploadTime})");
+                 return staleVal;
+             }
         }
 
         return null; // Request failed or didn't return data
@@ -155,12 +172,19 @@ public class UniversalisService : IDisposable
             return results;
         }
         
-        // Queue batch request
-        // Split into chunks if > 100 (though we took 100 above)
-        // RequestQueue handles one request at a time, but we can submit one batch.
-        // It's already <= 100 items.
-        
-        await requestQueue.EnqueueRequestAsync(worldName, uncachedItems, RequestPriority.Normal);
+        try
+        {
+            // Queue batch request
+            // Split into chunks if > 100 (though we took 100 above)
+            // RequestQueue handles one request at a time, but we can submit one batch.
+            // It's already <= 100 items.
+            
+            await requestQueue.EnqueueRequestAsync(worldName, uncachedItems, RequestPriority.Normal);
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"Batch API request failed: {ex.Message}. Attempting to fallback to stale cache.");
+        }
         
         // Re-check cache for the uncached items
         foreach (var itemId in uncachedItems)
@@ -173,7 +197,19 @@ public class UniversalisService : IDisposable
             else if (currentWorldId != 0)
             {
                  var dbVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
-                 if (dbVal != null) results[itemId] = dbVal;
+                 if (dbVal != null) 
+                 {
+                     results[itemId] = dbVal;
+                 }
+                 else
+                 {
+                     // Fallback to stale data
+                     var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+                     if (staleVal != null)
+                     {
+                         results[itemId] = staleVal;
+                     }
+                 }
             }
         }
         
