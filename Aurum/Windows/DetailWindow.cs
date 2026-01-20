@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Windowing;
 using Dalamud.Bindings.ImGui;
+using System.Diagnostics;
 using Aurum.Models;
 
 namespace Aurum.Windows;
@@ -77,10 +78,37 @@ public class DetailWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.TextDisabled($"(Lvl {currentItem.Recipe.ClassJobLevel} {currentItem.Recipe.CraftingClassName})");
         
-        if (ImGui.Button("View on Universalis"))
+        ImGui.Spacing();
+
+        if (ImGui.Button("Universalis"))
         {
-            // Open browser (placeholder)
-            // Util.OpenUrl($"https://universalis.app/market/{currentItem.MarketData?.ItemId}");
+            OpenUrl($"https://universalis.app/market/{currentItem.MarketData?.ItemId}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Garland Tools"))
+        {
+            OpenUrl($"https://www.garlandtools.org/db/#item/{currentItem.MarketData?.ItemId}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Teamcraft"))
+        {
+            OpenUrl($"https://ffxivteamcraft.com/db/en/item/{currentItem.MarketData?.ItemId}");
+        }
+    }
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception)
+        {
+            // Ideally log this error
         }
     }
 
