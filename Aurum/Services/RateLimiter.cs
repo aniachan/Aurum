@@ -10,6 +10,7 @@ public class RateLimiter : IDisposable
 {
     private readonly IPluginLog log;
     private readonly Configuration configuration;
+    private readonly DatabaseService database; // Add dependency for persistent tracking
     
     // Token Bucket State
     private readonly object _lock = new();
@@ -61,10 +62,11 @@ public class RateLimiter : IDisposable
         }
     }
 
-    public RateLimiter(IPluginLog log, Configuration config)
+    public RateLimiter(IPluginLog log, Configuration config, DatabaseService database)
     {
         this.log = log;
         this.configuration = config;
+        this.database = database;
         
         // Calculate rate from config or default
         // Config stores requests per MINUTE (e.g., 900)
@@ -126,7 +128,7 @@ public class RateLimiter : IDisposable
                     if (globalTokenAcquired)
                     {
                         TotalRequests++;
-                        TrackRequest();
+                        TrackRequest(endpoint ?? "unknown"); // Pass endpoint
                         return; // Token acquired
                     }
                 }
@@ -156,7 +158,7 @@ public class RateLimiter : IDisposable
         TotalRetries++;
     }
 
-    private void TrackRequest()
+    private void TrackRequest(string endpoint)
     {
         var now = DateTime.UtcNow;
         _minuteHistory.Enqueue(now);
@@ -164,6 +166,27 @@ public class RateLimiter : IDisposable
         
         CheckDailyReset();
         Interlocked.Increment(ref _dailyCount);
+
+        // Persistent logging
+        if (database != null)
+        {
+            // We fire and forget this task to avoid blocking the request thread
+            // or just rely on the database's internal locking/pooling which is fast enough
+            // For now, let's just do it synchronously inside this method as it's already async-context friendly mostly?
+            // Actually TrackRequest is called from WaitForTokenAsync which is async, but this method is void.
+            // Let's spawn a Task for DB logging to keep rate limiter snappy.
+            Task.Run(() => 
+            {
+               try 
+               {
+                   database.LogApiRequest(endpoint, now, 0, 0, true);
+               }
+               catch(Exception ex)
+               {
+                   // Swallow DB log errors to not crash app, maybe log to file
+               }
+            });
+        }
         
         // Lazy prune
         if (TotalRequests % 10 == 0)

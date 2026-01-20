@@ -66,7 +66,7 @@
 - [x] **Implement RateLimiter class**
   - [x] Token bucket algorithm (configurable requests/minute)
   - [x] Per-endpoint rate limits
-  - [ ] Global API request counter
+  - [x] Global API request counter
   - [ ] Request queue with priority levels
   - [ ] Exponential backoff on failures
   - [ ] Respect HTTP 429 (Too Many Requests) responses

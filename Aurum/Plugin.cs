@@ -65,7 +65,7 @@ public sealed class Plugin : IDalamudPlugin
         
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
-        RateLimiter = new RateLimiter(Log, Configuration);
+        RateLimiter = new RateLimiter(Log, Configuration, DatabaseService);
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);

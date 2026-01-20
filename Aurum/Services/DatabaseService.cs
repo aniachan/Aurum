@@ -772,6 +772,37 @@ public class DatabaseService : IDisposable
         }
     }
     
+    public void LogApiRequest(string endpoint, DateTime timestamp, long responseTimeMs, int statusCode, bool success)
+    {
+        // Don't block the main thread for logging
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    INSERT INTO ApiRequestLog (endpoint, timestamp, response_time_ms, status_code, success)
+                    VALUES (@endpoint, @timestamp, @responseTime, @statusCode, @success);
+                ";
+                
+                command.Parameters.AddWithValue("@endpoint", endpoint);
+                command.Parameters.AddWithValue("@timestamp", ((DateTimeOffset)timestamp).ToUnixTimeSeconds());
+                command.Parameters.AddWithValue("@responseTime", responseTimeMs);
+                command.Parameters.AddWithValue("@statusCode", statusCode);
+                command.Parameters.AddWithValue("@success", success);
+                
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to log API request");
+            }
+        }
+    }
+    
     public void Vacuum()
     {
         log.Information("Running database VACUUM...");
