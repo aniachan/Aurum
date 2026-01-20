@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Aurum.Models;
 using Dalamud.Plugin.Services;
 
@@ -147,5 +148,20 @@ public class ItemPriorityService
 
         // Very low priority (<20): Refresh every 24 hours
         return age.TotalHours >= 24;
+    }
+
+    /// <summary>
+    /// Sorts a list of recipes by their priority score in descending order.
+    /// </summary>
+    /// <param name="recipes">The list of recipes to sort.</param>
+    /// <param name="getMarketData">A function to retrieve the last known market data for a recipe (can return null).</param>
+    /// <returns>A new list of recipes sorted by priority.</returns>
+    public List<RecipeData> SortRecipesByPriority(IEnumerable<RecipeData> recipes, Func<RecipeData, MarketData?> getMarketData)
+    {
+        return recipes
+            .Select(r => new { Recipe = r, Score = CalculatePriority(r, getMarketData(r)) })
+            .OrderByDescending(x => x.Score)
+            .Select(x => x.Recipe)
+            .ToList();
     }
 }

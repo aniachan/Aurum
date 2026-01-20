@@ -125,7 +125,7 @@
 
 - [x] **Implement ItemPriorityService**
   - [x] Score items based on combined heuristics (0-100)
-  - [ ] Sort recipes by priority score
+  - [x] Sort recipes by priority score
   - [ ] Limit API fetches to top N items (configurable)
   - [x] Update priority scores based on new data
   - [x] Cache priority scores in database
