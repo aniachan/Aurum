@@ -41,7 +41,7 @@
   - [x] Create tables if not exist
   - [x] Add migration system for schema updates
   - [x] Implement CRUD operations for all tables
-  - [ ] Add connection pooling for performance
+  - [x] Add connection pooling for performance
   - [x] Implement database vacuum/cleanup routine
 
 - [x] **Integrate database with UniversalisService**

@@ -21,7 +21,8 @@ public class DatabaseService : IDisposable
         this.log = log;
         
         var dbPath = Path.Combine(pluginDir, "aurum.db");
-        this.connectionString = $"Data Source={dbPath}";
+        // Enable pooling explicitly, though it is often default.
+        this.connectionString = $"Data Source={dbPath};Pooling=True";
         
         log.Information($"Initializing database at: {dbPath}");
         
@@ -34,6 +35,13 @@ public class DatabaseService : IDisposable
         {
             using var connection = GetConnection();
             connection.Open();
+
+            // Enable WAL mode for better concurrency and performance
+            using (var pragmaCmd = connection.CreateCommand())
+            {
+                pragmaCmd.CommandText = "PRAGMA journal_mode=WAL;";
+                pragmaCmd.ExecuteNonQuery();
+            }
             
             // Ensure SchemaVersion table exists
             var createSchemaVersionTable = @"
