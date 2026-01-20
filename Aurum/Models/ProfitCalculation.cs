@@ -74,9 +74,12 @@ public class ProfitCalculation
     public uint NetSalePrice { get; set; }       // After tax
     
     // Profit metrics
-    public int RawProfit { get; set; }           // Net sale - cost (can be negative!)
+    public int RawProfit { get; set; }           // Net sale - cost (can be negative!) - Renamed back to RawProfit due to extensive usage
     public float ProfitMargin { get; set; }      // profit / sale_price * 100
     public int GilPerHour { get; set; }          // profit / craft_time
+    
+    // Convenience property for new code preferring "NetProfit"
+    public int NetProfit { get => RawProfit; set => RawProfit = value; }
     public float ROI { get; set; }               // profit / cost * 100
     
     // Demand-adjusted scoring

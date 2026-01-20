@@ -301,6 +301,87 @@ public class DatabaseService : IDisposable
             return null;
         }
     }
+
+    public void UpsertRecipeCache(RecipeData recipe, ProfitCalculation profit)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var transaction = connection.BeginTransaction();
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+
+                command.CommandText = @"
+                    INSERT OR REPLACE INTO RecipeCache (
+                        recipe_id, item_id, last_analyzed, profit_snapshot, margin_snapshot, 
+                        risk_score, recommendation_score, ingredients_json
+                    ) VALUES (
+                        @recipeId, @itemId, @lastAnalyzed, @profit, @margin,
+                        @risk, @recommendation, @ingredientsJson
+                    );
+                ";
+
+                command.Parameters.AddWithValue("@recipeId", recipe.RecipeId);
+                command.Parameters.AddWithValue("@itemId", recipe.ResultItemId);
+                command.Parameters.AddWithValue("@lastAnalyzed", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                command.Parameters.AddWithValue("@profit", profit.NetProfit);
+                command.Parameters.AddWithValue("@margin", profit.ProfitMargin);
+                command.Parameters.AddWithValue("@risk", profit.RiskScore);
+                command.Parameters.AddWithValue("@recommendation", profit.RecommendationScore);
+                command.Parameters.AddWithValue("@ingredientsJson", JsonSerializer.Serialize(recipe.Ingredients));
+                
+                command.ExecuteNonQuery();
+                transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to upsert recipe cache for recipe {recipe.RecipeId}");
+            }
+        }
+    }
+
+    public ProfitCalculation? GetCachedProfit(uint recipeId)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    SELECT profit_snapshot, margin_snapshot, risk_score, recommendation_score, last_analyzed
+                    FROM RecipeCache
+                    WHERE recipe_id = @recipeId
+                ";
+                command.Parameters.AddWithValue("@recipeId", recipeId);
+
+                using var reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    // Construct a partial ProfitCalculation from cache
+                    // Note: This won't have full breakdown, just key metrics
+                    return new ProfitCalculation
+                    {
+                        NetProfit = reader.GetInt32(0),
+                        ProfitMargin = reader.GetFloat(1),
+                        RiskScore = reader.GetInt32(2),
+                        RecommendationScore = reader.GetInt32(3),
+                        // We might want to add a Timestamp property to ProfitCalculation or just use it to validate freshness
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to get cached profit for recipe {recipeId}");
+            }
+            return null;
+        }
+    }
     
     public void Vacuum()
     {
