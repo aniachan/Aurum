@@ -1,7 +1,7 @@
 # run-ralph.ps1
 
 $maxIterations = 50
-$completionPromise = "NO_UNFINISHED_TASKS_REMAIN"
+$completionPromise = "16413cd5-514b-4bdb-b01d-e726012b4684"
 
 $prompt = @"
 On each iteration:
