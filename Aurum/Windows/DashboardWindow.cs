@@ -244,9 +244,13 @@ public class DashboardWindow : Window, IDisposable
     {
         ImGui.TableNextRow();
         
-        // Item name
+        // Item name (Clickable to open details)
         ImGui.TableNextColumn();
-        ImGui.Text(profit.Recipe.ItemName);
+        if (ImGui.Selectable($"{profit.Recipe.ItemName}##{profit.Recipe.RecipeId}", false, ImGuiSelectableFlags.SpanAllColumns))
+        {
+            plugin.DetailWindow.SetItem(profit);
+        }
+        
         if (ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();
