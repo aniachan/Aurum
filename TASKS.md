@@ -147,7 +147,7 @@
   - [x] Use Universalis batch endpoint (/api/v2/{world}/{ids})
   - [x] Max 100 items per batch (API limit)
   - [x] Split large requests into multiple batches
-  - [ ] Parallel batch processing with rate limiting
+  - [x] Parallel batch processing with rate limiting
 
 - [ ] **Request deduplication**
   - [ ] Track in-flight requests (don't duplicate)

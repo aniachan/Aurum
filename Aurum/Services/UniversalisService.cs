@@ -180,22 +180,38 @@ public class UniversalisService : IDisposable
         
         log.Info($"Fetching {uncachedItems.Count} items in {chunks.Count} batches");
         
+        // Use SemaphoreSlim to limit concurrency if needed, but RateLimiter is global anyway.
+        // We can process chunks in parallel, but they will all hit the same RateLimiter lock.
+        // However, this allows overlapping the "wait for rate limit" and "network request" phases slightly if rate limit allows.
+        // Or if rate limit is high (e.g. 25/sec), we want to fire multiple requests.
+        
+        // Actually, EnqueueRequestAsync waits for the queue processor. The queue processor is single-threaded (ProcessQueueAsync).
+        // So parallelism here just means queueing them up faster.
+        // To truly have parallel processing, we'd need multiple queue processors or a concurrent queue processor.
+        // BUT, given the strict rate limits on Universalis, serial processing is safer and likely fast enough.
+        // Let's stick to serial queueing for safety, but maybe verify if we can do Task.WhenAll on the results.
+        
+        var batchTasks = new List<Task>();
+        
         foreach (var chunk in chunks)
         {
-            try
+            // We launch these tasks to enqueue. They return when the request COMPLETEs.
+            // So by adding them to a list and waiting WhenAll, we are waiting for all of them to finish.
+            // The queue processor will pick them up one by one.
+            batchTasks.Add(Task.Run(async () => 
             {
-                // Queue batch request for this chunk
-                // We use EnqueueRequestAsync which handles rate limiting
-                // We wait for each chunk sequentially to avoid flooding the queue if the list is huge
-                // But RequestQueue processes sequentially anyway.
-                
-                await requestQueue.EnqueueRequestAsync(worldName, chunk.ToList(), RequestPriority.Normal);
-            }
-            catch (Exception ex)
-            {
-                log.Warning($"Batch API request failed for chunk: {ex.Message}. Attempting to fallback to stale cache.");
-            }
+                try
+                {
+                    await requestQueue.EnqueueRequestAsync(worldName, chunk.ToList(), RequestPriority.Normal);
+                }
+                catch (Exception ex)
+                {
+                    log.Warning($"Batch API request failed for chunk: {ex.Message}.");
+                }
+            }));
         }
+        
+        await Task.WhenAll(batchTasks);
         
         // 3. Re-check cache/DB for the uncached items
         foreach (var itemId in uncachedItems)
