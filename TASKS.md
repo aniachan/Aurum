@@ -162,35 +162,34 @@
 ## 🟡 HIGH PRIORITY (User Experience)
 
 ### UI Components - Dashboard Window
-- [ ] **Profit table display**
-  - [ ] Test table rendering with real data
-  - [ ] Verify sorting by profit/margin/risk
-  - [ ] Add filter controls (level, class, profit range)
-  - [ ] Implement pagination (50 items per page)
-  - [ ] Add row highlighting (green=profit, red=loss)
-  - [ ] Add tooltips on hover (show warnings)
+- [x] **Profit table display**
+  - [x] Test table rendering with real data
+  - [x] Verify sorting by profit/margin/risk
+  - [x] Add filter controls (level, class, profit range)
+  - [x] Implement pagination (50 items per page)
+  - [x] Add row highlighting (green=profit, red=loss)
+  - [x] Add tooltips on hover (show warnings)
 
-- [ ] **Risk indicators**
-  - [ ] Color-coded risk badges (low/medium/high/very high)
-  - [ ] Warning icons for market issues
-  - [ ] Tooltip explanations for risk factors
+- [x] **Risk indicators**
+  - [x] Color-coded risk badges (low/medium/high/very high)
+  - [x] Warning icons for market issues
+  - [x] Tooltip explanations for risk factors
   - [ ] Risk score breakdown (hover to see details)
 
 - [ ] **Market warnings display**
-  - [ ] Show top 3 warnings per item
-  - [ ] Icon+text format for each warning
-  - [ ] Color coding (yellow=caution, red=danger)
+  - [x] Show warnings in tooltip
+  - [x] Icon+text format for each warning
   - [ ] Expandable details on click
 
 - [ ] **Action buttons**
-  - [ ] "Refresh" button (re-fetch market data)
+  - [x] "Refresh" button (re-fetch market data)
   - [ ] "Export" button (CSV export)
-  - [ ] "Filter" button (open filter panel)
-  - [ ] Loading spinner during refresh
+  - [x] "Filter" button (Filters are inline)
+  - [x] Loading spinner during refresh
 
 - [ ] **Status indicators**
-  - [ ] Show last refresh timestamp
-  - [ ] Show number of items analyzed
+  - [x] Show last refresh timestamp
+  - [x] Show number of items analyzed
   - [ ] Show API request count/limit
   - [ ] Show cache hit rate
 
