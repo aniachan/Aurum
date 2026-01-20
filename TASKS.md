@@ -47,7 +47,7 @@
 - [x] **Integrate database with UniversalisService**
   - [x] Check database before making API calls
   - [x] Store API responses in database
-  - [ ] Implement cache expiration logic (configurable TTL)
+  - [x] Implement cache expiration logic (configurable TTL)
   - [x] Add database query methods (get latest price, get history, etc.)
   - [ ] Implement bulk insert for batch operations
 
