@@ -62,6 +62,7 @@ public class DatabaseService : IDisposable
             // Apply migrations
             if (currentVersion < 1) ApplyMigration(connection, 1, Migration_1_InitialSchema);
             if (currentVersion < 2) ApplyMigration(connection, 2, Migration_2_AddHistoryMetrics);
+            if (currentVersion < 3) ApplyMigration(connection, 3, Migration_3_AddPriorityScores);
             
             log.Information("Database initialization complete");
         }
@@ -194,6 +195,19 @@ public class DatabaseService : IDisposable
         // Currently PriceHistory schema in Migration 1 covers the basics.
         // We might add volatility or other computed metrics here later.
         // For now, it ensures we have a slot for schema evolution.
+    }
+
+    private void Migration_3_AddPriorityScores(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add priority tracking table
+        var createPriorityTable = @"
+            CREATE TABLE IF NOT EXISTS ItemPriorities (
+                item_id INTEGER PRIMARY KEY,
+                priority_score INTEGER NOT NULL,
+                last_calculated INTEGER NOT NULL
+            );
+        ";
+        ExecuteNonQuery(connection, createPriorityTable, transaction);
     }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
@@ -586,6 +600,60 @@ public class DatabaseService : IDisposable
             {
                 log.Error(ex, $"Failed to upsert recipe cache for recipe {recipe.RecipeId}");
             }
+        }
+    }
+
+    public void UpsertItemPriority(int itemId, int priorityScore)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    INSERT OR REPLACE INTO ItemPriorities (item_id, priority_score, last_calculated)
+                    VALUES (@itemId, @score, @lastCalc);
+                ";
+                command.Parameters.AddWithValue("@itemId", itemId);
+                command.Parameters.AddWithValue("@score", priorityScore);
+                command.Parameters.AddWithValue("@lastCalc", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to upsert priority for item {itemId}");
+            }
+        }
+    }
+
+    public Dictionary<int, int> GetAllItemPriorities()
+    {
+        lock (dbLock)
+        {
+            var result = new Dictionary<int, int>();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = "SELECT item_id, priority_score FROM ItemPriorities";
+                
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    result[reader.GetInt32(0)] = reader.GetInt32(1);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to load item priorities");
+            }
+            return result;
         }
     }
 

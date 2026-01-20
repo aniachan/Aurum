@@ -39,6 +39,7 @@ public sealed class Plugin : IDalamudPlugin
     public RecipeService RecipeService { get; init; }
     public UniversalisService UniversalisService { get; init; }
     public MarketAnalysisService MarketAnalysisService { get; init; }
+    public ItemPriorityService ItemPriorityService { get; init; }
     public RateLimiter RateLimiter { get; init; }
     public ProfitService ProfitService { get; init; }
 
@@ -62,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
         RateLimiter = new RateLimiter(Log, Configuration);
+        ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
