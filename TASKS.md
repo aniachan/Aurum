@@ -250,7 +250,7 @@
   - [x] Item icon and name (Name only for now)
   - [x] Item level, category
   - [x] Recipe details (ingredients, yield)
-  - [ ] Link to Garland Tools/Teamcraft
+  - [x] Link to Garland Tools/Teamcraft
 
 - [x] **Current market snapshot**
   - [x] Current listings (price, quantity, retainer)
