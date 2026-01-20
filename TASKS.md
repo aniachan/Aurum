@@ -28,21 +28,21 @@
 ## 🔴 CRITICAL PRIORITY (Before Public Release)
 
 ### Database & Caching System
-- [ ] **Design SQLite database schema**
-  - [ ] Market data table (item_id, world, timestamp, price, listings, sales)
-  - [ ] Price history table (item_id, world, timestamp, price, quantity, is_sale)
-  - [ ] Recipe cache table (recipe_id, last_analyzed, profit_snapshot)
-  - [ ] Item metadata table (item_id, item_level, patch_added, category)
-  - [ ] API request log table (endpoint, timestamp, response_time, success)
-  - [ ] Add indexes for performance (item_id+world, timestamp ranges)
+- [x] **Design SQLite database schema**
+  - [x] Market data table (item_id, world, timestamp, price, listings, sales)
+  - [x] Price history table (item_id, world, timestamp, price, quantity, is_sale)
+  - [x] Recipe cache table (recipe_id, last_analyzed, profit_snapshot)
+  - [x] Item metadata table (item_id, item_level, patch_added, category)
+  - [x] API request log table (endpoint, timestamp, response_time, success)
+  - [x] Add indexes for performance (item_id+world, timestamp ranges)
 
 - [ ] **Implement DatabaseService**
-  - [ ] Initialize SQLite database on plugin load
-  - [ ] Create tables if not exist
+  - [x] Initialize SQLite database on plugin load
+  - [x] Create tables if not exist
   - [ ] Add migration system for schema updates
   - [ ] Implement CRUD operations for all tables
   - [ ] Add connection pooling for performance
-  - [ ] Implement database vacuum/cleanup routine
+  - [x] Implement database vacuum/cleanup routine
 
 - [ ] **Integrate database with UniversalisService**
   - [ ] Check database before making API calls
