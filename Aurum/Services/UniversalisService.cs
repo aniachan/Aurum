@@ -386,8 +386,10 @@ public class UniversalisService : IDisposable
                 {
                     // Retry on 429 and 5xx errors
                     retryCount++;
+                    rateLimiter.RecordRetry();
                     if (retryCount > maxRetries)
                     {
+                        rateLimiter.RecordError();
                         log.Error(ex, $"Failed to process request after {maxRetries} retries. Giving up.");
                         request.CompletionSource.TrySetException(ex);
                         break;
@@ -401,6 +403,7 @@ public class UniversalisService : IDisposable
                 catch (Exception ex)
                 {
                     // Non-retriable error
+                    rateLimiter.RecordError();
                     log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
                     request.CompletionSource.TrySetException(ex);
                     break;

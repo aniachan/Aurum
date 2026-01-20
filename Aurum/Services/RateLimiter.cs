@@ -21,6 +21,42 @@ public class RateLimiter : IDisposable
     // Stats
     public long TotalRequests { get; private set; }
     public long RateLimitedRequests { get; private set; }
+    
+    // Usage Monitoring
+    private readonly ConcurrentQueue<DateTime> _minuteHistory = new();
+    private readonly ConcurrentQueue<DateTime> _hourHistory = new();
+    private long _dailyCount;
+    private DateTime _lastDailyReset = DateTime.UtcNow.Date;
+
+    public long TotalErrors { get; private set; }
+    public long TotalRetries { get; private set; }
+
+    public int RequestsLastMinute 
+    { 
+        get 
+        {
+            PruneQueue(_minuteHistory, TimeSpan.FromMinutes(1));
+            return _minuteHistory.Count;
+        } 
+    }
+
+    public int RequestsLastHour 
+    { 
+        get 
+        {
+            PruneQueue(_hourHistory, TimeSpan.FromHours(1));
+            return _hourHistory.Count;
+        } 
+    }
+
+    public long RequestsToday
+    {
+        get
+        {
+            CheckDailyReset();
+            return _dailyCount;
+        }
+    }
 
     public RateLimiter(IPluginLog log, Configuration config)
     {
@@ -62,6 +98,7 @@ public class RateLimiter : IDisposable
                 {
                     _tokens -= 1.0;
                     TotalRequests++;
+                    TrackRequest();
                     return; // Token acquired
                 }
             }
@@ -77,6 +114,58 @@ public class RateLimiter : IDisposable
             
             // log.Debug($"Rate limited. Waiting {waitTimeMs}ms...");
             await Task.Delay(waitTimeMs, cancellationToken);
+        }
+    }
+    
+    public void RecordError()
+    {
+        TotalErrors++;
+    }
+
+    public void RecordRetry()
+    {
+        TotalRetries++;
+    }
+
+    private void TrackRequest()
+    {
+        var now = DateTime.UtcNow;
+        _minuteHistory.Enqueue(now);
+        _hourHistory.Enqueue(now);
+        
+        CheckDailyReset();
+        Interlocked.Increment(ref _dailyCount);
+        
+        // Lazy prune
+        if (TotalRequests % 10 == 0)
+        {
+            PruneQueue(_minuteHistory, TimeSpan.FromMinutes(1));
+            PruneQueue(_hourHistory, TimeSpan.FromHours(1));
+        }
+    }
+
+    private void CheckDailyReset()
+    {
+        var today = DateTime.UtcNow.Date;
+        if (today > _lastDailyReset)
+        {
+            lock (_lock)
+            {
+                if (today > _lastDailyReset)
+                {
+                    _lastDailyReset = today;
+                    Interlocked.Exchange(ref _dailyCount, 0);
+                }
+            }
+        }
+    }
+
+    private void PruneQueue(ConcurrentQueue<DateTime> queue, TimeSpan window)
+    {
+        var cutoff = DateTime.UtcNow - window;
+        while (queue.TryPeek(out var time) && time < cutoff)
+        {
+            queue.TryDequeue(out _);
         }
     }
 
