@@ -87,6 +87,7 @@ public class MarketData
     public float PriceVolatility { get; set; }           // stddev / avg (0-1)
     public float EstimatedSellTimeDays { get; set; }     // listings / velocity
     public float MarketMomentum { get; set; }            // % change in velocity (-1 to 1)
+    public PriceTrend Trend { get; set; }                // Rising, Falling, Stable, Volatile
     
     // Risk assessment
     public int RiskScore { get; set; }                   // 0-100

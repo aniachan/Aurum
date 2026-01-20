@@ -48,6 +48,7 @@ public class MarketAnalysisService
         CalculateSupplyDemandRatio(marketData);
         CalculatePriceVolatility(marketData);
         CalculateMarketMomentum(marketData);
+        CalculatePriceTrend(marketData);
         CalculatePriceDistribution(marketData);
         
         // Generate risk score
@@ -168,6 +169,59 @@ public class MarketAnalysisService
         
         // Clamp to -1 to 1
         marketData.MarketMomentum = Math.Clamp(marketData.MarketMomentum, -1f, 1f);
+    }
+
+    /// <summary>
+    /// Analyze price trend (rising, falling, stable)
+    /// </summary>
+    private void CalculatePriceTrend(MarketData marketData)
+    {
+        if (marketData.RecentHistory.Count < 5)
+        {
+            marketData.Trend = PriceTrend.Unknown;
+            return;
+        }
+
+        // If volatility is extremely high, it's just volatile
+        if (marketData.PriceVolatility > 0.4f)
+        {
+            marketData.Trend = PriceTrend.Volatile;
+            return;
+        }
+
+        // Simple linear regression or moving average comparison
+        // Let's compare recent average vs older average
+        var history = marketData.RecentHistory.OrderBy(h => h.Timestamp).ToList();
+        var splitIndex = history.Count / 2;
+        
+        var olderHalf = history.Take(splitIndex).ToList();
+        var newerHalf = history.Skip(splitIndex).ToList();
+        
+        if (!olderHalf.Any() || !newerHalf.Any())
+        {
+            marketData.Trend = PriceTrend.Unknown;
+            return;
+        }
+        
+        var oldAvg = olderHalf.Average(h => h.PricePerUnit);
+        var newAvg = newerHalf.Average(h => h.PricePerUnit);
+        
+        var change = (newAvg - oldAvg) / oldAvg;
+        
+        if (change > 0.10) // > 10% increase
+        {
+            marketData.Trend = PriceTrend.Rising;
+        }
+        else if (change < -0.10) // > 10% decrease
+        {
+            marketData.Trend = PriceTrend.Falling;
+        }
+        else
+        {
+            marketData.Trend = PriceTrend.Stable;
+        }
+        
+        log.Debug($"Item {marketData.ItemId} Trend: {marketData.Trend} (Change: {change:P1})");
     }
     
     /// <summary>

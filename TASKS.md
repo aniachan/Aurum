@@ -55,7 +55,7 @@
   - [x] Store every API response with timestamp
   - [x] Track price changes over time
   - [x] Calculate price volatility metrics
-  - [ ] Identify price trends (rising, falling, stable)
+  - [x] Identify price trends (rising, falling, stable)
   - [ ] Store sale velocity history
 
 **Impact:** Reduces API calls by 90%+, enables historical analysis
