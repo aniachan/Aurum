@@ -125,28 +125,29 @@ public class UniversalisService : IDisposable
     }
     
     /// <summary>
-    /// Fetch market data for multiple items in batch (up to 100)
+    /// Fetch market data for multiple items in batch (handles splitting > 100 items)
     /// </summary>
     public async Task<Dictionary<uint, MarketData>> GetMarketDataBatchAsync(string worldName, IEnumerable<uint> itemIds)
     {
-        var items = itemIds.Take(100).ToList();  // API limit
+        var allItems = itemIds.ToList();
         var results = new Dictionary<uint, MarketData>();
         
-        if (items.Count == 0)
+        if (allItems.Count == 0)
             return results;
-        
-        // Check cache for all items first
+            
+        // 1. First pass: Check cache for everything
         var uncachedItems = new List<uint>();
-        foreach (var itemId in items)
+        
+        foreach (var itemId in allItems)
         {
             var cacheKey = $"market_{worldName}_{itemId}";
             
-            // 1. Memory Cache
+            // Memory Cache
             if (cache.TryGet(cacheKey, out MarketData? memCached) && memCached != null)
             {
                 results[itemId] = memCached;
             }
-            // 2. Database Cache
+            // Database Cache
             else if (currentWorldId != 0)
             {
                  var dbCached = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
@@ -168,25 +169,35 @@ public class UniversalisService : IDisposable
         
         if (uncachedItems.Count == 0)
         {
-            log.Info($"All {items.Count} items found in cache");
+            log.Info($"All {allItems.Count} items found in cache");
             return results;
         }
+
+        // 2. Fetch uncached items in chunks of 100
+        // Universalis API limit is 100 items per request
+        const int BatchSize = 100;
+        var chunks = uncachedItems.Chunk(BatchSize).ToList();
         
-        try
+        log.Info($"Fetching {uncachedItems.Count} items in {chunks.Count} batches");
+        
+        foreach (var chunk in chunks)
         {
-            // Queue batch request
-            // Split into chunks if > 100 (though we took 100 above)
-            // RequestQueue handles one request at a time, but we can submit one batch.
-            // It's already <= 100 items.
-            
-            await requestQueue.EnqueueRequestAsync(worldName, uncachedItems, RequestPriority.Normal);
-        }
-        catch (Exception ex)
-        {
-            log.Warning($"Batch API request failed: {ex.Message}. Attempting to fallback to stale cache.");
+            try
+            {
+                // Queue batch request for this chunk
+                // We use EnqueueRequestAsync which handles rate limiting
+                // We wait for each chunk sequentially to avoid flooding the queue if the list is huge
+                // But RequestQueue processes sequentially anyway.
+                
+                await requestQueue.EnqueueRequestAsync(worldName, chunk.ToList(), RequestPriority.Normal);
+            }
+            catch (Exception ex)
+            {
+                log.Warning($"Batch API request failed for chunk: {ex.Message}. Attempting to fallback to stale cache.");
+            }
         }
         
-        // Re-check cache for the uncached items
+        // 3. Re-check cache/DB for the uncached items
         foreach (var itemId in uncachedItems)
         {
             var cacheKey = $"market_{worldName}_{itemId}";

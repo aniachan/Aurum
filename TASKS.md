@@ -146,7 +146,7 @@
   - [x] Group items by world for batch API call
   - [x] Use Universalis batch endpoint (/api/v2/{world}/{ids})
   - [x] Max 100 items per batch (API limit)
-  - [ ] Split large requests into multiple batches
+  - [x] Split large requests into multiple batches
   - [ ] Parallel batch processing with rate limiting
 
 - [ ] **Request deduplication**
