@@ -61,6 +61,7 @@ public class DatabaseService : IDisposable
             
             // Apply migrations
             if (currentVersion < 1) ApplyMigration(connection, 1, Migration_1_InitialSchema);
+            if (currentVersion < 2) ApplyMigration(connection, 2, Migration_2_AddHistoryMetrics);
             
             log.Information("Database initialization complete");
         }
@@ -186,6 +187,14 @@ public class DatabaseService : IDisposable
         ";
         ExecuteNonQuery(connection, createApiRequestLogTable, transaction);
     }
+
+    private void Migration_2_AddHistoryMetrics(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // This migration is reserved for future metrics if needed.
+        // Currently PriceHistory schema in Migration 1 covers the basics.
+        // We might add volatility or other computed metrics here later.
+        // For now, it ensures we have a slot for schema evolution.
+    }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
@@ -267,10 +276,7 @@ public class DatabaseService : IDisposable
                 
                 command.ExecuteNonQuery();
 
-                // 2. Insert recent sales into PriceHistory (avoid duplicates logic could be complex, simple append for now)
-                // Note: In a real scenario, we might want to check if the sale already exists
-                // For simplicity, we'll only insert sales that are newer than the latest stored sale for this item/world
-                
+                // 2. Insert recent sales into PriceHistory
                 // Get latest sale timestamp
                 command.CommandText = "SELECT MAX(timestamp) FROM PriceHistory WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 1";
                 var lastSaleTimestampObj = command.ExecuteScalar();
@@ -298,6 +304,37 @@ public class DatabaseService : IDisposable
                         saleCmd.Parameters.AddWithValue("@quantity", sale.Quantity);
                         saleCmd.ExecuteNonQuery();
                     }
+                }
+
+                // 3. Insert SNAPSHOT of current price/listings into PriceHistory
+                // This allows tracking listing price over time, not just sales
+                // We mark these with is_sale = 0
+                
+                // Only insert a snapshot if we haven't done so recently (e.g. within last hour)
+                // This prevents spamming the history table if we refresh frequently
+                command.CommandText = "SELECT MAX(timestamp) FROM PriceHistory WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 0";
+                var lastSnapshotTimestampObj = command.ExecuteScalar();
+                long lastSnapshotTimestamp = 0;
+                if (lastSnapshotTimestampObj != DBNull.Value && lastSnapshotTimestampObj != null)
+                {
+                    lastSnapshotTimestamp = (long)lastSnapshotTimestampObj;
+                }
+                
+                long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                if (currentTimestamp - lastSnapshotTimestamp > 3600) // 1 hour
+                {
+                    using var snapshotCmd = connection.CreateCommand();
+                    snapshotCmd.Transaction = transaction;
+                    snapshotCmd.CommandText = @"
+                        INSERT INTO PriceHistory (item_id, world_id, timestamp, price, quantity, is_sale)
+                        VALUES (@itemId, @worldId, @timestamp, @price, @quantity, 0);
+                    ";
+                    snapshotCmd.Parameters.AddWithValue("@itemId", data.ItemId);
+                    snapshotCmd.Parameters.AddWithValue("@worldId", worldId);
+                    snapshotCmd.Parameters.AddWithValue("@timestamp", currentTimestamp);
+                    snapshotCmd.Parameters.AddWithValue("@price", data.MinPrice); // Track min price
+                    snapshotCmd.Parameters.AddWithValue("@quantity", data.CurrentListings); // Track listing count
+                    snapshotCmd.ExecuteNonQuery();
                 }
 
                 transaction.Commit();
@@ -363,6 +400,27 @@ public class DatabaseService : IDisposable
                 var pHPrice = historyCmd.Parameters.Add("@price", SqliteType.Integer);
                 var pHQuantity = historyCmd.Parameters.Add("@quantity", SqliteType.Integer);
 
+                // Prepared statements for snapshot logic
+                using var checkSnapshotCmd = connection.CreateCommand();
+                checkSnapshotCmd.Transaction = transaction;
+                checkSnapshotCmd.CommandText = "SELECT MAX(timestamp) FROM PriceHistory WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 0";
+                var pSnapCheckItemId = checkSnapshotCmd.Parameters.Add("@itemId", SqliteType.Integer);
+                var pSnapCheckWorldId = checkSnapshotCmd.Parameters.Add("@worldId", SqliteType.Integer);
+
+                using var insertSnapshotCmd = connection.CreateCommand();
+                insertSnapshotCmd.Transaction = transaction;
+                insertSnapshotCmd.CommandText = @"
+                    INSERT INTO PriceHistory (item_id, world_id, timestamp, price, quantity, is_sale)
+                    VALUES (@itemId, @worldId, @timestamp, @price, @quantity, 0);
+                ";
+                var pSnapItemId = insertSnapshotCmd.Parameters.Add("@itemId", SqliteType.Integer);
+                var pSnapWorldId = insertSnapshotCmd.Parameters.Add("@worldId", SqliteType.Integer);
+                var pSnapTimestamp = insertSnapshotCmd.Parameters.Add("@timestamp", SqliteType.Integer);
+                var pSnapPrice = insertSnapshotCmd.Parameters.Add("@price", SqliteType.Integer);
+                var pSnapQuantity = insertSnapshotCmd.Parameters.Add("@quantity", SqliteType.Integer);
+
+                long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
                 foreach (var data in dataList)
                 {
                     // 1. Upsert MarketData
@@ -378,7 +436,7 @@ public class DatabaseService : IDisposable
                     
                     marketCmd.ExecuteNonQuery();
 
-                    // 2. Insert PriceHistory
+                    // 2. Insert PriceHistory (Sales)
                     pLastSaleItemId.Value = data.ItemId;
                     pLastSaleWorldId.Value = worldId;
                     
@@ -402,6 +460,28 @@ public class DatabaseService : IDisposable
                             
                             historyCmd.ExecuteNonQuery();
                         }
+                    }
+
+                    // 3. Insert PriceHistory (Snapshot)
+                    pSnapCheckItemId.Value = data.ItemId;
+                    pSnapCheckWorldId.Value = worldId;
+                    
+                    var lastSnapshotTimestampObj = checkSnapshotCmd.ExecuteScalar();
+                    long lastSnapshotTimestamp = 0;
+                    if (lastSnapshotTimestampObj != DBNull.Value && lastSnapshotTimestampObj != null)
+                    {
+                        lastSnapshotTimestamp = (long)lastSnapshotTimestampObj;
+                    }
+
+                    if (currentTimestamp - lastSnapshotTimestamp > 3600) // 1 hour
+                    {
+                        pSnapItemId.Value = data.ItemId;
+                        pSnapWorldId.Value = worldId;
+                        pSnapTimestamp.Value = currentTimestamp;
+                        pSnapPrice.Value = data.MinPrice;
+                        pSnapQuantity.Value = data.CurrentListings;
+                        
+                        insertSnapshotCmd.ExecuteNonQuery();
                     }
                 }
 
