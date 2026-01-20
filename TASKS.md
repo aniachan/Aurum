@@ -74,7 +74,7 @@
 - [x] **Request queue system**
   - [x] FIFO queue for pending requests
   - [x] Request deduplication (don't fetch same item twice)
-  - [ ] Batch request optimization (group items for batch API)
+  - [x] Batch request optimization (group items for batch API)
   - [x] Priority queue (user-requested > background)
   - [x] Cancel queued requests on plugin unload
 
