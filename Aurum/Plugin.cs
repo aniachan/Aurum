@@ -35,6 +35,7 @@ public sealed class Plugin : IDalamudPlugin
     
     // Services
     public CacheService CacheService { get; init; }
+    public DatabaseService DatabaseService { get; init; }
     public RecipeService RecipeService { get; init; }
     public UniversalisService UniversalisService { get; init; }
     public MarketAnalysisService MarketAnalysisService { get; init; }
@@ -58,6 +59,7 @@ public sealed class Plugin : IDalamudPlugin
         Log.Information("Initializing Aurum services...");
         
         CacheService = new CacheService(Configuration);
+        DatabaseService = new DatabaseService(Log, pluginDir);
         RecipeService = new RecipeService(DataManager, Log);
         UniversalisService = new UniversalisService(Log, CacheService);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
@@ -109,6 +111,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         // Dispose services
         UniversalisService?.Dispose();
+        DatabaseService?.Dispose();
         
         // Unregister all actions to not leak anything during disposal of plugin
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;

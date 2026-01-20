@@ -1,0 +1,9 @@
+{
+  "active": true,
+  "iteration": 1,
+  "maxIterations": 30,
+  "completionPromise": "COMPLETE",
+  "prompt": "pick what you believe is the most important task from TASKS.md and implement it, verifying it is complete and then commit the change to git. Only complete one task from the list.",
+  "startedAt": "2026-01-20T20:26:11.474Z",
+  "model": ""
+}
