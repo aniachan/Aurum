@@ -1,0 +1,101 @@
+using System;
+using System.Collections.Generic;
+
+namespace Aurum.Models;
+
+/// <summary>
+/// Represents a single sale from market board history
+/// </summary>
+public class SaleRecord
+{
+    public uint ItemId { get; set; }
+    public bool IsHQ { get; set; }
+    public uint PricePerUnit { get; set; }
+    public uint Quantity { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string BuyerName { get; set; } = string.Empty;
+    public bool OnMannequin { get; set; }
+}
+
+/// <summary>
+/// Represents a current market board listing
+/// </summary>
+public class MarketListing
+{
+    public uint ItemId { get; set; }
+    public bool IsHQ { get; set; }
+    public uint PricePerUnit { get; set; }
+    public uint Quantity { get; set; }
+    public uint Total { get; set; }
+    public string RetainerName { get; set; } = string.Empty;
+    public string RetainerCity { get; set; } = string.Empty;
+    public DateTime ListingTime { get; set; }
+    public uint Materia { get; set; }
+    public bool OnMannequin { get; set; }
+    public string SellerName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Market risk level classification
+/// </summary>
+public enum RiskLevel
+{
+    Low,        // 0-25: Safe bet
+    Medium,     // 25-50: Calculated risk
+    High,       // 50-75: Caution advised
+    VeryHigh    // 75-100: Avoid unless you know what you're doing
+}
+
+/// <summary>
+/// Comprehensive market analysis data from Universalis API
+/// </summary>
+public class MarketData
+{
+    // Basic item info
+    public uint ItemId { get; set; }
+    public string WorldName { get; set; } = string.Empty;
+    public DateTime LastUploadTime { get; set; }
+    
+    // Current listings
+    public List<MarketListing> Listings { get; set; } = new();
+    public int CurrentListings { get; set; }
+    public uint MinPrice { get; set; }
+    public uint MaxPrice { get; set; }
+    public uint CurrentAveragePriceNQ { get; set; }
+    public uint CurrentAveragePriceHQ { get; set; }
+    
+    // Recent sales history
+    public List<SaleRecord> RecentHistory { get; set; } = new();
+    public uint AveragePriceNQ { get; set; }
+    public uint AveragePriceHQ { get; set; }
+    public uint MinPriceNQ { get; set; }
+    public uint MinPriceHQ { get; set; }
+    public uint MaxPriceNQ { get; set; }
+    public uint MaxPriceHQ { get; set; }
+    
+    // Demand metrics (calculated)
+    public float SaleVelocity { get; set; }              // sales per day
+    public float SupplyDemandRatio { get; set; }         // listings / daily_sales
+    public float PriceVolatility { get; set; }           // stddev / avg (0-1)
+    public float EstimatedSellTimeDays { get; set; }     // listings / velocity
+    public float MarketMomentum { get; set; }            // % change in velocity (-1 to 1)
+    
+    // Risk assessment
+    public int RiskScore { get; set; }                   // 0-100
+    public RiskLevel RiskLevel { get; set; }
+    public List<MarketWarningInfo> Warnings { get; set; } = new();
+    
+    // Recommendation scoring
+    public int RecommendationScore { get; set; }         // 0-100 (weighted with demand)
+    public int RecommendedQuantity { get; set; }         // Safe amount to craft
+    public int MaxSafeQuantity { get; set; }             // Upper limit before oversupply
+    
+    // Competition analysis
+    public Dictionary<uint, int> PriceDistribution { get; set; } = new();  // price -> count
+    public int YourCompetitorRank { get; set; }          // Where you'd place in listings
+    
+    // Freshness tracking
+    public DateTime CachedAt { get; set; }
+    public DateTime? LastSaleTime { get; set; }
+    public bool IsStale => (DateTime.UtcNow - CachedAt).TotalMinutes > 5;
+}
