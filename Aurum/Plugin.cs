@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
     public ItemPriorityService ItemPriorityService { get; init; }
     public RateLimiter RateLimiter { get; init; }
     public ProfitService ProfitService { get; init; }
+    public RefreshService RefreshService { get; init; }
 
     public readonly WindowSystem WindowSystem = new("Aurum");
     private ConfigWindow ConfigWindow { get; init; }
@@ -68,6 +69,7 @@ public sealed class Plugin : IDalamudPlugin
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
         ProfitService = new ProfitService(Log, Configuration, RecipeService, UniversalisService, MarketAnalysisService);
+        RefreshService = new RefreshService(Log, Configuration, UniversalisService, DatabaseService, ItemPriorityService, RecipeService, ClientState);
         
         // Initialize recipe service asynchronously
         RecipeService.Initialize();
@@ -114,6 +116,7 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         // Dispose services
+        RefreshService?.Dispose();
         UniversalisService?.Dispose();
         DatabaseService?.Dispose();
         RateLimiter?.Dispose();
