@@ -1,230 +1,185 @@
-# Aurum - Implementation Progress
+# Aurum Plugin - Development Progress
 
-## ✅ Completed (Phase 1 - Foundation)
-
-### Project Setup
-- [x] Renamed entire project from SamplePlugin to Aurum
-- [x] Updated all namespaces, references, and build files
-- [x] Updated plugin manifest with proper description
-- [x] Created comprehensive README.md
-
-### Design Documents
-- [x] **DESIGN.md** - Complete demand/risk analysis system design
-- [x] Market warning types and algorithms
-- [x] Risk scoring formulas
-- [x] Recommendation engine design
-
-### Core Data Models (Aurum/Models/)
-- [x] **MarketWarning.cs** - Warning types and severity levels
-- [x] **MarketData.cs** - Complete market analysis structure:
-  - Current listings and sales history
-  - Demand metrics (velocity, supply/demand ratio, volatility)
-  - Risk scoring (0-100)
-  - Recommendation scoring with quantity suggestions
-  - Competition analysis
-- [x] **RecipeData.cs** - Crafting recipes with ingredient trees
-- [x] **ProfitCalculation.cs** - Complete profit results with demand integration
-- [x] **Configuration.cs** - Extended settings for all features
-
-### Services Layer (Aurum/Services/)
-- [x] **CacheService.cs** - Thread-safe in-memory cache with TTL
-- [x] **UniversalisService.cs** - Universalis API client
-  - Single item fetch
-  - Batch fetch (up to 100 items)
-  - Automatic caching
-  - Error handling and retry logic
-- [x] **RecipeService.cs** - Game data queries via Lumina
-  - Loads all DoH recipes (CRP, BSM, ARM, GSM, LTW, WVR, ALC, CUL)
-  - Item name/icon caching
-  - Recipe lookup and search
-  - Sub-recipe detection
-- [x] **MarketAnalysisService.cs** - Demand calculation engine
-  - Sale velocity calculation
-  - Supply/demand ratio
-  - Price volatility (stddev/mean)
-  - Market momentum (trending up/down)
-  - Risk scoring algorithm
-  - Warning generation (6 types)
-  - Quantity recommendations
-- [x] **ProfitService.cs** - Profit calculation engine
-  - Recursive ingredient tree resolution
-  - Multiple cost modes (MB, Vendor, Cheapest, Self-gathered)
-  - Sub-recipe crafting cost calculation
-  - Full profit metrics (margin, ROI, gil/hour)
-  - Demand-weighted recommendation scoring
-  - Cycle detection and max depth protection
-
-### Plugin Integration
-- [x] **Plugin.cs** - Service initialization
-  - All services properly instantiated
-  - RecipeService auto-initialization
-  - Command registration (`/aurum`, `/aurum config`)
-  - Window system integration
-  - Proper disposal
-
-### Build System
-- [x] Solution compiles successfully
-- [x] All namespaces updated
-- [x] Only 1 warning (nullable reference - non-critical)
+**Last Updated:** 2026-01-20 21:06 (Build time from logs)  
+**Evidence Source:** Dalamud log + Build outputs
 
 ---
 
-## 📊 System Capabilities (Implemented)
+## ✅ CONFIRMED WORKING (With Evidence)
 
-### Market Analysis
-✅ **6 Warning Types:**
-1. Market Crash Risk - Oversupplied market
-2. Low Demand - Slow sales
-3. Price War Active - Volatile + falling prices
-4. Stale Market - No recent sales
-5. High Competition - Many sellers at same price
-6. (Reserved for future: Oversupply Expected)
+### Plugin Infrastructure
+- ✅ **Plugin loads successfully** - Evidence: `[INF] [LocalPlugin] Finished loading Aurum` (21:06:10)
+- ✅ **Auto-reload on build** - Evidence: Plugin reloaded at 21:06:10, build completed at 21:06:05
+- ✅ **Service initialization** - Evidence: All services marked OK in health check
+- ✅ **Version tracking** - Evidence: `✓ Plugin Version: 0.0.0.2`
 
-✅ **Risk Scoring (0-100):**
-- Supply/Demand ratio: 25 points
-- Price volatility: 25 points
-- Velocity penalty: 25 points
-- Competition: 25 points
+### Recipe Loading
+- ✅ **RecipeService loads recipes** - Evidence: `RecipeService initialized with 13393 recipes`
+- ✅ **Recipe breakdown by class:**
+  - ALC: 1561
+  - ARM: 1419
+  - BSM: 1911
+  - CRP: 1528
+  - CUL: 1037
+  - GSM: 2189
+  - LTW: 1823
+  - WVR: 1925
+- ✅ **Item database loaded** - Evidence: `Total Items: 50900`
+- ✅ **Recipe queries work** - Evidence: `✓ Sample Level 90 Recipe: Chondrite Saw (ID: 5166)`
 
-✅ **Recommendation Scoring (0-100):**
-- Profit margin: 30%
-- Sale velocity: 25%
-- Supply/demand: 20%
-- Price stability: 15%
-- Market momentum: 10%
+### Health Check System
+- ✅ **Health check runs automatically on load** - Evidence: Log shows health check at 21:06:10
+- ✅ **All services report OK**:
+  - CacheService: OK
+  - RecipeService: OK
+  - UniversalisService: OK
+  - MarketAnalysisService: OK
+  - ProfitService: OK
 
-### Profit Calculation
-✅ **Features:**
-- Full ingredient tree resolution (recursive)
-- Sub-recipe detection and cost comparison
-- HQ vs NQ pricing
-- Market board tax calculation (5%)
-- Multiple result amounts (recipes yielding >1 item)
-- Cycle detection
-- Max depth protection (10 levels)
+### DEV_MODE Testing
+- ✅ **DEV_MODE enabled** - Evidence: `DEV MODE ENABLED - Auto-running tests`
+- ✅ **Auto-test delay works** - Evidence: 2 second delay between init and test start
+- ✅ **Integration test executes** - Evidence: Test sequence ran completely
 
-✅ **Cost Modes:**
-- Market Board - Current MB prices
-- Vendor - Vendor prices (TODO: needs game data hookup)
-- Cheapest - Lowest of MB or Vendor
-- Self-Gathered - Zero cost
-
----
-
-## 📈 Statistics
-
-**Lines of Code:** ~2,500+
-**Services:** 5 core services
-**Models:** 10+ data structures
-**Recipes Loaded:** All DoH classes (thousands of recipes)
-**API Integration:** Universalis (REST)
-**Caching:** 5-minute default TTL
+### API Communication
+- ✅ **HTTP requests work** - Evidence: API URLs logged successfully
+  - `https://universalis.app/api/v2/Gilgamesh/5114?listings=20&entries=50`
+  - `https://universalis.app/api/v2/Gilgamesh/35383?listings=20&entries=50`
+- ✅ **Network connectivity confirmed** - Evidence: Responses received (even if parsing failed)
 
 ---
 
-## 🚧 Next Steps (Phase 2 - UI)
+## ❌ CONFIRMED BROKEN (With Evidence)
 
-### High Priority
-- [ ] Create DashboardWindow.cs - Main profit list UI
-- [ ] Implement profit list rendering
-- [ ] Add search and filter UI
-- [ ] Create DetailWindow.cs for item analysis
-- [ ] Add basic sorting (profit, margin, recommendation score)
-- [ ] Implement "refresh" button for manual cache clearing
+### JSON Parsing Errors
+- ❌ **Price field type mismatch** - Evidence:
+  ```
+  System.Text.Json.JsonException: The JSON value could not be converted to System.UInt32. 
+  Path: $.currentAveragePriceNQ | LineNumber: 0 | BytePositionInLine: 13051
+  ```
+  - **Root Cause:** API returns `"currentAveragePriceNQ":472.05` (double) but model expects `uint`
+  - **Affected Fields:**
+    - `currentAveragePriceNQ`
+    - `currentAveragePriceHQ`
+    - Likely: `minPrice`, `maxPrice`, `averagePrice` variants
 
-### Medium Priority
-- [ ] Add price history charts (ImPlot)
-- [ ] Create profit comparison visualizations
-- [ ] Implement watchlist/favorites
-- [ ] Add ingredient tree display in DetailWindow
-- [ ] Create shopping list view
+- ❌ **Market data fetch fails** - Evidence: `✗ Failed to fetch market data` (both test items)
+- ❌ **Profit calculation returns zeros** - Evidence:
+  ```
+  ✓ Raw Profit: 0 gil
+  ✓ Profit Margin: 0,0%
+  ✓ Risk Score: 100
+  ✓ Recommendation Score: 0
+  ```
+  - Caused by market data fetch failure
 
-### Low Priority (Future Versions)
-- [ ] Artisan IPC integration
-- [ ] Price alerts system
-- [ ] Historical profit tracking
-- [ ] Retainer integration
-- [ ] Multi-world comparison
-
----
-
-## 🎯 Current State
-
-**Status:** ✅ Foundation Complete, Ready for UI Development
-
-The core engine is **fully functional** and includes:
-- ✅ Game data loading (RecipeService)
-- ✅ Market data fetching (UniversalisService)
-- ✅ Demand analysis (MarketAnalysisService)
-- ✅ Profit calculation (ProfitService)
-- ✅ Risk assessment and warnings
-- ✅ Recommendation scoring
-
-**What works right now:**
-```csharp
-// Plugin has these services ready:
-plugin.RecipeService      // 5000+ recipes loaded
-plugin.UniversalisService // API client ready
-plugin.ProfitService      // Can calculate any recipe
-
-// Example usage (in UI code):
-var recipes = plugin.RecipeService.GetRecipesByClass("ALC");
-var profits = await plugin.ProfitService.CalculateProfitsBatchAsync(
-    recipes, 
-    "Gilgamesh"
-);
-// Returns List<ProfitCalculation> with full demand analysis!
-```
-
-**Next milestone:** Create a basic UI to display the profit calculations.
+### File Logging Not Working
+- ❌ **aurum.log is empty** - Evidence: File contains only header, no actual logs
+  - File created: `2026-01-20 21:06:06`
+  - File content: Only 5 lines (header + empty)
+  - **Root Cause:** FileLogger created but logs go through Dalamud IPluginLog, not intercepted
 
 ---
 
-## 🐛 Known Issues
+## ⚠️ UNKNOWN / NOT TESTED (No Evidence)
 
-1. **Vendor prices not implemented** - GetVendorPrice() returns 0 (needs GilShop/SpecialShop integration)
-2. **One nullable warning** - UniversalisService line 103 (non-critical)
-3. **No UI yet** - Services work but need visualization
+### UI Components
+- ⚠️ **Dashboard window** - No evidence in logs (not opened during test)
+- ⚠️ **Config window** - No evidence
+- ⚠️ **Profit table population** - Cannot test until API parsing fixed
+- ⚠️ **ImGui rendering** - Not tested
 
----
+### Advanced Features
+- ⚠️ **Market analysis calculations** - Cannot verify until data loads
+- ⚠️ **Demand scoring** - No test data
+- ⚠️ **Risk assessment** - Returns default value (100) when no data
+- ⚠️ **Ingredient tree resolution** - Not tested
+- ⚠️ **Vendor price lookup** - Not tested
 
-## 💡 Technical Highlights
-
-### Demand-First Design
-Unlike traditional profit calculators that only show margins, Aurum **actively prevents bad crafts**:
-- A 100K profit item with 0 sales/day gets a LOW score
-- A 40K profit item with 50 sales/day gets a HIGH score
-
-### Smart Ingredient Trees
-Recursively resolves sub-recipes:
-```
-Potion of Intelligence
-├─ Cloudsbreath (×2) - 8,400g MB
-│  └─ Silkworm Cocoon (×3) - Sub-recipe cheaper! (Craft it)
-│     ├─ Silkworm (×1) - 200g
-│     └─ Silk Thread (×1) - 150g
-└─ Water Crystal (×7) - 140g
-```
-
-### Batch Optimization
-- Fetches up to 100 items per API call
-- Caches aggressively (5-minute TTL)
-- Parallel profit calculations
+### Commands
+- ⚠️ `/aurum` - Not tested
+- ⚠️ `/aurum config` - Not tested  
+- ⚠️ `/aurum health` - Not tested (auto-run works, manual unknown)
+- ⚠️ `/aurum test` - Not tested manually
+- ⚠️ `/aurum log` - Not tested
 
 ---
 
-## 📝 Commit History
+## 🚧 MISSING / TODO (Identified Issues)
 
-1. Initial project setup and design documents
-2. Core data models with demand analysis
-3. Service layer implementation (Cache, Universalis, Recipe)
-4. Market analysis service with risk scoring
-5. Profit service with recursive ingredient trees
-6. Plugin integration and service initialization
-7. **Current:** Ready for UI development
+### Critical Bugs to Fix
+1. **JSON parsing error** - Change price fields from `uint` to `double` in UniversalisItemResponse
+2. **File logging** - FileLogger not intercepting log calls
+
+### Missing Features (Requested by User)
+3. **Local database for price history** - Not implemented
+   - Purpose: Cache historical data, reduce API calls
+   - Requirement: Don't crush Universalis API
+   
+4. **Rate limiting** - Not implemented
+   - No API throttling
+   - No request queuing
+   - Risk of API abuse
+
+### Technical Debt
+5. **Error handling** - JSON exceptions crash data fetches
+6. **Retry logic** - No retry on API failures
+7. **Batch optimization** - Not tuned for performance
+8. **Cache invalidation** - Simple time-based only
 
 ---
 
-**Last Updated:** January 20, 2026
-**Build Status:** ✅ Successful (1 warning, 0 errors)
-**Next Session:** Dashboard UI implementation
+## 📊 Statistics (From Logs)
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Total Recipes | 13,393 | RecipeService |
+| Total Items | 50,900 | RecipeService |
+| Plugin Version | 0.0.0.2 | Manifest |
+| Build Time | 2026-01-20 21:06:05 | DLL metadata |
+| Services Initialized | 5/5 (100%) | Health check |
+| API Requests Made | 2 | Integration test |
+| API Requests Successful | 0 (0%) | Error logs |
+| Integration Tests Passed | 0/2 (0%) | Test results |
+
+---
+
+## 🔍 Evidence-Based Conclusions
+
+### What Works
+The **plugin infrastructure is solid**:
+- Loads correctly
+- Auto-reloads on build
+- Services initialize
+- Recipe data loads perfectly
+- Health checks run
+- DEV_MODE works as intended
+- Network requests execute
+
+### What's Broken
+The **data layer has two critical bugs**:
+1. JSON model type mismatch (prices are doubles, not uints)
+2. File logging not wired up correctly
+
+### Impact
+- **Cannot fetch market data** (JSON parsing fails)
+- **Cannot calculate profits** (depends on market data)
+- **Cannot debug easily** (file log empty)
+- **Cannot use the plugin** (core functionality broken)
+
+### Next Steps (Priority Order)
+1. ✅ Fix JSON parsing (5 min fix)
+2. ✅ Fix file logging (investigate why logs don't write)
+3. ✅ Test with working data
+4. 🔄 Design local database schema
+5. 🔄 Implement rate limiting
+6. 🔄 Implement database caching
+
+---
+
+## 📝 Notes
+
+- All evidence from Dalamud log dated 2026-01-20 21:06:06 to 21:06:12
+- No assumptions made - every claim has log evidence
+- Missing features identified from user request in conversation
+- Statistics are exact counts from log output

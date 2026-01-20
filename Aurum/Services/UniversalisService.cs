@@ -166,16 +166,17 @@ public class UniversalisService : IDisposable
             WorldName = worldName,
             LastUploadTime = DateTimeOffset.FromUnixTimeMilliseconds(response.LastUploadTime).UtcDateTime,
             CurrentListings = response.Listings?.Count ?? 0,
-            MinPrice = response.MinPrice,
-            MaxPrice = response.MaxPrice,
-            CurrentAveragePriceNQ = response.CurrentAveragePriceNQ,
-            CurrentAveragePriceHQ = response.CurrentAveragePriceHQ,
-            AveragePriceNQ = response.AveragePriceNQ,
-            AveragePriceHQ = response.AveragePriceHQ,
-            MinPriceNQ = response.MinPriceNQ,
-            MinPriceHQ = response.MinPriceHQ,
-            MaxPriceNQ = response.MaxPriceNQ,
-            MaxPriceHQ = response.MaxPriceHQ,
+            // Round doubles to uints (prices in gil are whole numbers)
+            MinPrice = (uint)Math.Round(response.MinPrice),
+            MaxPrice = (uint)Math.Round(response.MaxPrice),
+            CurrentAveragePriceNQ = (uint)Math.Round(response.CurrentAveragePriceNQ),
+            CurrentAveragePriceHQ = (uint)Math.Round(response.CurrentAveragePriceHQ),
+            AveragePriceNQ = (uint)Math.Round(response.AveragePriceNQ),
+            AveragePriceHQ = (uint)Math.Round(response.AveragePriceHQ),
+            MinPriceNQ = (uint)Math.Round(response.MinPriceNQ),
+            MinPriceHQ = (uint)Math.Round(response.MinPriceHQ),
+            MaxPriceNQ = (uint)Math.Round(response.MaxPriceNQ),
+            MaxPriceHQ = (uint)Math.Round(response.MaxPriceHQ),
             CachedAt = DateTime.UtcNow
         };
         
@@ -255,16 +256,18 @@ public class UniversalisItemResponse
     public long LastUploadTime { get; set; }
     public List<UniversalisListing>? Listings { get; set; }
     public List<UniversalisHistoryEntry>? RecentHistory { get; set; }
-    public uint MinPrice { get; set; }
-    public uint MaxPrice { get; set; }
-    public uint CurrentAveragePriceNQ { get; set; }
-    public uint CurrentAveragePriceHQ { get; set; }
-    public uint AveragePriceNQ { get; set; }
-    public uint AveragePriceHQ { get; set; }
-    public uint MinPriceNQ { get; set; }
-    public uint MinPriceHQ { get; set; }
-    public uint MaxPriceNQ { get; set; }
-    public uint MaxPriceHQ { get; set; }
+    
+    // Price fields are doubles because Universalis returns floating point averages
+    public double MinPrice { get; set; }
+    public double MaxPrice { get; set; }
+    public double CurrentAveragePriceNQ { get; set; }
+    public double CurrentAveragePriceHQ { get; set; }
+    public double AveragePriceNQ { get; set; }
+    public double AveragePriceHQ { get; set; }
+    public double MinPriceNQ { get; set; }
+    public double MinPriceHQ { get; set; }
+    public double MaxPriceNQ { get; set; }
+    public double MaxPriceHQ { get; set; }
 }
 
 public class UniversalisListing

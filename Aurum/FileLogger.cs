@@ -1,141 +1,107 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Collections.Generic;
 using Dalamud.Plugin.Services;
 
 namespace Aurum;
 
 /// <summary>
-/// Writes logs to a file in the plugin bin directory for easier debugging.
-/// Also mirrors all logs to Dalamud's logging system.
+/// Copies Aurum-specific logs from Dalamud log to a dedicated file for easier debugging.
+/// Runs periodically to extract [Aurum] entries.
 /// </summary>
 public class FileLogger : IDisposable
 {
-    private readonly IPluginLog dalamudLog;
-    private readonly StreamWriter? fileWriter;
     private readonly string logFilePath;
-    private readonly object lockObj = new();
+    private readonly string dalamudLogPath;
+    private readonly System.Threading.Timer? syncTimer;
     
     public FileLogger(IPluginLog dalamudLog, string pluginDirectory)
     {
-        this.dalamudLog = dalamudLog;
-        
         // Create log file path next to the DLL
         logFilePath = Path.Combine(pluginDirectory, "aurum.log");
         
+        // Dalamud log path
+        var dalamudDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher");
+        dalamudLogPath = Path.Combine(dalamudDir, "dalamud.log");
+        
         try
         {
-            // Create or overwrite the log file
-            fileWriter = new StreamWriter(logFilePath, false)
-            {
-                AutoFlush = true
-            };
-            
-            // Write header
-            fileWriter.WriteLine("========================================");
-            fileWriter.WriteLine($"AURUM LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            fileWriter.WriteLine("========================================");
-            fileWriter.WriteLine();
+            // Create initial log file
+            File.WriteAllText(logFilePath, $"========================================\n" +
+                                           $"AURUM LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                                           $"========================================\n" +
+                                           $"Monitoring Dalamud log at: {dalamudLogPath}\n" +
+                                           $"Filtering for [Aurum] entries...\n\n");
             
             dalamudLog.Information($"File logging enabled: {logFilePath}");
+            
+            // Start periodic sync timer (every 2 seconds)
+            syncTimer = new System.Threading.Timer(SyncLogsCallback, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         }
         catch (Exception ex)
         {
             dalamudLog.Error(ex, $"Failed to create log file at {logFilePath}");
-            fileWriter = null;
         }
     }
     
-    public void Information(string message)
+    private long lastPosition = 0;
+    
+    private void SyncLogsCallback(object? state)
     {
-        dalamudLog.Information(message);
-        WriteToFile($"[INFO] {message}");
-    }
-    
-    public void Info(string message) => Information(message);
-    
-    public void Warning(string message)
-    {
-        dalamudLog.Warning(message);
-        WriteToFile($"[WARN] {message}");
-    }
-    
-    public void Warn(string message) => Warning(message);
-    
-    public void Error(string message)
-    {
-        dalamudLog.Error(message);
-        WriteToFile($"[ERROR] {message}");
-    }
-    
-    public void Error(Exception ex, string message)
-    {
-        dalamudLog.Error(ex, message);
-        WriteToFile($"[ERROR] {message}");
-        WriteToFile($"[ERROR] Exception: {ex.GetType().Name}: {ex.Message}");
-        if (ex.StackTrace != null)
+        try
         {
-            WriteToFile($"[ERROR] Stack trace: {ex.StackTrace}");
-        }
-    }
-    
-    public void Fatal(string message)
-    {
-        dalamudLog.Fatal(message);
-        WriteToFile($"[FATAL] {message}");
-    }
-    
-    public void Debug(string message)
-    {
-        dalamudLog.Debug(message);
-        WriteToFile($"[DEBUG] {message}");
-    }
-    
-    public void Verbose(string message)
-    {
-        dalamudLog.Verbose(message);
-        WriteToFile($"[VERBOSE] {message}");
-    }
-    
-    private void WriteToFile(string message)
-    {
-        if (fileWriter == null)
-            return;
+            if (!File.Exists(dalamudLogPath))
+                return;
+                
+            using var dalamudStream = new FileStream(dalamudLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             
-        lock (lockObj)
-        {
-            try
+            // Seek to last read position
+            dalamudStream.Seek(lastPosition, SeekOrigin.Begin);
+            
+            using var reader = new StreamReader(dalamudStream);
+            var newLines = new List<string>();
+            
+            string? line;
+            while ((line = reader.ReadLine()) != null)
             {
-                fileWriter.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] {message}");
+                // Only capture lines with [Aurum] tag
+                if (line.Contains("[Aurum]"))
+                {
+                    newLines.Add(line);
+                }
             }
-            catch
+            
+            // Update last position
+            lastPosition = dalamudStream.Position;
+            
+            // Append new lines to our log file
+            if (newLines.Any())
             {
-                // Silently fail if we can't write to file
+                File.AppendAllLines(logFilePath, newLines);
             }
         }
-    }
-    
-    public void Dispose()
-    {
-        if (fileWriter != null)
+        catch
         {
-            lock (lockObj)
-            {
-                try
-                {
-                    fileWriter.WriteLine();
-                    fileWriter.WriteLine("========================================");
-                    fileWriter.WriteLine($"LOG ENDED - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    fileWriter.WriteLine("========================================");
-                    fileWriter.Flush();
-                    fileWriter.Dispose();
-                }
-                catch
-                {
-                    // Silently fail during disposal
-                }
-            }
+            // Silently fail - don't crash plugin over logging
         }
     }
     
     public string GetLogFilePath() => logFilePath;
+    
+    public void Dispose()
+    {
+        syncTimer?.Dispose();
+        
+        try
+        {
+            File.AppendAllText(logFilePath, $"\n========================================\n" +
+                                            $"LOG ENDED - {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                                            $"========================================\n");
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
 }
