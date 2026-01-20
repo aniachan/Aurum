@@ -51,9 +51,9 @@
   - [x] Add database query methods (get latest price, get history, etc.)
   - [x] Implement bulk insert for batch operations
 
-- [ ] **Price history tracking**
-  - [ ] Store every API response with timestamp
-  - [ ] Track price changes over time
+- [x] **Price history tracking**
+  - [x] Store every API response with timestamp
+  - [x] Track price changes over time
   - [ ] Calculate price volatility metrics
   - [ ] Identify price trends (rising, falling, stable)
   - [ ] Store sale velocity history
