@@ -78,9 +78,9 @@
   - [x] Priority queue (user-requested > background)
   - [x] Cancel queued requests on plugin unload
 
-- [ ] **API usage monitoring**
-  - [ ] Track requests per minute/hour/day
-  - [ ] Log API errors and retry attempts
+- [x] **API usage monitoring**
+  - [x] Track requests per minute/hour/day
+  - [x] Log API errors and retry attempts
   - [ ] Display API usage stats in config window
   - [ ] Alert user if approaching rate limits
   - [ ] Implement graceful degradation (use cache only)
