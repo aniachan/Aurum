@@ -25,6 +25,7 @@ public class UniversalisService : IDisposable
     private readonly IDataManager dataManager;
     private readonly CancellationTokenSource disposeCts = new();
     private Task? processingTask;
+    private readonly SemaphoreSlim concurrencySemaphore;
 
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0;
@@ -40,6 +41,11 @@ public class UniversalisService : IDisposable
         this.dataManager = dataManager;
         this.requestQueue = new RequestQueue();
         
+        // Initialize concurrency semaphore with configured limit
+        // Default to 5 if not set or invalid
+        int maxConcurrency = configuration.MaxConcurrentApiRequests > 0 ? configuration.MaxConcurrentApiRequests : 5;
+        this.concurrencySemaphore = new SemaphoreSlim(maxConcurrency);
+
         httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30)
@@ -309,36 +315,17 @@ public class UniversalisService : IDisposable
         
         log.Info($"Fetching {uncachedItems.Count} items in {chunks.Count} batches (size: {batchSize})");
         
-        // Use SemaphoreSlim to limit concurrency if needed, but RateLimiter is global anyway.
-        // We can process chunks in parallel, but they will all hit the same RateLimiter lock.
-        // However, this allows overlapping the "wait for rate limit" and "network request" phases slightly if rate limit allows.
-        // Or if rate limit is high (e.g. 25/sec), we want to fire multiple requests.
-        
-        // Actually, EnqueueRequestAsync waits for the queue processor. The queue processor is single-threaded (ProcessQueueAsync).
-        // So parallelism here just means queueing them up faster.
-        // To truly have parallel processing, we'd need multiple queue processors or a concurrent queue processor.
-        // BUT, given the strict rate limits on Universalis, serial processing is safer and likely fast enough.
-        // Let's stick to serial queueing for safety, but maybe verify if we can do Task.WhenAll on the results.
-        
-        var batchTasks = new List<Task>();
-        
-        foreach (var chunk in chunks)
+        var batchTasks = chunks.Select(chunk => Task.Run(async () => 
         {
-            // We launch these tasks to enqueue. They return when the request COMPLETEs.
-            // So by adding them to a list and waiting WhenAll, we are waiting for all of them to finish.
-            // The queue processor will pick them up one by one.
-            batchTasks.Add(Task.Run(async () => 
+            try
             {
-                try
-                {
-                    await requestQueue.EnqueueRequestAsync(worldName, chunk.ToList(), RequestPriority.Normal);
-                }
-                catch (Exception ex)
-                {
-                    log.Warning($"Batch API request failed for chunk: {ex.Message}.");
-                }
-            }));
-        }
+                await requestQueue.EnqueueRequestAsync(worldName, chunk.ToList(), RequestPriority.Normal);
+            }
+            catch (Exception ex)
+            {
+                log.Warning($"Batch API request failed for chunk: {ex.Message}.");
+            }
+        }));
         
         await Task.WhenAll(batchTasks);
         
@@ -500,171 +487,210 @@ public class UniversalisService : IDisposable
                 continue;
             }
 
-            // Use configured batch size for dequeuing, clamped to 100 max
-            int batchSize = Math.Min(configuration.ApiBatchSize, 100);
-            
-            // Use DequeueBatch to get optimized requests
-            var request = requestQueue.DequeueBatch(maxItems: batchSize);
-            if (request == null)
+            // Wait for a concurrency slot
+            // This throttles the number of active processing tasks
+            try 
             {
-                // No requests? sleep for a bit
-                await Task.Delay(100, disposeCts.Token);
-                continue;
+                await concurrencySemaphore.WaitAsync(disposeCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
             }
 
-            // COALESCING DELAY:
-            // If we pulled a request, there might be more incoming very soon (e.g. UI rendering a list).
-            // Wait a short window (e.g. 50-100ms) to see if more requests arrive, 
-            // so we can batch them into this one if possible.
-            if (request.ItemIds.Count < batchSize)
+            QueuedRequest? request = null;
+            int batchSize = Math.Min(configuration.ApiBatchSize, 100);
+
+            try
             {
-                // Wait for potential coalescing
+                // Use DequeueBatch to get optimized requests
+                request = requestQueue.DequeueBatch(maxItems: batchSize);
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Error in queue dequeue");
+            }
+
+            if (request == null)
+            {
+                // No requests? Release slot and sleep
+                concurrencySemaphore.Release();
                 try 
                 {
                     await Task.Delay(100, disposeCts.Token);
                 }
                 catch (OperationCanceledException) { break; }
-
-                // Check for more items for the SAME world
-                var secondRequest = requestQueue.DequeueBatchForWorld(request.WorldName, maxItems: batchSize - request.ItemIds.Count);
-                if (secondRequest != null)
-                {
-                    // Merge!
-                    var combinedIds = request.ItemIds.Concat(secondRequest.ItemIds).Distinct().ToList();
-                    
-                    var superRequest = new QueuedRequest(request.WorldName, combinedIds, request.Priority > secondRequest.Priority ? request.Priority : secondRequest.Priority);
-                    
-                    // Propagate completion to both originals
-                    _ = superRequest.CompletionSource.Task.ContinueWith(t => 
-                    {
-                         PropagateResult(t, request.CompletionSource);
-                         PropagateResult(t, secondRequest.CompletionSource);
-                    });
-
-                    // Proceed with superRequest
-                    request = superRequest;
-                    log.Debug($"Coalesced requests: {combinedIds.Count} items");
-                }
-            }
-
-            // OPTIMIZATION: Re-check cache before fetching
-            // Some items might have been fetched by a parallel request or a previous batch while this was queued.
-            var itemsToFetch = new List<uint>();
-            foreach (var id in request.ItemIds)
-            {
-                var cacheKey = $"market_{request.WorldName}_{id}";
-                
-                // Check memory cache
-                if (cache.TryGet<MarketData>(cacheKey, out _)) continue;
-                
-                // Check DB cache if enabled
-                if (currentWorldId != 0) 
-                {
-                     var dbVal = database.GetMarketData((int)id, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
-                     if (dbVal != null) 
-                     {
-                         cache.Set(cacheKey, dbVal); // Rehydrate memory cache
-                         continue;
-                     }
-                }
-                
-                itemsToFetch.Add(id);
-            }
-            
-            // If all items are already cached, we can skip the API call entirely
-            if (itemsToFetch.Count == 0)
-            {
-                request.CompletionSource.TrySetResult(true);
                 continue;
             }
 
-            int retryCount = 0;
-            const int maxRetries = 3;
-            bool success = false;
-
-            while (!success && retryCount <= maxRetries && !disposeCts.Token.IsCancellationRequested)
+            // Spawn worker task for this request
+            _ = Task.Run(async () => 
             {
                 try
                 {
-                    // Wait for rate limit
-                    // We can be more granular here if needed. For now, use "api" as the endpoint key for general Universalis calls
-                    await rateLimiter.WaitForTokenAsync("api", disposeCts.Token, request.Priority);
-
-                    // Use itemsToFetch instead of request.ItemIds to avoid re-fetching cached items
-                    if (itemsToFetch.Count == 1)
-                    {
-                        await FetchSingleItemInternalAsync(request.WorldName, itemsToFetch[0]);
-                    }
-                    else
-                    {
-                        await FetchBatchItemsInternalAsync(request.WorldName, itemsToFetch);
-                    }
-                    
-                    success = true;
-                    request.CompletionSource.TrySetResult(true);
-                }
-                catch (OperationCanceledException)
-                {
-                    request.CompletionSource.TrySetCanceled();
-                    break;
-                }
-                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                {
-                    // Handle 429 explicitly
-                    retryCount++;
-                    rateLimiter.RecordRetry();
-                    
-                    // Default backoff if no Retry-After header
-                    var retryAfterSeconds = 60; // Default to 1 minute for 429 if header missing
-                    
-                    // Note: HttpRequestException doesn't expose headers easily in all versions.
-                    // We can rely on the default backoff or just wait a safe amount.
-                    // If we need precise Retry-After, we'd need to inspect the HttpResponseMessage which isn't available in the exception directly without custom handling.
-                    // For now, 60s is a safe default for Universalis 429s.
-                    
-                    log.Warning($"Universalis API returned 429 (Too Many Requests). Pausing for {retryAfterSeconds} seconds.");
-                    rateLimiter.PauseRequestsUntil(DateTime.UtcNow.AddSeconds(retryAfterSeconds));
-                    
-                    if (retryCount > maxRetries)
-                    {
-                        rateLimiter.RecordError();
-                        log.Error(ex, $"Failed to process request after {maxRetries} retries (including 429s). Giving up.");
-                        request.CompletionSource.TrySetException(ex);
-                        break;
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
-                }
-                catch (HttpRequestException ex) when ((int)(ex.StatusCode ?? 0) >= 500)
-                {
-                    // Retry on 5xx errors
-                    retryCount++;
-                    rateLimiter.RecordRetry();
-                    if (retryCount > maxRetries)
-                    {
-                        rateLimiter.RecordError();
-                        log.Error(ex, $"Failed to process request after {maxRetries} retries. Giving up.");
-                        request.CompletionSource.TrySetException(ex);
-                        break;
-                    }
-
-                    // Exponential backoff: 1s, 2s, 4s
-                    var delaySeconds = Math.Pow(2, retryCount - 1);
-                    log.Warning($"API request failed (Attempt {retryCount}/{maxRetries}). Retrying in {delaySeconds}s...");
-                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), disposeCts.Token);
+                    await ProcessRequestInternalAsync(request, batchSize);
                 }
                 catch (Exception ex)
                 {
-                    // Non-retriable error
-                    rateLimiter.RecordError();
-                    log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
-                    request.CompletionSource.TrySetException(ex);
-                    break;
+                    log.Error(ex, "Error in request processing worker");
                 }
-            }
+                finally
+                {
+                    concurrencySemaphore.Release();
+                }
+            }, disposeCts.Token);
         }
         
         log.Info("UniversalisService queue processor stopped");
+    }
+
+    private async Task ProcessRequestInternalAsync(QueuedRequest request, int batchSize)
+    {
+        // COALESCING DELAY:
+        // If we pulled a request, there might be more incoming very soon (e.g. UI rendering a list).
+        // Wait a short window (e.g. 50-100ms) to see if more requests arrive, 
+        // so we can batch them into this one if possible.
+        if (request.ItemIds.Count < batchSize)
+        {
+            // Wait for potential coalescing
+            try 
+            {
+                await Task.Delay(100, disposeCts.Token);
+            }
+            catch (OperationCanceledException) { return; }
+
+            // Check for more items for the SAME world
+            var secondRequest = requestQueue.DequeueBatchForWorld(request.WorldName, maxItems: batchSize - request.ItemIds.Count);
+            if (secondRequest != null)
+            {
+                // Merge!
+                var combinedIds = request.ItemIds.Concat(secondRequest.ItemIds).Distinct().ToList();
+                
+                var superRequest = new QueuedRequest(request.WorldName, combinedIds, request.Priority > secondRequest.Priority ? request.Priority : secondRequest.Priority);
+                
+                // Propagate completion to both originals
+                _ = superRequest.CompletionSource.Task.ContinueWith(t => 
+                {
+                        PropagateResult(t, request.CompletionSource);
+                        PropagateResult(t, secondRequest.CompletionSource);
+                });
+
+                // Proceed with superRequest
+                request = superRequest;
+                log.Debug($"Coalesced requests: {combinedIds.Count} items");
+            }
+        }
+
+        // OPTIMIZATION: Re-check cache before fetching
+        // Some items might have been fetched by a parallel request or a previous batch while this was queued.
+        var itemsToFetch = new List<uint>();
+        foreach (var id in request.ItemIds)
+        {
+            var cacheKey = $"market_{request.WorldName}_{id}";
+            
+            // Check memory cache
+            if (cache.TryGet<MarketData>(cacheKey, out _)) continue;
+            
+            // Check DB cache if enabled
+            if (currentWorldId != 0) 
+            {
+                    var dbVal = database.GetMarketData((int)id, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
+                    if (dbVal != null) 
+                    {
+                        cache.Set(cacheKey, dbVal); // Rehydrate memory cache
+                        continue;
+                    }
+            }
+            
+            itemsToFetch.Add(id);
+        }
+        
+        // If all items are already cached, we can skip the API call entirely
+        if (itemsToFetch.Count == 0)
+        {
+            request.CompletionSource.TrySetResult(true);
+            return;
+        }
+
+        int retryCount = 0;
+        const int maxRetries = 3;
+        bool success = false;
+
+        while (!success && retryCount <= maxRetries && !disposeCts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                // Wait for rate limit
+                // We can be more granular here if needed. For now, use "api" as the endpoint key for general Universalis calls
+                await rateLimiter.WaitForTokenAsync("api", disposeCts.Token, request.Priority);
+
+                // Use itemsToFetch instead of request.ItemIds to avoid re-fetching cached items
+                if (itemsToFetch.Count == 1)
+                {
+                    await FetchSingleItemInternalAsync(request.WorldName, itemsToFetch[0]);
+                }
+                else
+                {
+                    await FetchBatchItemsInternalAsync(request.WorldName, itemsToFetch);
+                }
+                
+                success = true;
+                request.CompletionSource.TrySetResult(true);
+            }
+            catch (OperationCanceledException)
+            {
+                request.CompletionSource.TrySetCanceled();
+                break;
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                // Handle 429 explicitly
+                retryCount++;
+                rateLimiter.RecordRetry();
+                
+                // Default backoff if no Retry-After header
+                var retryAfterSeconds = 60; // Default to 1 minute for 429 if header missing
+                
+                log.Warning($"Universalis API returned 429 (Too Many Requests). Pausing for {retryAfterSeconds} seconds.");
+                rateLimiter.PauseRequestsUntil(DateTime.UtcNow.AddSeconds(retryAfterSeconds));
+                
+                if (retryCount > maxRetries)
+                {
+                    rateLimiter.RecordError();
+                    log.Error(ex, $"Failed to process request after {maxRetries} retries (including 429s). Giving up.");
+                    request.CompletionSource.TrySetException(ex);
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
+            }
+            catch (HttpRequestException ex) when ((int)(ex.StatusCode ?? 0) >= 500)
+            {
+                // Retry on 5xx errors
+                retryCount++;
+                rateLimiter.RecordRetry();
+                if (retryCount > maxRetries)
+                {
+                    rateLimiter.RecordError();
+                    log.Error(ex, $"Failed to process request after {maxRetries} retries. Giving up.");
+                    request.CompletionSource.TrySetException(ex);
+                    break;
+                }
+
+                // Exponential backoff: 1s, 2s, 4s
+                var delaySeconds = Math.Pow(2, retryCount - 1);
+                log.Warning($"API request failed (Attempt {retryCount}/{maxRetries}). Retrying in {delaySeconds}s...");
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), disposeCts.Token);
+            }
+            catch (Exception ex)
+            {
+                // Non-retriable error
+                rateLimiter.RecordError();
+                log.Error(ex, $"Error processing request for {request.ItemIds.Count} items");
+                request.CompletionSource.TrySetException(ex);
+                break;
+            }
+        }
     }
 
     /// <summary>

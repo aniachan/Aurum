@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 using Aurum.Models;
@@ -97,56 +98,73 @@ public class ProfitService
         string worldName, 
         int maxConcurrent = 5)
     {
-        var results = new List<ProfitCalculation>();
         var recipeList = recipes.ToList();
+        var results = new System.Collections.Concurrent.ConcurrentBag<ProfitCalculation>();
         
         // Get all item IDs we need market data for
         var itemIds = recipeList.Select(r => r.ResultItemId).Distinct().ToList();
         
-        // Fetch market data in batches
+        // Fetch market data in batches (this is already parallelized internally by UniversalisService if needed)
+        // But we just need the dictionary to be ready.
         var marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, itemIds);
         
-        // Calculate profits
+        // Use SemaphoreSlim to limit concurrent CPU-bound processing if needed, 
+        // though profit calc is mostly waiting on DB/async tasks. 
+        // Actually, we can just use Parallel.ForEachAsync or Task.WhenAll with chunks.
+        // Let's use a semaphore to control concurrency as requested.
+        using var semaphore = new SemaphoreSlim(maxConcurrent);
+        var tasks = new List<Task>();
+
         foreach (var recipe in recipeList)
         {
-            try
+            tasks.Add(Task.Run(async () => 
             {
-                if (!marketDataDict.TryGetValue(recipe.ResultItemId, out var marketData))
+                await semaphore.WaitAsync();
+                try
                 {
-                    log.Debug($"No market data for {recipe.ItemName}");
-                    continue;
-                }
-                
-                marketAnalysisService.AnalyzeMarket(marketData);
-                var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName);
-                var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
-                
-                if (profit != null)
-                {
-                    results.Add(profit);
+                    if (!marketDataDict.TryGetValue(recipe.ResultItemId, out var marketData))
+                    {
+                        // Missing market data
+                        return;
+                    }
                     
-                    // Save to database cache
-                    try
+                    marketAnalysisService.AnalyzeMarket(marketData);
+                    var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName);
+                    var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
+                    
+                    if (profit != null)
                     {
-                        Plugin.Instance?.DatabaseService?.UpsertRecipeCache(recipe, profit);
+                        results.Add(profit);
                         
-                        // Set item priority based on recommendation score
-                        var priority = Math.Max(1, profit.RecommendationScore);
-                        Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
-                    }
-                    catch (Exception cacheEx)
-                    {
-                        log.Warning(cacheEx, $"Failed to cache profit for {recipe.ItemName}");
+                        // Save to database cache
+                        try
+                        {
+                            Plugin.Instance?.DatabaseService?.UpsertRecipeCache(recipe, profit);
+                            
+                            // Set item priority based on recommendation score
+                            var priority = Math.Max(1, profit.RecommendationScore);
+                            Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
+                        }
+                        catch (Exception cacheEx)
+                        {
+                            log.Warning(cacheEx, $"Failed to cache profit for {recipe.ItemName}");
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                log.Error(ex, $"Error calculating profit for {recipe.ItemName}");
-            }
+                catch (Exception ex)
+                {
+                    log.Error(ex, $"Error calculating profit for {recipe.ItemName}");
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }));
         }
         
-        return results;
+        await Task.WhenAll(tasks);
+        
+        return results.ToList();
     }
     
     /// <summary>
