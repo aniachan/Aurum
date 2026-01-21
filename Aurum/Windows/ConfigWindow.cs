@@ -63,10 +63,38 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
         }
 
+        ImGui.Separator();
+        ImGui.Text("API Settings");
+
+        var preferredWorld = configuration.PreferredWorld;
+        if (ImGui.InputText("Preferred World", ref preferredWorld, 32))
+        {
+            configuration.PreferredWorld = preferredWorld;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Leave as 'Auto' to use your current world, or specify a world name.");
+        }
+
         var cacheDuration = configuration.MarketDataCacheDurationSeconds;
         if (ImGui.InputInt("Market Data Cache Duration (Seconds)", ref cacheDuration))
         {
             configuration.MarketDataCacheDurationSeconds = cacheDuration;
+            configuration.Save();
+        }
+        
+        var maxConcurrent = configuration.MaxConcurrentApiRequests;
+        if (ImGui.SliderInt("Max Concurrent API Requests", ref maxConcurrent, 1, 20))
+        {
+            configuration.MaxConcurrentApiRequests = maxConcurrent;
+            configuration.Save();
+        }
+
+        var rateLimit = configuration.ApiRateLimitPerMinute;
+        if (ImGui.InputInt("API Rate Limit (Requests/Minute)", ref rateLimit))
+        {
+            configuration.ApiRateLimitPerMinute = rateLimit;
             configuration.Save();
         }
         
