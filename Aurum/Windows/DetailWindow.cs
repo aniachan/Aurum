@@ -5,6 +5,8 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Bindings.ImGui;
 using System.Diagnostics;
 using Aurum.Models;
+using Aurum.Utils;
+using Dalamud.Interface;
 
 namespace Aurum.Windows;
 
@@ -188,25 +190,44 @@ public class DetailWindow : Window, IDisposable
 
         ImGui.TextDisabled("RISK ASSESSMENT");
         
-        var riskColor = currentItem.RiskLevel switch
-        {
-            RiskLevel.Low => new Vector4(0f, 1f, 0.5f, 1f),
-            RiskLevel.Medium => new Vector4(1f, 1f, 0.5f, 1f),
-            RiskLevel.High => new Vector4(1f, 0.7f, 0f, 1f),
-            RiskLevel.VeryHigh => new Vector4(1f, 0.3f, 0.3f, 1f),
-            _ => new Vector4(1f, 1f, 1f, 1f)
-        };
+        UiUtils.DrawRiskBadge(currentItem.RiskLevel);
         
-        ImGui.TextColored(riskColor, $"Risk Level: {currentItem.RiskLevel}");
         ImGui.Text($"Score: {currentItem.RiskScore}/100");
         
+        if (!string.IsNullOrEmpty(currentItem.RiskAnalysis))
+        {
+             ImGui.Spacing();
+             ImGui.TextWrapped(currentItem.RiskAnalysis);
+        }
+
         if (currentItem.Warnings.Any())
         {
             ImGui.Spacing();
+            ImGui.Separator();
             ImGui.Text("Warnings:");
             foreach (var w in currentItem.Warnings)
             {
-                ImGui.BulletText(w.Message);
+                var warningIcon = UiUtils.GetWarningIcon(w.Type);
+                var warningColor = w.Level switch
+                {
+                    WarningLevel.Danger => new Vector4(1f, 0.3f, 0.3f, 1f),
+                    WarningLevel.Warning => new Vector4(1f, 0.7f, 0f, 1f),
+                    _ => new Vector4(0.8f, 0.8f, 1f, 1f)
+                };
+
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.TextColored(warningColor, warningIcon);
+                ImGui.PopFont();
+                
+                ImGui.SameLine();
+                ImGui.TextWrapped(w.Message);
+                
+                if (!string.IsNullOrEmpty(w.Details))
+                {
+                    ImGui.Indent();
+                    ImGui.TextDisabled(w.Details);
+                    ImGui.Unindent();
+                }
             }
         }
     }

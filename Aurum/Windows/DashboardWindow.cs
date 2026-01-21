@@ -9,6 +9,8 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Aurum.Models;
+using Aurum.Utils;
+using Dalamud.Interface;
 
 namespace Aurum.Windows;
 
@@ -328,7 +330,12 @@ public class DashboardWindow : Window, IDisposable
                     ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), "Warnings:");
                     foreach (var warning in profit.Warnings)
                     {
-                        ImGui.TextWrapped($"⚠️ {warning.Message}");
+                         var icon = UiUtils.GetWarningIcon(warning.Type);
+                         ImGui.PushFont(UiBuilder.IconFont);
+                         ImGui.Text(icon);
+                         ImGui.PopFont();
+                         ImGui.SameLine();
+                         ImGui.TextWrapped(warning.Message);
                     }
                 }
                 ImGui.EndTooltip();
@@ -394,25 +401,7 @@ public class DashboardWindow : Window, IDisposable
         if (!plugin.Configuration.HiddenColumns.Contains("Risk"))
         {
             ImGui.TableNextColumn();
-            var riskColor = profit.RiskLevel switch
-            {
-                RiskLevel.Low => new Vector4(0f, 1f, 0.5f, 1f),
-                RiskLevel.Medium => new Vector4(1f, 1f, 0.5f, 1f),
-                RiskLevel.High => new Vector4(1f, 0.7f, 0f, 1f),
-                RiskLevel.VeryHigh => new Vector4(1f, 0.3f, 0.3f, 1f),
-                _ => new Vector4(1f, 1f, 1f, 1f)
-            };
-            
-            var riskIcon = profit.RiskLevel switch
-            {
-                RiskLevel.Low => "🟢",
-                RiskLevel.Medium => "🟡",
-                RiskLevel.High => "🟠",
-                RiskLevel.VeryHigh => "🔴",
-                _ => "⚪"
-            };
-            
-            ImGui.TextColored(riskColor, $"{riskIcon} {profit.RiskLevel}");
+            UiUtils.DrawRiskBadge(profit.RiskLevel);
         }
         
         // Score (stars)
