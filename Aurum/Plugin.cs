@@ -43,6 +43,9 @@ public sealed class Plugin : IDalamudPlugin
     public RateLimiter RateLimiter { get; init; }
     public ProfitService ProfitService { get; init; }
     public RefreshService RefreshService { get; init; }
+    
+    // Static accessor for UI components if needed (use sparingly)
+    public static Plugin Instance { get; private set; }
 
     public readonly WindowSystem WindowSystem = new("Aurum");
     private ConfigWindow ConfigWindow { get; init; }
@@ -52,6 +55,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
+        Instance = this;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         // Initialize file logging

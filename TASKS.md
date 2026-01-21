@@ -81,7 +81,7 @@
 - [x] **API usage monitoring**
   - [x] Track requests per minute/hour/day
   - [x] Log API errors and retry attempts
-  - [ ] Display API usage stats in config window
+  - [x] Display API usage stats in config window
   - [ ] Alert user if approaching rate limits
   - [ ] Implement graceful degradation (use cache only)
 
@@ -204,7 +204,7 @@
   - [x] Add window open/close button in dashboard
 
 - [ ] **Price history chart**
-  - [x] Line chart showing price over time (Basic table for now due to dependency issues)
+  - [ ] Line chart showing price over time
   - [ ] Dual Y-axis (listings + price)
   - [x] Time range selector (1d, 7d, 30d, all)
   - [ ] Zoom and pan controls

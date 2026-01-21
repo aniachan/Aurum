@@ -69,5 +69,18 @@ public class ConfigWindow : Window, IDisposable
             configuration.MarketDataCacheDurationSeconds = cacheDuration;
             configuration.Save();
         }
+
+        ImGui.Separator();
+        ImGui.Text("API Usage Statistics");
+        var limiter = Aurum.Plugin.Instance.RateLimiter;
+        if (limiter != null)
+        {
+            ImGui.Text($"Requests (Last Minute): {limiter.RequestsLastMinute}");
+            ImGui.Text($"Requests (Last Hour): {limiter.RequestsLastHour}");
+            ImGui.Text($"Requests (Today): {limiter.RequestsToday}");
+            ImGui.Text($"Total Requests: {limiter.TotalRequests}");
+            ImGui.Text($"Rate Limited: {limiter.RateLimitedRequests}");
+            ImGui.Text($"Errors/Retries: {limiter.TotalErrors} / {limiter.TotalRetries}");
+        }
     }
 }
