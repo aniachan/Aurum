@@ -121,6 +121,17 @@ public static class ShoppingListTests
         // NOTE: This depends on the desired behavior. If we recursively break down, we consume the intermediate.
         var intermediate = shoppingList.Items.FirstOrDefault(i => i.ItemId == intermediateId);
         if (intermediate != null) throw new Exception("Intermediate item should be broken down and not appear in list");
+        
+        // 4. Verify Crafting Steps
+        if (shoppingList.CraftingSteps.Count != 2) throw new Exception($"Expected 2 crafting steps, got {shoppingList.CraftingSteps.Count}");
+        
+        // Step 1: Craft Intermediate (Bottom-Up order)
+        var step1 = shoppingList.CraftingSteps[0];
+        if (step1.ItemId != intermediateId) throw new Exception("Step 1 should be Intermediate item");
+        
+        // Step 2: Craft Final Product
+        var step2 = shoppingList.CraftingSteps[1];
+        if (step2.ItemId != finalProductId) throw new Exception("Step 2 should be Final Product");
 
         Console.WriteLine("- TestRecursiveBreakdown passed");
     }

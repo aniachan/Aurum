@@ -83,6 +83,28 @@ public class ShoppingListWindow : Window, IDisposable
         
         ImGui.Separator();
 
+        if (ImGui.BeginTabBar("ShoppingListTabs"))
+        {
+            if (ImGui.BeginTabItem("Materials"))
+            {
+                DrawMaterialsTable();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Crafting Plan"))
+            {
+                DrawCraftingPlan();
+                ImGui.EndTabItem();
+            }
+            
+            ImGui.EndTabBar();
+        }
+    }
+
+    private void DrawMaterialsTable()
+    {
+        if (currentList == null) return;
+
         if (ImGui.BeginTable("ShoppingListTable", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
         {
             ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
@@ -123,6 +145,57 @@ public class ShoppingListWindow : Window, IDisposable
             ImGui.TableNextColumn();
             ImGui.TextColored(new Vector4(1f, 0.84f, 0f, 1f), $"{currentList.TotalEstimatedCost:N0}");
 
+            ImGui.EndTable();
+        }
+    }
+
+    private void DrawCraftingPlan()
+    {
+        if (currentList?.CraftingSteps == null || !currentList.CraftingSteps.Any())
+        {
+            ImGui.Text("No crafting steps available.");
+            return;
+        }
+
+        if (ImGui.BeginTable("CraftingPlanTable", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        {
+            ImGui.TableSetupColumn("Step", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Quantity", ImGuiTableColumnFlags.WidthFixed, 120);
+            ImGui.TableSetupColumn("Ingredients", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableHeadersRow();
+
+            foreach (var step in currentList.CraftingSteps.OrderBy(s => s.StepIndex))
+            {
+                ImGui.TableNextRow();
+                
+                ImGui.TableNextColumn();
+                ImGui.Text($"{step.StepIndex}");
+                
+                ImGui.TableNextColumn();
+                ImGui.Text($"{step.ItemName}");
+                if (step.BatchSize > 1)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextDisabled($"(Yields {step.BatchSize})");
+                }
+                
+                ImGui.TableNextColumn();
+                ImGui.Text($"{step.Quantity} ({step.TotalCrafts} crafts)");
+                
+                ImGui.TableNextColumn();
+                // Simple list of ingredients
+                if (step.Ingredients.Any())
+                {
+                    var ingredients = string.Join(", ", step.Ingredients.Select(i => $"{i.AmountNeeded}x {i.ItemName}"));
+                    ImGui.TextWrapped(ingredients);
+                }
+                else
+                {
+                     ImGui.TextDisabled("None");
+                }
+            }
+            
             ImGui.EndTable();
         }
     }

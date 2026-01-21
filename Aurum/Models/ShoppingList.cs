@@ -16,6 +16,9 @@ public class ShoppingList
     // Items we are crafting that generated this list
     public List<CraftingTarget> Targets { get; set; } = new();
 
+    // Optimal crafting order to achieve the targets
+    public List<CraftingStep> CraftingSteps { get; set; } = new();
+
     public string ToClipboardString()
     {
         var sb = new System.Text.StringBuilder();
@@ -31,6 +34,16 @@ public class ShoppingList
         
         sb.AppendLine();
         sb.AppendLine($"Total Estimated Cost: {TotalEstimatedCost:N0} gil");
+        
+        if (CraftingSteps.Any())
+        {
+            sb.AppendLine();
+            sb.AppendLine("=== Suggested Crafting Order ===");
+            foreach (var step in CraftingSteps.OrderBy(s => s.StepIndex))
+            {
+                sb.AppendLine($"{step.StepIndex}. Craft {step.Quantity}x {step.ItemName} ({step.TotalCrafts} actions)");
+            }
+        }
         
         return sb.ToString();
     }
@@ -86,4 +99,21 @@ public enum MaterialSourceType
     Vendor,
     Gathering,
     Craftable
+}
+
+public class CraftingStep
+{
+    public int StepIndex { get; set; }
+    public uint ItemId { get; set; }
+    public string ItemName { get; set; } = string.Empty;
+    public uint IconId { get; set; }
+    public uint RecipeId { get; set; }
+    public int Quantity { get; set; }
+    
+    // Efficiency metrics
+    public int BatchSize { get; set; }     // e.g. yields 3 per craft
+    public int TotalCrafts { get; set; }   // Number of crafting actions
+    
+    // Ingredients needed for THIS step (not full recursive tree)
+    public List<ShoppingListItem> Ingredients { get; set; } = new();
 }

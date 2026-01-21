@@ -139,21 +139,22 @@ public class ShoppingListService
             if (recipe == null) continue;
             int crafts = (int)Math.Ceiling((double)target.AmountToCraft / recipe.ResultAmount);
             
-            foreach (var ing in recipe.Ingredients)
-            {
-                AddToPool(itemPool, ing.ItemId, ing.AmountNeeded * crafts);
-                if (ing.SubRecipeId.HasValue)
-                {
-                    itemRecipeMap[ing.ItemId] = ing.SubRecipeId.Value;
-                }
-            }
-             foreach (var crystal in recipe.Crystals)
-            {
-                 AddToPool(itemPool, crystal.ItemId, crystal.AmountNeeded * crafts);
-            }
+            // Add the final product to our plan too, so it gets sequenced
+            itemRecipeMap[target.ItemId] = target.RecipeId;
+            AddToPool(itemPool, target.ItemId, target.AmountToCraft);
+
+            // We don't add ingredients here immediately if we want to sequence the final product too.
+            // But the current logic assumes itemPool only contains things we need to ACQUIRE (buy or craft).
+            // The existing logic removes items from pool as they are processed.
+            
+            // Wait, if we put the TARGETS in the pool, the loop below will process them (break them down).
+            // That is exactly what we want for ordering!
         }
         
-        // 2. Iterative processing
+        // 2. Iterative processing with step recording
+        var steps = new List<CraftingStep>();
+        
+        // We need to keep processing until NO craftable items remain in the pool.
         bool changed = true;
         while (changed)
         {
@@ -161,49 +162,26 @@ public class ShoppingListService
             // Find items in pool that have a recipe mapped
             var craftableItems = itemPool.Keys.Where(k => itemRecipeMap.ContainsKey(k)).ToList();
             
-            // We need to process them in topological order effectively.
-            // But simply picking one, calculating crafts, adding ingredients, and removing it works
-            // IF we don't have cycles (crafting trees usually DAGs).
-            
-            // However, we want to aggregate maximal amount before breaking down.
-            // If we break down 'Iron Ingot' now, but later another branch adds more 'Iron Ingot',
-            // we might have optimized prematurely (e.g. 2 needed now -> 1 craft (yield 3). Later +1 needed -> 0 extra crafts).
-            // But if we processed 2, then 1, we might calculate 1 craft + 1 craft = 2 crafts.
-            // If we processed 3 at once -> 1 craft.
-            
-            // So we need to peel from the "top" (items that are NOT ingredients of any other current item).
-            // But identifying "top" is hard without full graph.
-            
-            // Heuristic: Just process everything currently in the pool that IS craftable?
-            // No, if A needs B, and we have A and B in pool.
-            // We should process A first, which adds more B. THEN process B.
-            
-            // So: Process items that are NOT ingredients of any OTHER item currently in the pool? Expensive.
-            
-            // Alternative: Recursion with Memoization?
-            // No, we need global aggregation.
-            
-            // Let's use a "Tiered" approach?
-            // Or just iterate until no changes, but only process "Leafs" of the current dependency graph?
-            // Actually, "Roots" (items that no one else needs).
-            // But "no one else needs" changes as we break things down.
-            
-            // Let's try a simpler approach:
-            // 1. Expand EVERYTHING to a list of (ItemId, Depth).
-            // 2. Sort by Depth descending?
-            
-            // Let's trust that the recipe data implies a hierarchy.
-            // We can iterate: Pick an item. Does any OTHER item in the pool use this as ingredient?
-            // If yes, defer. If no, process.
-            
-            // To do this efficiently:
+            if (craftableItems.Count == 0) break;
+
             // Build dependency graph of items in pool.
             // Key: ItemId. Value: List of Ingredients.
             
             var currentPool = itemPool.Where(kv => itemRecipeMap.ContainsKey(kv.Key)).ToList();
-            if (currentPool.Count == 0) break; // Nothing left to break down
             
-            // Build a mini-graph of the current pool
+            // Build a mini-graph of the current pool to find "Leafs" (items that don't depend on other craftables in pool)
+            // Actually, for crafting order (execution), we want to do the opposite of breakdown?
+            // "Breakdown" order is Top-Down (Final Product -> Ingredients).
+            // "Crafting" order is Bottom-Up (Ingredients -> Final Product).
+            
+            // If we process Top-Down here (which we do to find raw materials), we are generating the steps in REVERSE order.
+            // So: Final Product depends on Intermediate. We process Final Product first (break it down).
+            // Then we process Intermediate (break it down).
+            // The execution order should be: Craft Intermediate -> Craft Final Product.
+            // So if we record steps as we break them down, we just need to REVERSE the list at the end!
+            
+            // ... logic for finding what to process next (Top-Down) ...
+            
             var dependencies = new Dictionary<uint, HashSet<uint>>();
             foreach (var kv in currentPool)
             {
@@ -216,8 +194,8 @@ public class ShoppingListService
                  dependencies[kv.Key] = deps;
             }
             
-            // Find items that are NOT dependencies of anyone else in the current "craftable" set
-            // i.e. Indegree 0 within the subgraph of craftables.
+            // Find items that are NOT ingredients of any OTHER item currently in the pool (Roots of dependency tree)
+            // This allows us to aggregate demand before breaking down.
             
             var referencedByOthers = new HashSet<uint>();
             foreach(var kv in dependencies)
@@ -233,8 +211,7 @@ public class ShoppingListService
             
             if (toProcess.Count == 0 && currentPool.Count > 0)
             {
-                 // Cycle detected or logic error?
-                 // Fallback: Process first
+                 // Cycle detected or complex dependency? Fallback to processing first one.
                  toProcess.Add(currentPool.First());
             }
             
@@ -245,19 +222,70 @@ public class ShoppingListService
                 int amountNeeded = item.Value;
                 uint recipeId = itemRecipeMap[itemId];
                 
-                // Remove from pool (we are replacing it with ingredients)
-                itemPool.Remove(itemId);
-                itemRecipeMap.Remove(itemId); // No longer pending breakdown
-                
+                // Record this step (Top-Down)
                 var recipe = recipeService.GetRecipe(recipeId);
                 if (recipe != null)
                 {
                     int crafts = (int)Math.Ceiling((double)amountNeeded / recipe.ResultAmount);
                     
+                    var step = new CraftingStep
+                    {
+                        ItemId = itemId,
+                        ItemName = recipe.ItemName, // Or recipeService.GetItemName(itemId)
+                        IconId = recipe.IconId,
+                        RecipeId = recipeId,
+                        Quantity = amountNeeded,
+                        BatchSize = recipe.ResultAmount,
+                        TotalCrafts = crafts
+                    };
+                    
+                    // Capture immediate ingredients for this step (for display)
+                    foreach (var ing in recipe.Ingredients)
+                    {
+                        step.Ingredients.Add(new ShoppingListItem 
+                        {
+                            ItemId = ing.ItemId,
+                            ItemName = ing.ItemName,
+                            AmountNeeded = ing.AmountNeeded * crafts
+                        });
+                    }
+                     foreach (var cry in recipe.Crystals)
+                    {
+                        step.Ingredients.Add(new ShoppingListItem 
+                        {
+                            ItemId = cry.ItemId,
+                            ItemName = cry.ItemName, // Crystals usually have names
+                            AmountNeeded = cry.AmountNeeded * crafts
+                        });
+                    }
+                    
+                    steps.Add(step);
+                    
+                    // Remove from pool (we are replacing it with ingredients)
+                    itemPool.Remove(itemId);
+                    itemRecipeMap.Remove(itemId); 
+                    
                     AddImmediateIngredients(recipe, crafts, itemPool, itemRecipeMap);
+                }
+                else
+                {
+                    // Recipe not found? Just remove it to prevent infinite loop
+                    itemPool.Remove(itemId);
+                    itemRecipeMap.Remove(itemId);
                 }
             }
         }
+        
+        // Reverse steps to get Execution Order (Bottom-Up)
+        steps.Reverse();
+        
+        // Assign step indices
+        for (int i = 0; i < steps.Count; i++)
+        {
+            steps[i].StepIndex = i + 1;
+        }
+        
+        shoppingList.CraftingSteps = steps;
         
         // Convert leftover pool to shopping list
         foreach (var (itemId, amount) in itemPool)
