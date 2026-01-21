@@ -221,11 +221,10 @@ public class DashboardWindow : Window, IDisposable
         }
 
         ImGui.SameLine();
-
-            if (ImGui.Button("📥 Export CSV"))
-            {
-                 _ = ExportToCsvAsync();
-            }
+        if (ImGui.Button("📥 Export CSV"))
+        {
+            _ = ExportToCsvAsync();
+        }
             
             // Error Reporting Button (shows when an error has occurred recently)
             if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)

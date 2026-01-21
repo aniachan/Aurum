@@ -258,6 +258,20 @@ public class ChartWindow : Window, IDisposable
                 DrawSeries(comparisonSeries[i]);
             }
             
+            // Crosshair
+            if (ImPlot.IsPlotHovered())
+            {
+                var mouse = ImPlot.GetPlotMousePos();
+                ImPlot.TagX(mouse.X, new Vector4(1, 1, 1, 0.5f));
+                ImPlot.TagY(mouse.Y, new Vector4(1, 1, 1, 0.5f));
+
+                ImGui.BeginTooltip();
+                var date = DateTimeOffset.FromUnixTimeSeconds((long)mouse.X).ToLocalTime();
+                ImGui.Text($"Date: {date:g}");
+                ImGui.Text($"Price: {mouse.Y:N0} Gil");
+                ImGui.EndTooltip();
+            }
+
             ImPlot.EndPlot();
         }
 
