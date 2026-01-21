@@ -183,7 +183,7 @@
 
 - [ ] **Action buttons**
   - [x] "Refresh" button (re-fetch market data)
-  - [ ] "Export" button (CSV export)
+  - [x] "Export" button (CSV export)
   - [x] "Filter" button (Filters are inline)
   - [x] Loading spinner during refresh
 
