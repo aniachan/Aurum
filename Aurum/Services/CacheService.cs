@@ -12,6 +12,10 @@ public class CacheService
     private readonly object lockObject = new();
     private readonly Configuration config;
     
+    // Statistics
+    private long _hits;
+    private long _misses;
+    
     public CacheService(Configuration config)
     {
         this.config = config;
@@ -28,6 +32,7 @@ public class CacheService
             {
                 if (!entry.IsExpired)
                 {
+                    System.Threading.Interlocked.Increment(ref _hits);
                     value = entry.Value as T;
                     return value != null;
                 }
@@ -38,6 +43,7 @@ public class CacheService
                 }
             }
             
+            System.Threading.Interlocked.Increment(ref _misses);
             value = null;
             return false;
         }
@@ -154,7 +160,9 @@ public class CacheService
             {
                 TotalEntries = cache.Count,
                 ExpiredEntries = expired,
-                ActiveEntries = cache.Count - expired
+                ActiveEntries = cache.Count - expired,
+                Hits = System.Threading.Interlocked.Read(ref _hits),
+                Misses = System.Threading.Interlocked.Read(ref _misses)
             };
         }
     }
@@ -172,4 +180,10 @@ public class CacheStats
     public int TotalEntries { get; set; }
     public int ExpiredEntries { get; set; }
     public int ActiveEntries { get; set; }
+    public long Hits { get; set; }
+    public long Misses { get; set; }
+    
+    public float HitRate => (Hits + Misses) > 0 
+        ? (float)Hits / (Hits + Misses) * 100 
+        : 0;
 }

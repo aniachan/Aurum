@@ -55,7 +55,45 @@ public class DashboardWindow : Window, IDisposable
         ImGui.Separator();
         DrawFilters();
         ImGui.Separator();
-        DrawProfitList();
+        
+        // Reserve space for status bar at bottom
+        float footerHeight = ImGui.GetFrameHeightWithSpacing();
+        float availableHeight = ImGui.GetContentRegionAvail().Y - footerHeight;
+        
+        // Create a child window for the list to ensure it doesn't overlap the footer
+        if (ImGui.BeginChild("ListRegion", new Vector2(0, availableHeight), false, ImGuiWindowFlags.None))
+        {
+            DrawProfitList();
+            ImGui.EndChild();
+        }
+        
+        ImGui.Separator();
+        DrawStatusBar();
+    }
+
+    private void DrawStatusBar()
+    {
+        // API Stats
+        var requests = plugin.RateLimiter.RequestsLastMinute;
+        var limit = plugin.Configuration.ApiRateLimitPerMinute;
+        var apiColor = requests > limit * 0.8 
+            ? new Vector4(1f, 0.7f, 0f, 1f) // Orange if near limit
+            : new Vector4(0.7f, 0.7f, 0.7f, 1f); // Grey otherwise
+
+        ImGui.TextColored(apiColor, $"API Usage: {requests}/{limit} (1m)");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Requests to Universalis API in the last minute");
+
+        ImGui.SameLine();
+        ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "|");
+        ImGui.SameLine();
+
+        // Cache Stats
+        var cacheStats = plugin.CacheService.GetStats();
+        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), $"Cache Hit Rate: {cacheStats.HitRate:F1}%");
+        if (ImGui.IsItemHovered()) 
+        {
+            ImGui.SetTooltip($"Hits: {cacheStats.Hits}\nMisses: {cacheStats.Misses}\nActive Entries: {cacheStats.ActiveEntries}\nExpired: {cacheStats.ExpiredEntries}");
+        }
     }
     
     private void DrawHeader()
