@@ -39,6 +39,7 @@ public class ChartWindow : Window, IDisposable
         public MarketData Data { get; init; } = null!;
         public string Name { get; init; } = string.Empty;
         public Vector4 Color { get; set; }
+        public bool IsVisible { get; set; } = true;
     }
 
     private readonly List<ChartSeries> comparisonSeries = new();
@@ -97,7 +98,8 @@ public class ChartWindow : Window, IDisposable
         { 
             Data = data, 
             Name = name,
-            Color = SeriesColors[0]
+            Color = SeriesColors[0],
+            IsVisible = true
         });
 
         // If we have access to database service (via plugin), we could fetch historical snapshots here
@@ -152,7 +154,8 @@ public class ChartWindow : Window, IDisposable
         {
             Data = data,
             Name = name,
-            Color = SeriesColors[colorIndex]
+            Color = SeriesColors[colorIndex],
+            IsVisible = true
         });
     }
 
@@ -237,10 +240,17 @@ public class ChartWindow : Window, IDisposable
             foreach (var series in comparisonSeries)
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, series.Color);
-                ImGui.Bullet();
-                ImGui.PopStyleColor();
+                bool isVisible = series.IsVisible;
+                if (ImGui.Checkbox($"##Vis_{series.Name}", ref isVisible))
+                {
+                    series.IsVisible = isVisible;
+                }
                 ImGui.SameLine();
+                // If it's the primary series (first one), indicate it with a bullet or similar distinction if needed.
+                // But for now, just the name.
+                ImGui.PopStyleColor();
                 ImGui.Text(series.Name);
+
                 if (series != comparisonSeries[0])
                 {
                     ImGui.SameLine();
@@ -398,13 +408,17 @@ public class ChartWindow : Window, IDisposable
 
             // Draw all series with the same chart type
             // First draw comparison series (non-primary), then primary on top
+            // Iterate backwards so primary (index 0) is drawn last (on top)
             for (int i = comparisonSeries.Count - 1; i >= 1; i--)
             {
-                DrawSeries(comparisonSeries[i], isPrimary: false, chartType: selectedChartType);
+                if (comparisonSeries[i].IsVisible)
+                {
+                    DrawSeries(comparisonSeries[i], isPrimary: false, chartType: selectedChartType);
+                }
             }
             
             // Draw primary series on top with selected chart type
-            if (comparisonSeries.Count > 0)
+            if (comparisonSeries.Count > 0 && comparisonSeries[0].IsVisible)
             {
                 DrawSeries(comparisonSeries[0], isPrimary: true, chartType: selectedChartType);
             }
