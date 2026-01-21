@@ -30,6 +30,7 @@ public class ChartWindow : Window, IDisposable
     private ChartType selectedChartType = ChartType.Candle;
     private bool showVolumeChart = true;
     private bool useLogScale = false;
+    private bool normalizePrices = false;
     private bool shouldFitHistory = true;
     private bool shouldFitDistribution = true;
     private bool showColorCodedSupplyDemand = true;
@@ -226,6 +227,19 @@ public class ChartWindow : Window, IDisposable
         {
             ImGui.SetTooltip("Use logarithmic scale for Y-axis (helpful when comparing items with different price ranges)");
         }
+
+        // Price Normalization Checkbox
+        if (comparisonSeries.Count > 1)
+        {
+            ImGui.SameLine();
+            ImGui.Spacing();
+            ImGui.SameLine();
+            ImGui.Checkbox("Normalize Prices", ref normalizePrices);
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Normalize prices to percentage change (0% = Start Price). Helpful for comparing trends between expensive and cheap items.");
+            }
+        }
         
         // Show comparison series management
         if (comparisonSeries.Count > 1)
@@ -384,11 +398,12 @@ public class ChartWindow : Window, IDisposable
         if (ImPlot.BeginPlot("##PriceHistoryChart", new Vector2(-1, mainChartHeight), ImPlotFlags.None))
         {
             // Setup axes with cleaner styling (single Y-axis for price only)
-            ImPlot.SetupAxes("Time", "Price (Gil)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.RangeFit);
+            string yLabel = normalizePrices ? "Price Change (%)" : "Price (Gil)";
+            ImPlot.SetupAxes("Time", yLabel, ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.RangeFit);
             ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
             
             // Apply logarithmic scale if enabled (useful for comparing items with different price ranges)
-            if (useLogScale)
+            if (useLogScale && !normalizePrices)
             {
                 ImPlot.SetupAxisScale(ImAxis.Y1, ImPlotScale.Log10);
                 // For log scale, constrain to positive values only (log(0) is undefined)
@@ -396,12 +411,21 @@ public class ChartWindow : Window, IDisposable
             }
             else
             {
-                // For linear scale, allow starting from 0
-                ImPlot.SetupAxisLimitsConstraints(ImAxis.Y1, 0, double.PositiveInfinity);
+                // For linear scale, allow starting from 0 (or -100% for normalized)
+                double minLimit = normalizePrices ? -100 : 0;
+                ImPlot.SetupAxisLimitsConstraints(ImAxis.Y1, minLimit, double.PositiveInfinity);
+            }
+
+            if (normalizePrices)
+            {
+                ImPlot.SetupAxisFormat(ImAxis.Y1, "%.0f%%");
+            }
+            else
+            {
+                ImPlot.SetupAxisFormat(ImAxis.Y1, "%.0f");
             }
             
             ImPlot.SetupAxisFormat(ImAxis.X1, "%m/%d");
-            ImPlot.SetupAxisFormat(ImAxis.Y1, "%.0f");
             
             // Enable legend with better positioning and styling
             ImPlot.SetupLegend(ImPlotLocation.NorthWest, ImPlotLegendFlags.Outside | ImPlotLegendFlags.Horizontal);
@@ -435,7 +459,12 @@ public class ChartWindow : Window, IDisposable
                 var date = DateTimeOffset.FromUnixTimeSeconds((long)mouse.X).ToLocalTime();
                 ImGui.TextColored(new Vector4(0.5f, 0.85f, 1f, 1f), $"📅 {date:MMM dd, yyyy HH:mm}");
                 ImGui.Spacing();
-                ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.6f, 1f), $"💰 {mouse.Y:N0} Gil");
+
+                if (normalizePrices)
+                    ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.6f, 1f), $"📈 {mouse.Y:F1}%");
+                else
+                    ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.6f, 1f), $"💰 {mouse.Y:N0} Gil");
+                    
                 ImGui.EndTooltip();
             }
 
@@ -744,93 +773,102 @@ public class ChartWindow : Window, IDisposable
                 _ => TimeSpan.FromDays(1)        // Daily for all time
             };
 
-            var candles = historyList
-                .GroupBy(h => new DateTime((long)(h.Timestamp.Ticks / bucketSize.Ticks) * bucketSize.Ticks))
-                .Select(g => new
-                {
-                    Time = g.Key,
-                    Open = g.First().PricePerUnit,
-                    High = g.Max(x => x.PricePerUnit),
-                    Low = g.Min(x => x.PricePerUnit),
-                    Close = g.Last().PricePerUnit,
-                    Volume = g.Sum(x => x.Quantity)
-                })
-                .OrderBy(c => c.Time)
-                .ToList();
+        // Determine base price for normalization
+        // Use the first available price in the visible range or first history item
+        double basePrice = 1.0;
+        if (normalizePrices && historyList.Any())
+        {
+            basePrice = (double)historyList.First().PricePerUnit;
+            if (basePrice <= 0) basePrice = 1.0;
+        }
 
-            if (candles.Any())
+        var candles = historyList
+            .GroupBy(h => new DateTime((long)(h.Timestamp.Ticks / bucketSize.Ticks) * bucketSize.Ticks))
+            .Select(g => new
             {
-                var bullColor = new Vector4(0.2f, 0.8f, 0.4f, 1.0f);   // Bright green for up
-                var bearColor = new Vector4(0.8f, 0.6f, 0f, 1.0f);  // Darker gold for down
-                var wickColor = new Vector4(0.6f, 0.6f, 0.6f, 0.9f);   // Gray for wicks
-                var syntheticWickColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded for synthetic
-                var interpolateColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded gray for gaps
-                var candleWidth = bucketSize.TotalSeconds * 0.7; // 70% of time bucket
+                Time = g.Key,
+                Open = NormalizeIfNeeded(g.First().PricePerUnit, basePrice),
+                High = NormalizeIfNeeded(g.Max(x => x.PricePerUnit), basePrice),
+                Low = NormalizeIfNeeded(g.Min(x => x.PricePerUnit), basePrice),
+                Close = NormalizeIfNeeded(g.Last().PricePerUnit, basePrice),
+                Volume = g.Sum(x => x.Quantity)
+            })
+            .OrderBy(c => c.Time)
+            .ToList();
 
-                // Draw interpolation line connecting candle closes (helps see trend through gaps)
-                var closeXs = candles.Select(c => (double)new DateTimeOffset(c.Time).ToUnixTimeSeconds()).ToArray();
-                var closeYs = candles.Select(c => (double)c.Close).ToArray();
+        if (candles.Any())
+        {
+            var bullColor = new Vector4(0.2f, 0.8f, 0.4f, 1.0f);   // Bright green for up
+            var bearColor = new Vector4(0.8f, 0.6f, 0f, 1.0f);  // Darker gold for down
+            var wickColor = new Vector4(0.6f, 0.6f, 0.6f, 0.9f);   // Gray for wicks
+            var syntheticWickColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded for synthetic
+            var interpolateColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded gray for gaps
+            var candleWidth = bucketSize.TotalSeconds * 0.7; // 70% of time bucket
+
+            // Draw interpolation line connecting candle closes (helps see trend through gaps)
+            var closeXs = candles.Select(c => (double)new DateTimeOffset(c.Time).ToUnixTimeSeconds()).ToArray();
+            var closeYs = candles.Select(c => (double)c.Close).ToArray();
+            
+            // Use series color for the line so it appears in the legend with the correct color
+            ImPlot.SetNextLineStyle(series.Color, 2.0f);
+            ImPlot.PlotLine(series.Name, ref closeXs[0], ref closeYs[0], closeXs.Length);
+
+            foreach (var candle in candles)
+            {
+                var time = (double)new DateTimeOffset(candle.Time).ToUnixTimeSeconds();
+                var isBull = candle.Close > candle.Open;  // Strictly greater for green
+                var bodyColor = isBull ? bullColor : bearColor;
+
+                // Generate synthetic wick if we don't have real high/low data
+                // Add padding to make wicks visible even on flat candles
+                var wickHigh = candle.High;
+                var wickLow = candle.Low;
+                var isSyntheticWick = false;
                 
-                // Use series color for the line so it appears in the legend with the correct color
-                ImPlot.SetNextLineStyle(series.Color, 2.0f);
-                ImPlot.PlotLine(series.Name, ref closeXs[0], ref closeYs[0], closeXs.Length);
-
-                foreach (var candle in candles)
+                // If candle is completely flat (same open/high/low/close), add synthetic wick
+                if (Math.Abs(wickHigh - wickLow) < (normalizePrices ? 0.01 : 1)) // Adjust epsilon for normalized vs raw
                 {
-                    var time = (double)new DateTimeOffset(candle.Time).ToUnixTimeSeconds();
-                    var isBull = candle.Close > candle.Open;  // Strictly greater for green
-                    var bodyColor = isBull ? bullColor : bearColor;
-
-                    // Generate synthetic wick if we don't have real high/low data
-                    // Add padding to make wicks visible even on flat candles
-                    var wickHigh = candle.High;
-                    var wickLow = candle.Low;
-                    var isSyntheticWick = false;
-                    
-                    // If candle is completely flat (same open/high/low/close), add synthetic wick
-                    if (Math.Abs(wickHigh - wickLow) < 0.01)
-                    {
-                        var wickSize = Math.Max(5u, (uint)(candle.Close * 0.03)); // 3% wick for visibility
-                        wickHigh = candle.Close + wickSize;
-                        wickLow = candle.Close - wickSize;
-                        isSyntheticWick = true;
-                    }
-
-                    // Always draw wick (high-low line) - use dotted style for synthetic wicks
-                    var wickX = new[] { time, time };
-                    var wickY = new[] { (double)wickLow, (double)wickHigh };
-                    
-                    if (isSyntheticWick)
-                    {
-                        // Dotted/dashed line for synthetic wicks
-                        ImPlot.SetNextLineStyle(syntheticWickColor, 2.0f);
-                    }
-                    else
-                    {
-                        // Solid line for real wicks
-                        ImPlot.SetNextLineStyle(wickColor, 1.5f);
-                    }
-                    ImPlot.PlotLine($"##wick{time}", ref wickX[0], ref wickY[0], 2);
-
-                    // Draw body (open to close)
-                    var bodyX = new[] { time, time };
-                    var bodyY = new[] { (double)candle.Open, (double)candle.Close };
-                    
-                    // Keep bodies narrow - scale with time period
-                    var bodyThickness = selectedTimeRange switch
-                    {
-                        1 => 4f,   // Very thin for intraday
-                        7 => 6f,   // Thin for weekly
-                        30 => 8f,  // Medium for monthly
-                        90 => 10f, // Slightly thicker for quarterly
-                        _ => 12f   // Thicker for long term
-                    };
-                    
-                    // If open == close (flat candle), we still draw the line - it will appear as a horizontal dash
-                    ImPlot.SetNextLineStyle(bodyColor, bodyThickness);
-                    ImPlot.PlotLine($"##body{time}", ref bodyX[0], ref bodyY[0], 2);
+                    var wickSize = Math.Max(normalizePrices ? 0.5 : 5u, Math.Abs(candle.Close) * 0.03); // 3% wick for visibility
+                    wickHigh = candle.Close + wickSize;
+                    wickLow = candle.Close - wickSize;
+                    isSyntheticWick = true;
                 }
+
+                // Always draw wick (high-low line) - use dotted style for synthetic wicks
+                var wickX = new[] { time, time };
+                var wickY = new[] { (double)wickLow, (double)wickHigh };
+                
+                if (isSyntheticWick)
+                {
+                    // Dotted/dashed line for synthetic wicks
+                    ImPlot.SetNextLineStyle(syntheticWickColor, 2.0f);
+                }
+                else
+                {
+                    // Solid line for real wicks
+                    ImPlot.SetNextLineStyle(wickColor, 1.5f);
+                }
+                ImPlot.PlotLine($"##wick{time}", ref wickX[0], ref wickY[0], 2);
+
+                // Draw body (open to close)
+                var bodyX = new[] { time, time };
+                var bodyY = new[] { (double)candle.Open, (double)candle.Close };
+                
+                // Keep bodies narrow - scale with time period
+                var bodyThickness = selectedTimeRange switch
+                {
+                    1 => 4f,   // Very thin for intraday
+                    7 => 6f,   // Thin for weekly
+                    30 => 8f,  // Medium for monthly
+                    90 => 10f, // Slightly thicker for quarterly
+                    _ => 12f   // Thicker for long term
+                };
+                
+                // If open == close (flat candle), we still draw the line - it will appear as a horizontal dash
+                ImPlot.SetNextLineStyle(bodyColor, bodyThickness);
+                ImPlot.PlotLine($"##body{time}", ref bodyX[0], ref bodyY[0], 2);
             }
+        }
     }
 
     private void DrawBarChart(ChartSeries series, List<SaleRecord> historyList)
@@ -844,13 +882,21 @@ public class ChartWindow : Window, IDisposable
             90 => TimeSpan.FromDays(1),
             _ => TimeSpan.FromDays(1)
         };
+        
+        // Determine base price for normalization
+        double basePrice = 1.0;
+        if (normalizePrices && historyList.Any())
+        {
+            basePrice = (double)historyList.First().PricePerUnit;
+            if (basePrice <= 0) basePrice = 1.0;
+        }
 
         var bars = historyList
             .GroupBy(h => new DateTime((long)(h.Timestamp.Ticks / bucketSize.Ticks) * bucketSize.Ticks))
             .Select(g => new
             {
                 Time = g.Key,
-                AvgPrice = g.Average(x => x.PricePerUnit)
+                AvgPrice = NormalizeIfNeeded(g.Average(x => x.PricePerUnit), basePrice)
             })
             .OrderBy(c => c.Time)
             .ToList();
@@ -872,8 +918,16 @@ public class ChartWindow : Window, IDisposable
 
     private void DrawLineChart(ChartSeries series, List<SaleRecord> historyList)
     {
+        // Determine base price for normalization
+        double basePrice = 1.0;
+        if (normalizePrices && historyList.Any())
+        {
+            basePrice = (double)historyList.First().PricePerUnit;
+            if (basePrice <= 0) basePrice = 1.0;
+        }
+    
         var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
-        var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
+        var ys = historyList.Select(x => NormalizeIfNeeded(x.PricePerUnit, basePrice)).ToArray();
         
         if (xs.Length > 0)
         {
@@ -884,15 +938,29 @@ public class ChartWindow : Window, IDisposable
 
     private void DrawHQMarkers(List<SaleRecord> historyList)
     {
+        // Determine base price for normalization
+        double basePrice = 1.0;
+        if (normalizePrices && historyList.Any())
+        {
+            basePrice = (double)historyList.First().PricePerUnit;
+            if (basePrice <= 0) basePrice = 1.0;
+        }
+
         var hqItems = historyList.Where(x => x.IsHQ).ToList();
         if (hqItems.Any())
         {
             var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
-            var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
+            var hqYs = hqItems.Select(x => NormalizeIfNeeded(x.PricePerUnit, basePrice)).ToArray();
             
             ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 5, new Vector4(1f, 0.85f, 0.1f, 0.9f), 1.0f, new Vector4(1f, 0.65f, 0f, 0.7f));
             ImPlot.PlotScatter("HQ", ref hqXs[0], ref hqYs[0], hqXs.Length);
         }
+    }
+    
+    private double NormalizeIfNeeded(double price, double basePrice)
+    {
+        if (!normalizePrices) return price;
+        return ((price - basePrice) / basePrice) * 100.0;
     }
 
     private void DrawSupplyDemandAnalysis()
