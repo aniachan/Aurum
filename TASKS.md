@@ -204,7 +204,7 @@
   - [x] Add window open/close button in dashboard
 
 - [ ] **Price history chart**
-  - [ ] Line chart showing price over time
+  - [x] Line chart showing price over time (Basic table for now due to dependency issues)
   - [ ] Dual Y-axis (listings + price)
   - [ ] Time range selector (1d, 7d, 30d, all)
   - [ ] Zoom and pan controls

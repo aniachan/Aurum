@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Interface.Windowing;
 using Aurum.Models;
 using Dalamud.Bindings.ImGui;
+// using ImPlotNET; // ImPlot integration paused until dependency is resolved
 
 namespace Aurum.Windows;
 
@@ -43,8 +44,39 @@ public class ChartWindow : Window, IDisposable
         ImGui.Text($"Price History: {itemName}");
         ImGui.Separator();
 
-        // Placeholder for ImPlot implementation
-        ImGui.Text("Charts will be implemented here using ImPlot.");
+        if (currentData.RecentHistory == null || !currentData.RecentHistory.Any())
+        {
+            ImGui.Text("No history data available for chart.");
+        }
+        else
+        {
+            var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).ToList();
+            
+            // Temporary placeholder until ImPlot is available
+            ImGui.Text("Price History Data:");
+            
+            if (ImGui.BeginTable("HistoryTable", 3))
+            {
+                ImGui.TableSetupColumn("Date");
+                ImGui.TableSetupColumn("Price");
+                ImGui.TableSetupColumn("Qty");
+                ImGui.TableHeadersRow();
+
+                foreach (var entry in history.Take(20))
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableNextColumn();
+                    ImGui.Text(entry.Timestamp.ToLocalTime().ToString("g"));
+                    ImGui.TableNextColumn();
+                    ImGui.Text(entry.PricePerUnit.ToString("N0"));
+                    ImGui.TableNextColumn();
+                    ImGui.Text(entry.Quantity.ToString());
+                }
+                ImGui.EndTable();
+            }
+            
+            ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "ImPlot dependency missing - Charts temporarily disabled");
+        }
         
         // Debug data dump
         if (ImGui.CollapsingHeader("Raw Data Debug"))
