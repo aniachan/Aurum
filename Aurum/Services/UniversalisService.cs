@@ -355,6 +355,37 @@ public class UniversalisService : IDisposable
                 continue;
             }
 
+            // OPTIMIZATION: Re-check cache before fetching
+            // Some items might have been fetched by a parallel request or a previous batch while this was queued.
+            var itemsToFetch = new List<uint>();
+            foreach (var id in request.ItemIds)
+            {
+                var cacheKey = $"market_{request.WorldName}_{id}";
+                
+                // Check memory cache
+                if (cache.TryGet<MarketData>(cacheKey, out _)) continue;
+                
+                // Check DB cache if enabled
+                if (currentWorldId != 0) 
+                {
+                     var dbVal = database.GetMarketData((int)id, currentWorldId, TimeSpan.FromSeconds(configuration.MarketDataCacheDurationSeconds));
+                     if (dbVal != null) 
+                     {
+                         cache.Set(cacheKey, dbVal); // Rehydrate memory cache
+                         continue;
+                     }
+                }
+                
+                itemsToFetch.Add(id);
+            }
+            
+            // If all items are already cached, we can skip the API call entirely
+            if (itemsToFetch.Count == 0)
+            {
+                request.CompletionSource.TrySetResult(true);
+                continue;
+            }
+
             int retryCount = 0;
             const int maxRetries = 3;
             bool success = false;
@@ -367,13 +398,14 @@ public class UniversalisService : IDisposable
                     // We can be more granular here if needed. For now, use "api" as the endpoint key for general Universalis calls
                     await rateLimiter.WaitForTokenAsync("api", disposeCts.Token);
 
-                    if (request.ItemIds.Count == 1)
+                    // Use itemsToFetch instead of request.ItemIds to avoid re-fetching cached items
+                    if (itemsToFetch.Count == 1)
                     {
-                        await FetchSingleItemInternalAsync(request.WorldName, request.ItemIds[0]);
+                        await FetchSingleItemInternalAsync(request.WorldName, itemsToFetch[0]);
                     }
                     else
                     {
-                        await FetchBatchItemsInternalAsync(request.WorldName, request.ItemIds);
+                        await FetchBatchItemsInternalAsync(request.WorldName, itemsToFetch);
                     }
                     
                     success = true;
