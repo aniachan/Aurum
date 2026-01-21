@@ -128,4 +128,5 @@ public class MarketData
     public DateTime CachedAt { get; set; }
     public DateTime? LastSaleTime { get; set; }
     public bool IsStale => (DateTime.UtcNow - CachedAt).TotalMinutes > 5;
+    public bool IsCachedData { get; set; } = false; // Flag to indicate if this is cached data returned because API was unreachable
 }

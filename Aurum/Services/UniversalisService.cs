@@ -117,6 +117,7 @@ public class UniversalisService : IDisposable
              if (staleVal != null)
              {
                  log.Info($"Returning stale data for item {itemId} (Last updated: {staleVal.LastUploadTime})");
+                 staleVal.IsCachedData = true; // Mark as cached fallback
                  return staleVal;
              }
         }
@@ -234,6 +235,7 @@ public class UniversalisService : IDisposable
                      var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
                      if (staleVal != null)
                      {
+                         staleVal.IsCachedData = true; // Mark as cached fallback
                          results[itemId] = staleVal;
                      }
                  }

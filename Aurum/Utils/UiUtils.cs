@@ -52,6 +52,7 @@ public static class UiUtils
             MarketWarning.StaleMarket => FontAwesomeIcon.HourglassEnd.ToIconString(),
             MarketWarning.HighCompetition => FontAwesomeIcon.Users.ToIconString(),
             MarketWarning.OversupplyExpected => FontAwesomeIcon.BoxOpen.ToIconString(),
+            MarketWarning.ApiUnreachable => FontAwesomeIcon.Wifi.ToIconString(), // Using Wifi icon (strikethrough usually implies it's off)
             _ => FontAwesomeIcon.ExclamationCircle.ToIconString()
         };
     }

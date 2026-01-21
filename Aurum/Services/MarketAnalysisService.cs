@@ -309,6 +309,17 @@ public class MarketAnalysisService
     {
         marketData.Warnings.Clear();
         
+        if (marketData.IsCachedData)
+        {
+            marketData.Warnings.Add(new MarketWarningInfo
+            {
+                Type = MarketWarning.ApiUnreachable,
+                Message = "Using Cached Data",
+                Details = "The API was unreachable or the request failed. Showing cached data which may be outdated.",
+                Level = WarningLevel.Warning
+            });
+        }
+        
         // Market crash risk
         if (marketData.SupplyDemandRatio > 5.0f)
         {
