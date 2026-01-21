@@ -203,8 +203,8 @@
   - [x] Integrate ImPlot library (already in Dalamud. Use Dalamud.Bindings.ImPlot)
   - [x] Add window open/close button in dashboard
 
-- [ ] **Price history chart**
-  - [ ] Line chart showing price over time
+- [x] **Price history chart**
+  - [x] Line chart showing price over time
   - [ ] Dual Y-axis (listings + price)
   - [x] Time range selector (1d, 7d, 30d, all)
   - [ ] Zoom and pan controls
