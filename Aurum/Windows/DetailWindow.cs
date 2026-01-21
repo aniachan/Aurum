@@ -74,6 +74,8 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawHeader()
     {
+        if (currentItem == null) return;
+
         ImGui.TextColored(new Vector4(0.5f, 0.8f, 1.0f, 1.0f), currentItem.Recipe.ItemName);
         ImGui.SameLine();
         ImGui.TextDisabled($"(Lvl {currentItem.Recipe.ClassJobLevel} {currentItem.Recipe.CraftingClassName})");
@@ -82,17 +84,20 @@ public class DetailWindow : Window, IDisposable
 
         if (ImGui.Button("Universalis"))
         {
-            OpenUrl($"https://universalis.app/market/{currentItem.MarketData?.ItemId}");
+            if (currentItem?.MarketData != null)
+                OpenUrl($"https://universalis.app/market/{currentItem.MarketData.ItemId}");
         }
         ImGui.SameLine();
         if (ImGui.Button("Garland Tools"))
         {
-            OpenUrl($"https://www.garlandtools.org/db/#item/{currentItem.MarketData?.ItemId}");
+            if (currentItem?.MarketData != null)
+                OpenUrl($"https://www.garlandtools.org/db/#item/{currentItem.MarketData.ItemId}");
         }
         ImGui.SameLine();
         if (ImGui.Button("Teamcraft"))
         {
-            OpenUrl($"https://ffxivteamcraft.com/db/en/item/{currentItem.MarketData?.ItemId}");
+            if (currentItem?.MarketData != null)
+                OpenUrl($"https://ffxivteamcraft.com/db/en/item/{currentItem.MarketData.ItemId}");
         }
     }
 
@@ -114,6 +119,8 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawMarketSnapshot()
     {
+        if (currentItem == null) return;
+
         ImGui.TextDisabled("MARKET SNAPSHOT");
         if (currentItem.MarketData == null) return;
 
@@ -141,6 +148,8 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawProfitBreakdown()
     {
+        if (currentItem == null) return;
+
         ImGui.TextDisabled("PROFIT ANALYSIS");
         
         if (ImGui.BeginTable("ProfitStats", 2))
@@ -175,6 +184,8 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawRiskAnalysis()
     {
+        if (currentItem == null) return;
+
         ImGui.TextDisabled("RISK ASSESSMENT");
         
         var riskColor = currentItem.RiskLevel switch
@@ -202,6 +213,7 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawRecipeInfo()
     {
+        if (currentItem == null) return;
         ImGui.TextDisabled("RECIPE INFO");
         ImGui.Text($"Yields: {currentItem.Recipe.ResultAmount}");
         ImGui.Text($"Est. Time: {currentItem.Recipe.EstimatedCraftTimeSeconds}s");

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
@@ -76,6 +78,13 @@ public class DashboardWindow : Window, IDisposable
         else if (ImGui.Button("🔄 Refresh"))
         {
             _ = RefreshDataAsync();
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("📥 Export CSV"))
+        {
+             _ = ExportToCsvAsync();
         }
         
         // Stats row
@@ -448,5 +457,36 @@ public class DashboardWindow : Window, IDisposable
         if (amount >= 1000)
             return $"{amount / 1000.0:F1}K";
         return amount.ToString();
+    }
+
+    private async Task ExportToCsvAsync()
+    {
+        if (!profitResults.Any())
+        {
+             Plugin.Log.Warning("No data to export");
+             return;
+        }
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Item Name,Recipe Level,Class,Level,Profit,Margin %,Gil/Hr,Velocity,Risk Score,Risk Level");
+
+            foreach (var p in filteredResults)
+            {
+                var velocity = p.MarketData?.SaleVelocity ?? 0;
+                sb.AppendLine($"\"{p.Recipe.ItemName}\",{p.Recipe.RecipeLevel},{p.Recipe.CraftingClassName},{p.Recipe.ClassJobLevel},{p.RawProfit},{p.ProfitMargin:F2},{p.GilPerHour},{velocity:F2},{p.RecommendationScore},{p.RiskLevel}");
+            }
+
+            var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var filePath = Path.Combine(documentsPath, $"Aurum_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            
+            await File.WriteAllTextAsync(filePath, sb.ToString());
+            Plugin.Log.Information($"Exported data to {filePath}");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, "Failed to export CSV");
+        }
     }
 }

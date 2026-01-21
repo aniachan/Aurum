@@ -121,26 +121,34 @@ public class ChartWindow : Window, IDisposable
         {
             ImGui.Text($"Listings: {currentData.CurrentListings}");
             ImGui.Text($"Avg Price: {currentData.CurrentAveragePrice:F0}");
-            ImGui.Text($"History Entries: {currentData.RecentHistory.Count}");
             
-            if (ImGui.BeginTable("HistoryTable", 3))
+            if (currentData.RecentHistory != null)
             {
-                ImGui.TableSetupColumn("Date");
-                ImGui.TableSetupColumn("Price");
-                ImGui.TableSetupColumn("Qty");
-                ImGui.TableHeadersRow();
-
-                foreach (var entry in currentData.RecentHistory.Take(10))
+                ImGui.Text($"History Entries: {currentData.RecentHistory.Count}");
+                
+                if (ImGui.BeginTable("HistoryTableDebug", 3))
                 {
-                    ImGui.TableNextRow();
-                    ImGui.TableNextColumn();
-                    ImGui.Text(entry.Timestamp.ToLocalTime().ToString("g"));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(entry.PricePerUnit.ToString("N0"));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(entry.Quantity.ToString());
+                    ImGui.TableSetupColumn("Date");
+                    ImGui.TableSetupColumn("Price");
+                    ImGui.TableSetupColumn("Qty");
+                    ImGui.TableHeadersRow();
+    
+                    foreach (var entry in currentData.RecentHistory.Take(10))
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        ImGui.Text(entry.Timestamp.ToLocalTime().ToString("g"));
+                        ImGui.TableNextColumn();
+                        ImGui.Text(entry.PricePerUnit.ToString("N0"));
+                        ImGui.TableNextColumn();
+                        ImGui.Text(entry.Quantity.ToString());
+                    }
+                    ImGui.EndTable();
                 }
-                ImGui.EndTable();
+            }
+            else
+            {
+                ImGui.Text("History Entries: 0 (null)");
             }
         }
     }
