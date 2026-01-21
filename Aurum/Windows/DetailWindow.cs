@@ -67,6 +67,7 @@ public class DetailWindow : Window, IDisposable
             // Right Column: Risk & Warnings
             ImGui.TableNextColumn();
             DrawRiskAnalysis();
+            DrawRecommendation();
             ImGui.Spacing();
             DrawRecipeInfo();
             
@@ -239,6 +240,67 @@ public class DetailWindow : Window, IDisposable
                     ImGui.TextWrapped(w.Message);
                 }
             }
+        }
+    }
+
+    private void DrawRecommendation()
+    {
+        if (currentItem == null) return;
+        
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextDisabled("RECOMMENDATION");
+
+        // Weighted score (Profit vs Risk)
+        ImGui.Text("Weighted Score:");
+        ImGui.SameLine();
+        
+        Vector4 scoreColor;
+        if (currentItem.RecommendationScore >= 75) scoreColor = new Vector4(0f, 1f, 0.5f, 1f); // Green
+        else if (currentItem.RecommendationScore >= 50) scoreColor = new Vector4(1f, 1f, 0.5f, 1f); // Yellow
+        else if (currentItem.RecommendationScore >= 25) scoreColor = new Vector4(1f, 0.7f, 0f, 1f); // Orange
+        else scoreColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+
+        ImGui.TextColored(scoreColor, $"{currentItem.RecommendationScore}/100");
+
+        // Recommended Action
+        string actionText;
+        Vector4 actionColor;
+        
+        if (currentItem.RecommendationScore >= 75)
+        {
+            actionText = "Recommended to Craft";
+            actionColor = new Vector4(0f, 1f, 0.5f, 1f);
+        }
+        else if (currentItem.RecommendationScore >= 50)
+        {
+            actionText = "Craft with Caution";
+            actionColor = new Vector4(1f, 1f, 0.5f, 1f);
+        }
+        else
+        {
+            actionText = "Not Recommended";
+            actionColor = new Vector4(1f, 0.3f, 0.3f, 1f);
+        }
+        
+        ImGui.TextColored(actionColor, actionText);
+
+        // Suggested Quantity
+        if (currentItem.RecommendationScore >= 50 && currentItem.RecommendedQuantity > 0)
+        {
+            ImGui.Text($"Suggested Batch: {currentItem.RecommendedQuantity} (Max Safe: {currentItem.MaxSafeQuantity})");
+            ImGui.TextDisabled($"Est. Sell Time: {currentItem.EstimatedSellTimeDays:F1} days");
+        }
+
+        // Suggested Price
+        ImGui.Spacing();
+        ImGui.Text("Suggested Price:");
+        ImGui.SameLine();
+        ImGui.Text($"{currentItem.ExpectedSalePrice:N0} gil");
+        if (currentItem.MarketData != null)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled($"(undercuts by 1 gil)");
         }
     }
 
