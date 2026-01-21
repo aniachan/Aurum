@@ -286,6 +286,20 @@ public class MarketAnalysisService
             < 75 => RiskLevel.High,
             _ => RiskLevel.VeryHigh
         };
+
+        // Generate detailed risk analysis
+        marketData.RiskAnalysis = BuildRiskAnalysis(marketData, sdRatio, volatility, velocityScore, competitionScore);
+    }
+    
+    private string BuildRiskAnalysis(MarketData marketData, float sdScore, float volScore, float velScore, float compScore)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Risk Score Breakdown:");
+        sb.AppendLine($"- Supply/Demand: {sdScore:F0}/25 (Ratio: {marketData.SupplyDemandRatio:F1})");
+        sb.AppendLine($"- Volatility: {volScore:F0}/25 ({(marketData.PriceVolatility*100):F1}%)");
+        sb.AppendLine($"- Velocity: {velScore:F0}/25 ({marketData.SaleVelocity:F1}/day)");
+        sb.AppendLine($"- Competition: {compScore:F0}/25 ({marketData.CurrentListings} listings)");
+        return sb.ToString();
     }
     
     /// <summary>

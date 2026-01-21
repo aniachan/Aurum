@@ -91,6 +91,7 @@ public class ProfitCalculation
     public RiskLevel RiskLevel { get; set; }
     public int RiskScore { get; set; }
     public List<MarketWarningInfo> Warnings { get; set; } = new();
+    public string RiskAnalysis { get; set; } = string.Empty; // Detailed breakdown
     
     // Recommendations
     public int RecommendedQuantity { get; set; }

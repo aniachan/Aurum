@@ -304,6 +304,14 @@ public class DashboardWindow : Window, IDisposable
             ImGui.BeginTooltip();
             ImGui.Text($"Recipe Level: {profit.Recipe.RecipeLevel}");
             ImGui.Text($"Crafting Level: {profit.Recipe.ClassJobLevel}");
+            
+            // Risk Analysis Breakdown
+            if (profit.MarketData != null && !string.IsNullOrEmpty(profit.MarketData.RiskAnalysis))
+            {
+                ImGui.Separator();
+                ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), profit.MarketData.RiskAnalysis);
+            }
+            
             if (profit.Warnings.Any())
             {
                 ImGui.Separator();

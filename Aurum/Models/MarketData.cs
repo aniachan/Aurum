@@ -93,6 +93,7 @@ public class MarketData
     public int RiskScore { get; set; }                   // 0-100
     public RiskLevel RiskLevel { get; set; }
     public List<MarketWarningInfo> Warnings { get; set; } = new();
+    public string RiskAnalysis { get; set; } = string.Empty; // Detailed breakdown of risk factors
     
     // Recommendation scoring
     public int RecommendationScore { get; set; }         // 0-100 (weighted with demand)
