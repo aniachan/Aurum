@@ -63,6 +63,9 @@ public class MarketAnalysisService
         // Calculate quantity recommendations
         CalculateQuantityRecommendations(marketData);
 
+        // Identify best time to sell (peak demand)
+        CalculatePeakDemand(marketData);
+
         // Generate final recommendation
         GenerateRecommendation(marketData);
     }
@@ -459,6 +462,55 @@ public class MarketAnalysisService
         {
             marketData.RecommendedQuantity = 1;
             marketData.MaxSafeQuantity = 1;
+        }
+    }
+
+    /// <summary>
+    /// Identify best time to sell based on historical sales data
+    /// </summary>
+    private void CalculatePeakDemand(MarketData marketData)
+    {
+        if (marketData.RecentHistory == null || !marketData.RecentHistory.Any())
+        {
+            return;
+        }
+
+        var history = marketData.RecentHistory;
+
+        // Group sales by day of week
+        var salesByDay = history
+            .GroupBy(h => h.Timestamp.DayOfWeek)
+            .Select(g => new { Day = g.Key, Count = g.Count(), AveragePrice = g.Average(x => x.PricePerUnit) })
+            .OrderByDescending(x => x.Count)
+            .ToList();
+
+        // Identify best days (top 3)
+        marketData.BestDaysToSell = salesByDay.Take(3).Select(x => x.Day).ToList();
+
+        // Group sales by hour of day (UTC)
+        var salesByHour = history
+            .GroupBy(h => h.Timestamp.Hour)
+            .Select(g => new { Hour = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .ToList();
+
+        // Identify best hours (top 5)
+        marketData.BestHoursToSell = salesByHour.Take(5).Select(x => x.Hour).ToList();
+
+        // Generate analysis text
+        if (salesByDay.Any())
+        {
+            var bestDay = salesByDay.First();
+            var bestHour = salesByHour.First();
+            
+            marketData.PeakDemandAnalysis = $"Best selling day: {bestDay.Day} ({bestDay.Count} sales). Peak hour: {bestHour.Hour}:00 UTC.";
+            
+            // Add price insight if significant
+            var maxPriceDay = salesByDay.OrderByDescending(x => x.AveragePrice).First();
+            if (maxPriceDay.AveragePrice > bestDay.AveragePrice * 1.1)
+            {
+                 marketData.PeakDemandAnalysis += $" Highest prices on {maxPriceDay.Day}.";
+            }
         }
     }
 

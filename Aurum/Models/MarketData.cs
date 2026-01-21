@@ -125,6 +125,11 @@ public class MarketData
     public Dictionary<uint, int> PriceDistribution { get; set; } = new();  // price -> count
     public int YourCompetitorRank { get; set; }          // Where you'd place in listings
     
+    // Peak Demand Analysis
+    public List<DayOfWeek> BestDaysToSell { get; set; } = new();
+    public List<int> BestHoursToSell { get; set; } = new(); // 0-23
+    public string PeakDemandAnalysis { get; set; } = string.Empty;
+
     // Freshness tracking
     public DateTime CachedAt { get; set; }
     public DateTime? LastSaleTime { get; set; }
