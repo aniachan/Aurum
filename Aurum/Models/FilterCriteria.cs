@@ -36,6 +36,7 @@ public class FilterCriteria
     public bool IncludeCombatGear { get; set; } = true;
     public bool IncludeCraftingGatheringGear { get; set; } = true;
     public bool IncludeFurniture { get; set; } = true;
+    public bool IncludeConsumables { get; set; } = true;
     public bool IncludeMaterials { get; set; } = true;
     public bool OnlyFavorites { get; set; } = false;
 
