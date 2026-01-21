@@ -226,6 +226,10 @@ public class DetailWindow : Window, IDisposable
             ImGui.TextColored(color, $"{currentItem.RawProfit:N0} gil");
 
             ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Gil / Hour:");
+            ImGui.TableNextColumn(); ImGui.Text($"{currentItem.GilPerHour:N0}");
+
+            ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Margin:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.ProfitMargin:F0}%");
 
