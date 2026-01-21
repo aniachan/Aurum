@@ -73,7 +73,8 @@ public class ItemFilterService
         if (item.Recipe != null)
         {
             if (!criteria.IncludeCombatGear && item.Recipe.MainCategory == ItemMainCategory.Combat) return false;
-            if (!criteria.IncludeCraftingGatheringGear && item.Recipe.MainCategory == ItemMainCategory.Crafting) return false;
+            if (!criteria.IncludeCraftingGatheringGear && 
+                (item.Recipe.MainCategory == ItemMainCategory.Crafting || item.Recipe.MainCategory == ItemMainCategory.Gathering)) return false;
             if (!criteria.IncludeFurniture && item.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
             if (!criteria.IncludeConsumables && item.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
             if (!criteria.IncludeMaterials && item.Recipe.MainCategory == ItemMainCategory.Material) return false;
