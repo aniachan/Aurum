@@ -134,7 +134,7 @@
   - [x] Refresh high-priority items every 5 minutes (via RefreshService)
   - [x] Refresh medium-priority items every 30 minutes
   - [x] Refresh low-priority items every 6 hours
-  - [ ] Skip items with no market activity for 30 days
+  - [x] Skip items with no market activity for 30 days
   - [x] Respect rate limits during background refresh (UniversalisService handles this)
 
 **Impact:** Reduces unnecessary API calls by 80%, focuses on relevant items

@@ -131,6 +131,7 @@ public class RefreshService : IDisposable
             // but GetMarketData is what we have.
             // Using a very long maxAge to ensure we get whatever is there.
             var marketData = database.GetMarketData((int)itemId, 0, TimeSpan.MaxValue); 
+            
             // Note: worldId=0 might fail if we don't know the world. 
             // We need to know the current world.
             // UniversalisService knows the current world? 
@@ -148,6 +149,13 @@ public class RefreshService : IDisposable
             
             if (marketData != null)
             {
+                // SKIP items with no market activity for 30 days
+                if ((DateTime.UtcNow - marketData.LastUploadTime).TotalDays > 30)
+                {
+                    log.Debug($"Skipping item {itemId} - No activity for >30 days (Last update: {marketData.LastUploadTime})");
+                    continue;
+                }
+
                 if (priorityService.ShouldRefresh(score, marketData.LastUploadTime))
                 {
                     itemsToRefresh.Add(itemId);
