@@ -457,64 +457,76 @@ public class ChartWindow : Window, IDisposable
     {
         if (currentData?.RecentHistory == null) return;
         
-        // This chart will show supply/demand ratio over time, color coded to show
-        // periods of oversupply (red) and undersupply (green).
+        var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).ToList();
+        var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).ToList() ?? new List<MarketSnapshot>();
         
-        var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
-        var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
+        if (!history.Any()) return;
         
-        if (selectedTimeRange > 0)
+        // 1. Calculate Daily Sales (full history)
+        var dailySales = history
+            .GroupBy(x => x.Timestamp.Date)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+            
+        // 2. Prepare Date Range (Start from earliest history to ensure MA is calculated correctly)
+        var minDate = history.Min(x => x.Timestamp).Date;
+        var maxDate = DateTime.UtcNow.Date;
+        
+        if (snapshots.Any())
         {
-            var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
-            history = history.Where(h => h.Timestamp >= cutoff);
-            snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
+            var minSnap = snapshots.Min(x => x.Timestamp).Date;
+            if (minSnap < minDate) minDate = minSnap;
+        }
+        
+        // 3. Continuous date iteration to calculate metrics
+        var allDates = new List<DateTime>();
+        for (var d = minDate; d <= maxDate; d = d.AddDays(1))
+        {
+            allDates.Add(d);
         }
 
-        var historyList = history.ToList();
-        var snapshotList = snapshots.ToList();
-        
-        if (!historyList.Any() || !snapshotList.Any()) return;
-        
-        // Calculate daily metrics to align supply and demand
-        var dailyMetrics = historyList
-            .GroupBy(x => x.Timestamp.Date)
-            .Select(g => new 
-            { 
-                Date = g.Key, 
-                SalesVolume = g.Sum(x => x.Quantity) 
-            })
-            .ToDictionary(k => k.Date, v => v.SalesVolume);
+        // Helpers for interpolation
+        var rawSupply = snapshots
+            .GroupBy(s => s.Timestamp.Date)
+            .ToDictionary(g => g.Key, g => g.Last().ListingCount);
             
-        // Interpolate snapshots to daily resolution for easier charting
-        var dailySupply = new Dictionary<DateTime, int>();
-        foreach(var snap in snapshotList)
-        {
-            // Simple nearest neighbor or just use snapshot for that day
-            dailySupply[snap.Timestamp.Date] = snap.ListingCount;
-        }
-        
-        // Merge keys
-        var allDates = dailyMetrics.Keys.Union(dailySupply.Keys).OrderBy(d => d).ToList();
-        
-        if (allDates.Count < 2) return;
+        int lastSupply = rawSupply.TryGetValue(minDate, out int initialSupply) ? initialSupply : 0;
         
         var timePoints = new List<double>();
         var ratioPoints = new List<double>();
-        var colors = new List<Vector4>();
         
-        foreach(var date in allDates)
+        foreach (var date in allDates)
         {
-            if (!dailyMetrics.TryGetValue(date, out var sales)) sales = 0; // No sales that day
-            if (!dailySupply.TryGetValue(date, out var listings)) listings = 0; // No snapshot that day? Maybe skip or interpolate.
+            // Interpolate Supply (Carry Forward)
+            if (rawSupply.TryGetValue(date, out int supply))
+            {
+                lastSupply = supply;
+            }
             
-            // We need both for a ratio. If listings is missing, we can maybe carry forward previous?
-            // For now, let's just skip points with missing supply data as it's harder to infer.
-            if (listings == 0) continue; 
+            // Calculate 7-day Moving Average of Sales
+            double sumSales = 0;
+            for (int i = 0; i < 7; i++)
+            {
+                var lookbackDate = date.AddDays(-i);
+                if (dailySales.TryGetValue(lookbackDate, out long s))
+                {
+                    sumSales += s;
+                }
+            }
+            double avgDailySales = sumSales / 7.0;
+
+            // Only add point if it falls within selected range (but we needed prior data for MA)
+            if (selectedTimeRange > 0)
+            {
+                 var cutoff = DateTime.UtcNow.Date.AddDays(-selectedTimeRange);
+                 if (date < cutoff) continue;
+            }
+
+            // Calculate Ratio (Days to Clear)
+            // If avg sales is super low (< 0.1/day), treat as "infinite" (cap at 60)
+            // Use 0.1 to avoid division by zero or massive numbers for 0 sales
+            double ratio = avgDailySales > 0.1 ? (double)lastSupply / avgDailySales : 60.0;
             
-            // Avoid division by zero. If sales is 0, ratio is effectively infinite (oversupplied).
-            // Let's cap it at some high number for visualization.
-            double ratio = sales > 0 ? (double)listings / sales : 50.0;
-            if (ratio > 50) ratio = 50; // Cap at 50 days to clear
+            if (ratio > 60) ratio = 60; // Hard cap for visualization
             
             timePoints.Add((double)new DateTimeOffset(date).ToUnixTimeSeconds());
             ratioPoints.Add(ratio);
@@ -523,21 +535,29 @@ public class ChartWindow : Window, IDisposable
         if (timePoints.Count == 0) return;
         
         ImGui.Spacing();
-        ImGui.Text("Supply/Demand Ratio (Days to Clear) - Over Time");
+        ImGui.Separator();
+        ImGui.Text("Supply/Demand Ratio (Days to Clear) - 7-Day Moving Average");
         
         if (ImPlot.BeginPlot("##SDRatioChart", new Vector2(-1, 200), ImPlotFlags.None))
         {
-            ImPlot.SetupAxes("Date", "Ratio (Listings/Sales)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxes("Date", "Ratio (Listings/DailySales)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit);
             ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+            
+            // Align X-axis limits with main chart if possible, but here we just autofit or use calculated range
+            if (selectedTimeRange > 0)
+            {
+                 // ensure we see the whole range
+                 // ImPlot.SetupAxisLimits(ImAxis.X1, ...); 
+                 // AutoFit usually works fine
+            }
             
             var xs = timePoints.ToArray();
             var ys = ratioPoints.ToArray();
             
-            // We have to loop to set color for each bar if we want individual control
-            // Or we can use a custom rendering loop. 
-            // Actually, PlotBars allows color mapping? No.
-            // Let's use PlotShaded or just draw multiple bar series based on color classification?
-            // Drawing multiple series is easiest.
+            // Separate into color buckets
+            // Green: < 7 days (Healthy)
+            // Yellow: 7 - 30 days (Slower)
+            // Red: > 30 days (Stagnant)
             
             var greenX = new List<double>(); var greenY = new List<double>();
             var yellowX = new List<double>(); var yellowY = new List<double>();
@@ -545,8 +565,8 @@ public class ChartWindow : Window, IDisposable
             
             for(int i=0; i<xs.Length; i++)
             {
-                if (ys[i] < 3) { greenX.Add(xs[i]); greenY.Add(ys[i]); }
-                else if (ys[i] < 14) { yellowX.Add(xs[i]); yellowY.Add(ys[i]); }
+                if (ys[i] < 7) { greenX.Add(xs[i]); greenY.Add(ys[i]); }
+                else if (ys[i] < 30) { yellowX.Add(xs[i]); yellowY.Add(ys[i]); }
                 else { redX.Add(xs[i]); redY.Add(ys[i]); }
             }
             
@@ -556,23 +576,45 @@ public class ChartWindow : Window, IDisposable
             {
                 var gX = greenX.ToArray(); var gY = greenY.ToArray();
                 ImPlot.SetNextFillStyle(new Vector4(0.2f, 0.8f, 0.4f, 0.7f));
-                ImPlot.PlotBars("Undersupplied (<3d)", ref gX[0], ref gY[0], gX.Length, barWidth);
+                ImPlot.PlotBars("Healthy (<7d)", ref gX[0], ref gY[0], gX.Length, barWidth);
             }
             
             if (yellowX.Any())
             {
                 var yX = yellowX.ToArray(); var yY = yellowY.ToArray();
                 ImPlot.SetNextFillStyle(new Vector4(1f, 0.84f, 0f, 0.7f));
-                ImPlot.PlotBars("Balanced (3-14d)", ref yX[0], ref yY[0], yX.Length, barWidth);
+                ImPlot.PlotBars("Moderate (7-30d)", ref yX[0], ref yY[0], yX.Length, barWidth);
             }
             
             if (redX.Any())
             {
                 var rX = redX.ToArray(); var rY = redY.ToArray();
                 ImPlot.SetNextFillStyle(new Vector4(1f, 0.3f, 0.3f, 0.7f));
-                ImPlot.PlotBars("Oversupplied (>14d)", ref rX[0], ref rY[0], rX.Length, barWidth);
+                ImPlot.PlotBars("Stagnant (>30d)", ref rX[0], ref rY[0], rX.Length, barWidth);
             }
             
+            // Add a horizontal line at 30 days and 7 days for reference
+            var plotLimits = ImPlot.GetPlotLimits(ImAxis.X1);
+            double xMin = plotLimits.X.Min;
+            double xMax = plotLimits.X.Max;
+            
+            // Fallback if limits are invalid (e.g. before first render)
+            if (xMin >= xMax || double.IsNaN(xMin)) 
+            {
+                 xMin = xs.First();
+                 xMax = xs.Last();
+            }
+            
+            // Draw thresholds lines
+            ImPlot.SetNextLineStyle(new Vector4(1f, 0.84f, 0f, 0.5f));
+            double[] y7 = { 7, 7 };
+            double[] xRange = { xMin, xMax };
+            ImPlot.PlotLine("##Threshold7", ref xRange[0], ref y7[0], 2);
+            
+            ImPlot.SetNextLineStyle(new Vector4(1f, 0.3f, 0.3f, 0.5f));
+            double[] y30 = { 30, 30 };
+            ImPlot.PlotLine("##Threshold30", ref xRange[0], ref y30[0], 2);
+
             ImPlot.EndPlot();
         }
     }
