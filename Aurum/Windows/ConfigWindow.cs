@@ -118,6 +118,17 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SetTooltip("Leave as 'Auto' to use your current world, or specify a world name.");
         }
 
+        var rememberWorld = configuration.RememberLastWorld;
+        if (ImGui.Checkbox("Remember Last World Selection", ref rememberWorld))
+        {
+            configuration.RememberLastWorld = rememberWorld;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("If enabled, the dashboard will remember the last world you refreshed data for,\noverriding 'Auto' until you change it back.");
+        }
+
         var cacheDuration = configuration.MarketDataCacheDurationSeconds;
         if (ImGui.InputInt("Market Data Cache Duration (Seconds)", ref cacheDuration))
         {

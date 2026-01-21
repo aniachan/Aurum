@@ -20,6 +20,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     
     // API Settings
     public string PreferredWorld { get; set; } = "Auto";  // or specific world name
+    public bool RememberLastWorld { get; set; } = true; // New setting
     public int MarketDataCacheDurationSeconds { get; set; } = 300;  // 5 minutes
     public int MaxCacheEntries { get; set; } = 1000;
     public int MaxConcurrentApiRequests { get; set; } = 5;

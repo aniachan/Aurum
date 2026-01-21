@@ -494,13 +494,41 @@ public class DashboardWindow : Window, IDisposable
         {
             Plugin.Log.Information("Refreshing market data...");
             
-            // Get world name
-            var worldName = Plugin.PlayerState.CurrentWorld.Value.Name.ToString() 
-                ?? plugin.Configuration.PreferredWorld;
+            // Get world name logic:
+            // 1. If user manually set a world in Config and RememberLastWorld is true, use that (if valid)
+            // 2. Else if "Auto" or empty, use PlayerState current world
+            // 3. Else use config value directly
             
-            if (worldName == "Auto" || string.IsNullOrEmpty(worldName))
+            var worldName = plugin.Configuration.PreferredWorld;
+
+            // If set to "Auto" or empty, try to get from game state
+            if (string.IsNullOrEmpty(worldName) || worldName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
             {
-                Plugin.Log.Warning("Unable to determine world name");
+                // CurrentWorld is a nullable value type or similar in Dalamud, check .RowId or just check if it has value if it's nullable struct
+                // Looking at Plugin.cs: PlayerState.CurrentWorld is IPlayerState.CurrentWorld
+                // It usually returns a Lumina.Excel.GeneratedSheets.World?
+                
+                // Let's rely on standard null check or .Value access if we are sure
+                try 
+                {
+                    var currentWorld = Plugin.PlayerState.CurrentWorld;
+                    if (currentWorld.Value.RowId != 0) // Check if valid
+                    {
+                        worldName = currentWorld.Value.Name.ToString();
+                    }
+                }
+                catch 
+                {
+                    // Fallback if not logged in
+                }
+            }
+            
+            // If we still don't have a world name, we can't proceed
+            if (string.IsNullOrEmpty(worldName) || worldName == "Auto")
+            {
+                Plugin.Log.Warning("Unable to determine world name. Please log in or specify a world in settings.");
+                lastErrorMessage = "Unable to determine world name. Please log in or specify a world in settings.";
+                lastErrorTime = DateTime.UtcNow;
                 return;
             }
             
