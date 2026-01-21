@@ -64,7 +64,23 @@ public class DetailWindow : Window, IDisposable
             ImGui.Spacing();
             DrawProfitBreakdown();
             ImGui.Spacing();
-            DrawRecentSales();
+
+            if (ImGui.BeginTabBar("MarketDetailsTabs"))
+            {
+                if (ImGui.BeginTabItem("Current Listings"))
+                {
+                    DrawCurrentListings();
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Recent Sales"))
+                {
+                    DrawRecentSales();
+                    ImGui.EndTabItem();
+                }
+
+                ImGui.EndTabBar();
+            }
             
             // Right Column: Risk & Warnings
             ImGui.TableNextColumn();
@@ -182,6 +198,61 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Margin:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.ProfitMargin:F0}%");
+
+            ImGui.EndTable();
+        }
+    }
+
+    private void DrawCurrentListings()
+    {
+        if (currentItem?.MarketData == null || !currentItem.MarketData.Listings.Any())
+        {
+            ImGui.TextDisabled("No current listings found.");
+            return;
+        }
+
+        var listings = currentItem.MarketData.Listings.Take(20).ToList();
+
+        if (ImGui.BeginTable("CurrentListingsTable", 4, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
+        {
+            ImGui.TableSetupColumn("Price", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Retainer", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableHeadersRow();
+
+            foreach (var listing in listings)
+            {
+                ImGui.TableNextRow();
+                
+                // Price Column
+                ImGui.TableNextColumn();
+                ImGui.Text($"{listing.PricePerUnit:N0}");
+                if (listing.IsHQ)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(1, 1, 0, 1), ""); // HQ Icon
+                }
+
+                // Quantity Column
+                ImGui.TableNextColumn();
+                ImGui.Text($"{listing.Quantity}");
+
+                // Total Column
+                ImGui.TableNextColumn();
+                ImGui.Text($"{listing.Total:N0}");
+
+                // Retainer Column
+                ImGui.TableNextColumn();
+                ImGui.Text(listing.RetainerName);
+                if (!string.IsNullOrEmpty(listing.RetainerCity))
+                {
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip($"City: {listing.RetainerCity}");
+                    }
+                }
+            }
 
             ImGui.EndTable();
         }
