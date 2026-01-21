@@ -120,6 +120,18 @@ public class ShoppingListService
             // But if an intermediate is cheaper to buy than craft, we should buy it.
             // For MVP: Flatten to immediate ingredients. Users often buy intermediates.
             
+            // Check if this ingredient has a sub-recipe and recursively break it down
+            if (ingredient.SubRecipeId.HasValue)
+            {
+                var subRecipe = recipeService.GetRecipe(ingredient.SubRecipeId.Value);
+                if (subRecipe != null)
+                {
+                    // Recursively add ingredients for the sub-recipe
+                    AddIngredientsRecursive(subRecipe, quantity * ingredient.AmountNeeded, totals);
+                    continue; // Skip adding the intermediate item itself to the shopping list
+                }
+            }
+            
             if (totals.ContainsKey(ingredient.ItemId))
             {
                 totals[ingredient.ItemId] += ingredient.AmountNeeded * quantity;

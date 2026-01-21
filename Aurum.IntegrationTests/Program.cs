@@ -15,6 +15,7 @@ class Program
         Console.WriteLine("=== Aurum Service Tests ===\n");
         
         RecipeServiceTests.Run();
+        ShoppingListTests.Run();
         
         Console.WriteLine("=== Aurum Config Window Verification ===\n");
         Console.WriteLine("Since this involves UI components that depend on Dalamud/ImGui,");
