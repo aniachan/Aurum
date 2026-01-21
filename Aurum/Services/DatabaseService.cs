@@ -64,6 +64,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 1) ApplyMigration(connection, 1, Migration_1_InitialSchema);
             if (currentVersion < 2) ApplyMigration(connection, 2, Migration_2_AddHistoryMetrics);
             if (currentVersion < 3) ApplyMigration(connection, 3, Migration_3_AddPriorityScores);
+            if (currentVersion < 4) ApplyMigration(connection, 4, Migration_4_AddSupplyDemandMetrics);
             
             log.Information("Database initialization complete");
         }
@@ -218,6 +219,26 @@ public class DatabaseService : IDisposable
         ";
         ExecuteNonQuery(connection, createPriorityTable, transaction);
     }
+
+    private void Migration_4_AddSupplyDemandMetrics(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add supply/demand metrics columns to MarketData table if they don't exist
+        // Note: SQLite ALTER TABLE is limited. We can add columns one by one.
+        
+        try
+        {
+            var addSalesPerDay = "ALTER TABLE MarketData ADD COLUMN sales_per_day REAL DEFAULT 0;";
+            ExecuteNonQuery(connection, addSalesPerDay, transaction);
+        }
+        catch { /* Column might already exist, ignore */ }
+
+        try
+        {
+            var addDemandRatio = "ALTER TABLE MarketData ADD COLUMN demand_ratio REAL DEFAULT 0;";
+            ExecuteNonQuery(connection, addDemandRatio, transaction);
+        }
+        catch { /* Column might already exist, ignore */ }
+    }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
     {
@@ -280,10 +301,12 @@ public class DatabaseService : IDisposable
                 command.CommandText = @"
                     INSERT OR REPLACE INTO MarketData (
                         item_id, world_id, last_updated, min_price, average_price, 
-                        listing_count, velocity, current_listings_json, recent_sales_json
+                        listing_count, velocity, current_listings_json, recent_sales_json,
+                        sales_per_day, demand_ratio
                     ) VALUES (
                         @itemId, @worldId, @lastUpdated, @minPrice, @avgPrice,
-                        @listingCount, @velocity, @listingsJson, @salesJson
+                        @listingCount, @velocity, @listingsJson, @salesJson,
+                        @salesPerDay, @demandRatio
                     );
                 ";
 
@@ -296,6 +319,8 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@velocity", data.SaleVelocity);
                 command.Parameters.AddWithValue("@listingsJson", JsonSerializer.Serialize(data.Listings));
                 command.Parameters.AddWithValue("@salesJson", JsonSerializer.Serialize(data.RecentHistory));
+                command.Parameters.AddWithValue("@salesPerDay", data.SalesPerDay);
+                command.Parameters.AddWithValue("@demandRatio", data.DemandRatio);
                 
                 command.ExecuteNonQuery();
 
@@ -433,10 +458,12 @@ public class DatabaseService : IDisposable
                 marketCmd.CommandText = @"
                     INSERT OR REPLACE INTO MarketData (
                         item_id, world_id, last_updated, min_price, average_price, 
-                        listing_count, velocity, current_listings_json, recent_sales_json
+                        listing_count, velocity, current_listings_json, recent_sales_json,
+                        sales_per_day, demand_ratio
                     ) VALUES (
                         @itemId, @worldId, @lastUpdated, @minPrice, @avgPrice,
-                        @listingCount, @velocity, @listingsJson, @salesJson
+                        @listingCount, @velocity, @listingsJson, @salesJson,
+                        @salesPerDay, @demandRatio
                     );
                 ";
                 
@@ -450,6 +477,8 @@ public class DatabaseService : IDisposable
                 var pVelocity = marketCmd.Parameters.Add("@velocity", SqliteType.Real);
                 var pListingsJson = marketCmd.Parameters.Add("@listingsJson", SqliteType.Text);
                 var pSalesJson = marketCmd.Parameters.Add("@salesJson", SqliteType.Text);
+                var pSalesPerDay = marketCmd.Parameters.Add("@salesPerDay", SqliteType.Real);
+                var pDemandRatio = marketCmd.Parameters.Add("@demandRatio", SqliteType.Real);
 
                 // Prepared statement for checking last sale
                 using var lastSaleCmd = connection.CreateCommand();
@@ -504,6 +533,8 @@ public class DatabaseService : IDisposable
                     pVelocity.Value = data.SaleVelocity;
                     pListingsJson.Value = JsonSerializer.Serialize(data.Listings);
                     pSalesJson.Value = JsonSerializer.Serialize(data.RecentHistory);
+                    pSalesPerDay.Value = data.SalesPerDay;
+                    pDemandRatio.Value = data.DemandRatio;
                     
                     marketCmd.ExecuteNonQuery();
 
@@ -595,7 +626,7 @@ public class DatabaseService : IDisposable
                 using var command = connection.CreateCommand();
 
                 command.CommandText = @"
-                    SELECT last_updated, min_price, average_price, listing_count, velocity, current_listings_json, recent_sales_json
+                    SELECT last_updated, min_price, average_price, listing_count, velocity, current_listings_json, recent_sales_json, sales_per_day, demand_ratio
                     FROM MarketData
                     WHERE item_id = @itemId AND world_id = @worldId
                 ";
@@ -626,6 +657,10 @@ public class DatabaseService : IDisposable
                         RecentHistory = JsonSerializer.Deserialize<List<SaleRecord>>(reader.GetString(6)) ?? new(),
                         CachedAt = DateTime.UtcNow // Set to now as it's fresh from DB
                     };
+                    
+                    // Optional columns added in later migration
+                    if (!reader.IsDBNull(7)) marketData.SalesPerDay = (float)reader.GetDouble(7);
+                    if (!reader.IsDBNull(8)) marketData.DemandRatio = (float)reader.GetDouble(8);
 
                     return marketData;
                 }
@@ -635,6 +670,46 @@ public class DatabaseService : IDisposable
                 log.Error(ex, $"Failed to get market data for item {itemId}");
             }
             return null;
+        }
+    }
+
+    public List<MarketSnapshot> GetMarketSnapshots(int itemId, int worldId, DateTime since)
+    {
+        lock (dbLock)
+        {
+            var results = new List<MarketSnapshot>();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    SELECT timestamp, price, quantity 
+                    FROM PriceHistory
+                    WHERE item_id = @itemId AND world_id = @worldId AND is_sale = 0 AND timestamp >= @since
+                    ORDER BY timestamp ASC
+                ";
+                command.Parameters.AddWithValue("@itemId", itemId);
+                command.Parameters.AddWithValue("@worldId", worldId);
+                command.Parameters.AddWithValue("@since", ((DateTimeOffset)since).ToUnixTimeSeconds());
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    results.Add(new MarketSnapshot
+                    {
+                        Timestamp = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(0)).UtcDateTime,
+                        MinPrice = (uint)reader.GetInt32(1),
+                        ListingCount = reader.GetInt32(2)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to get market snapshots for item {itemId}");
+            }
+            return results;
         }
     }
 

@@ -19,6 +19,16 @@ public class SaleRecord
 }
 
 /// <summary>
+/// Represents a historical snapshot of market state (not a sale)
+/// </summary>
+public class MarketSnapshot
+{
+    public DateTime Timestamp { get; set; }
+    public uint MinPrice { get; set; }
+    public int ListingCount { get; set; }
+}
+
+/// <summary>
 /// Represents a current market board listing
 /// </summary>
 public class MarketListing
@@ -81,12 +91,22 @@ public class MarketData
     public int RecentSales => RecentHistory.Count;
     public List<SaleRecord> SaleHistory => RecentHistory; // Alias for compatibility
     
+    // Historical Snapshots (for supply/demand over time)
+    // These are loaded on demand usually, but we can store them here for chart convenience
+    public List<MarketSnapshot> HistorySnapshots { get; set; } = new();
+
     // Demand metrics (calculated)
     public float SaleVelocity { get; set; }              // sales per day
     public float SupplyDemandRatio { get; set; }         // listings / daily_sales
     public float PriceVolatility { get; set; }           // stddev / avg (0-1)
     public float EstimatedSellTimeDays { get; set; }     // listings / velocity
     public float MarketMomentum { get; set; }            // % change in velocity (-1 to 1)
+    
+    // Additional metrics for Supply/Demand analysis
+    public float SalesPerDay { get; set; }               // Explicit Sales Per Day
+    public int ListingsCount { get; set; }               // Explicit Listings Count for history tracking
+    public float DemandRatio { get; set; }               // Sales / Listings ratio
+
     public PriceTrend Trend { get; set; }                // Rising, Falling, Stable, Volatile
     
     // Risk assessment

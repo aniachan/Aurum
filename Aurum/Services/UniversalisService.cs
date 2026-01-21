@@ -265,7 +265,10 @@ public class UniversalisService : IDisposable
             MinPriceHQ = (uint)Math.Round(response.MinPriceHQ),
             MaxPriceNQ = (uint)Math.Round(response.MaxPriceNQ),
             MaxPriceHQ = (uint)Math.Round(response.MaxPriceHQ),
-            CachedAt = DateTime.UtcNow
+            CachedAt = DateTime.UtcNow,
+
+            // Initialize supply/demand metrics that can be derived from raw response
+            ListingsCount = response.Listings?.Count ?? 0
         };
         
         // Convert listings
