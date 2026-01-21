@@ -23,6 +23,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool RememberLastWorld { get; set; } = true; // New setting
     public int MarketDataCacheDurationSeconds { get; set; } = 300;  // 5 minutes
     public int MaxCacheEntries { get; set; } = 1000;
+    public int MaxRecipeCacheEntries { get; set; } = 2000;
     public int MaxConcurrentApiRequests { get; set; } = 5;
     public int ApiRateLimitPerMinute { get; set; } = 900; // 15 requests/second * 60 = 900
     public int ApiBatchSize { get; set; } = 20; // Default batch size

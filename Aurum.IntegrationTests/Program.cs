@@ -12,6 +12,10 @@ class Program
 {
     static async Task Main(string[] args)
     {
+        Console.WriteLine("=== Aurum Service Tests ===\n");
+        
+        RecipeServiceTests.Run();
+        
         Console.WriteLine("=== Aurum Config Window Verification ===\n");
         Console.WriteLine("Since this involves UI components that depend on Dalamud/ImGui,");
         Console.WriteLine("automated verification is limited to checking the code logic.");

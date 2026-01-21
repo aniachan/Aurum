@@ -14,8 +14,10 @@ public class RecipeService
 {
     private readonly IDataManager dataManager;
     private readonly IPluginLog log;
+    private readonly Configuration config;
     
     private Dictionary<uint, RecipeData> recipeCache = new();
+    private List<uint> recipeLruList = new();
     private Dictionary<uint, string> itemNameCache = new();
     private Dictionary<uint, uint> itemIconCache = new();
     
@@ -41,10 +43,11 @@ public class RecipeService
         { 7, "CUL" }   // Culinarian
     };
     
-    public RecipeService(IDataManager dataManager, IPluginLog log)
+    public RecipeService(IDataManager dataManager, IPluginLog log, Configuration config)
     {
         this.dataManager = dataManager;
         this.log = log;
+        this.config = config;
     }
     
     /// <summary>
@@ -367,7 +370,16 @@ public class RecipeService
     private RecipeData? LoadRecipe(uint recipeId)
     {
         if (recipeCache.TryGetValue(recipeId, out var cached))
+        {
+            UpdateLru(recipeId);
             return cached;
+        }
+
+        // Check if cache is full
+        if (recipeCache.Count >= config.MaxRecipeCacheEntries)
+        {
+            EvictLru();
+        }
 
         var recipeSheet = dataManager.GetExcelSheet<Recipe>();
         var recipe = recipeSheet?.GetRow(recipeId);
@@ -379,6 +391,7 @@ public class RecipeService
         {
             var data = ConvertToRecipeData(recipe.Value);
             recipeCache[recipeId] = data;
+            UpdateLru(recipeId);
             return data;
         }
         catch (Exception ex)
@@ -386,6 +399,22 @@ public class RecipeService
             log.Error(ex, $"Failed to load recipe {recipeId}");
             return null;
         }
+    }
+    
+    private void UpdateLru(uint recipeId)
+    {
+        recipeLruList.Remove(recipeId);
+        recipeLruList.Add(recipeId);
+    }
+    
+    private void EvictLru()
+    {
+        if (recipeLruList.Count == 0) return;
+        
+        // Remove oldest 10% or just 1? Let's remove 1 for now to keep it strict
+        var idToRemove = recipeLruList[0];
+        recipeLruList.RemoveAt(0);
+        recipeCache.Remove(idToRemove);
     }
     
     /// <summary>
