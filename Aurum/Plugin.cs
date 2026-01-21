@@ -45,7 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     public RefreshService RefreshService { get; init; }
     
     // Static accessor for UI components if needed (use sparingly)
-    public static Plugin Instance { get; private set; }
+    public static Plugin? Instance { get; private set; }
 
     public readonly WindowSystem WindowSystem = new("Aurum");
     private ConfigWindow ConfigWindow { get; init; }

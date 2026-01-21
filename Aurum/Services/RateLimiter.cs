@@ -229,7 +229,7 @@ public class RateLimiter : IDisposable
                {
                    database.LogApiRequest(endpoint, now, 0, 0, true);
                }
-               catch(Exception ex)
+               catch(Exception)
                {
                    // Swallow DB log errors to not crash app, maybe log to file
                }

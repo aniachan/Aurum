@@ -72,7 +72,7 @@ public class ConfigWindow : Window, IDisposable
 
         ImGui.Separator();
         ImGui.Text("API Usage Statistics");
-        var limiter = Aurum.Plugin.Instance.RateLimiter;
+        var limiter = Aurum.Plugin.Instance?.RateLimiter;
         if (limiter != null)
         {
             ImGui.Text($"Requests (Last Minute): {limiter.RequestsLastMinute}");

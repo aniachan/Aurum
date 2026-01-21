@@ -217,7 +217,7 @@ public class UniversalisService : IDisposable
         foreach (var itemId in uncachedItems)
         {
             var cacheKey = $"market_{worldName}_{itemId}";
-            if (cache.TryGet(cacheKey, out MarketData? val))
+            if (cache.TryGet(cacheKey, out MarketData? val) && val != null)
             {
                 results[itemId] = val;
             }
@@ -443,7 +443,7 @@ public class UniversalisService : IDisposable
 
                     await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
                 }
-                catch (HttpRequestException ex) when ((int)ex.StatusCode >= 500)
+                catch (HttpRequestException ex) when ((int)(ex.StatusCode ?? 0) >= 500)
                 {
                     // Retry on 5xx errors
                     retryCount++;
