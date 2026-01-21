@@ -113,7 +113,41 @@ public class ChartWindow : Window, IDisposable
                 }
                 
                 ImGui.Spacing();
-                ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "ImPlot dependency missing - Charts temporarily disabled");
+                
+                // Draw Chart using ImPlot
+                if (ImPlot.BeginPlot("Price History", new Vector2(-1, 300), ImPlotFlags.None))
+                {
+                    // Setup axes
+                    ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+                    ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+                    
+                    // Convert data to arrays for ImPlot
+                    var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                    var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
+                    
+                    // Plot line
+                    ImPlot.SetNextLineStyle(new Vector4(0f, 0.8f, 1f, 1f), 2.0f);
+                    ImPlot.PlotLine("Price", ref xs[0], ref ys[0], xs.Length);
+
+                    // Plot scatter points for individual sales
+                    ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, new Vector4(0f, 0.8f, 1f, 1f));
+                    ImPlot.PlotScatter("Sales", ref xs[0], ref ys[0], xs.Length);
+
+                    // Add markers for HQ items if any
+                    var hqItems = historyList.Where(x => x.IsHQ).ToList();
+                    if (hqItems.Any())
+                    {
+                        var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                        var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
+                        
+                        ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
+                        ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
+                    }
+
+                    // Tooltip logic is handled by ImPlot automatically for basic values
+                    
+                    ImPlot.EndPlot();
+                }
             }
         }
         

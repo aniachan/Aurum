@@ -2,7 +2,7 @@
 <Project Sdk="Dalamud.NET.Sdk/14.0.1">
   <PropertyGroup>
     <Version>0.0.0.2</Version>
-    <PackageProjectUrl>https://github.com/goatcorp/Aurum</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/aniachan/Aurum</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
