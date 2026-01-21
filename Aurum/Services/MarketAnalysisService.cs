@@ -337,6 +337,28 @@ public class MarketAnalysisService
                 Level = WarningLevel.Danger
             });
         }
+        else if (marketData.MarketMomentum < -0.2f && marketData.SupplyDemandRatio > 2.0f)
+        {
+            // Saturation Risk - Falling Demand
+            marketData.Warnings.Add(new MarketWarningInfo
+            {
+                Type = MarketWarning.OversupplyExpected,
+                Message = "Market saturation imminent",
+                Details = $"Falling demand ({marketData.MarketMomentum:P0}) with moderate supply. Saturation likely.",
+                Level = WarningLevel.Warning
+            });
+        }
+        else if (marketData.SupplyDemandRatio > 3.0f)
+        {
+            // Saturation Risk - Accumulating Supply
+            marketData.Warnings.Add(new MarketWarningInfo
+            {
+                Type = MarketWarning.OversupplyExpected,
+                Message = "Supply accumulating",
+                Details = $"Supply is accumulating ({marketData.SupplyDemandRatio:F1} days supply). Competition is increasing.",
+                Level = WarningLevel.Warning
+            });
+        }
         
         // Low demand
         if (marketData.SaleVelocity < 1.0f && marketData.SaleVelocity > 0)
