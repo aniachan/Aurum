@@ -1041,6 +1041,9 @@ public class ChartWindow : Window, IDisposable
             double[] minLineX = { currentMin, currentMin };
             double[] minLineY = { 0, countsTotal.Max() * 1.1 }; // Go a bit above max
             ImPlot.PlotLine("Market Price", ref minLineX[0], ref minLineY[0], 2);
+            
+            // Add Annotation for Market Price
+            ImPlot.PlotText($"Market Price: {currentMin:N0} gil", currentMin, minLineY[1] * 0.95, new Vector2(0, -10), ImPlotTextFlags.None);
 
             // Highlight Outliers Threshold
             if (maxPrice > outlierThreshold)
