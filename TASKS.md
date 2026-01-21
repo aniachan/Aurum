@@ -206,7 +206,7 @@
 - [ ] **Price history chart**
   - [x] Line chart showing price over time (Basic table for now due to dependency issues)
   - [ ] Dual Y-axis (listings + price)
-  - [ ] Time range selector (1d, 7d, 30d, all)
+  - [x] Time range selector (1d, 7d, 30d, all)
   - [ ] Zoom and pan controls
   - [ ] Crosshair with value tooltip
 
