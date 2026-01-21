@@ -361,6 +361,18 @@ public class ConfigWindow : Window, IDisposable
             ImGui.Text($"Total Requests: {limiter.TotalRequests}");
             ImGui.Text($"Rate Limited: {limiter.RateLimitedRequests}");
             ImGui.Text($"Errors/Retries: {limiter.TotalErrors} / {limiter.TotalRetries}");
+            
+            // Visual indicator for token bucket
+            var currentTokens = (float)limiter.CurrentTokens;
+            var maxTokens = (float)limiter.MaxTokens;
+            
+            ImGui.Spacing();
+            ImGui.Text("API Token Bucket (Burst Capacity)");
+            ImGui.ProgressBar(currentTokens / maxTokens, new Vector2(-1, 0), $"{currentTokens:F1} / {maxTokens:F0}");
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Tokens replenish over time.\nRequests consume 1 token.\nEmpty bucket = Rate Limiting active.");
+            }
         }
     }
 }

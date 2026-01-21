@@ -50,6 +50,17 @@ public class RateLimiter : IDisposable
     public long TotalErrors { get; private set; }
     public long TotalRetries { get; private set; }
 
+    // Expose token state for UI visualization
+    public double CurrentTokens 
+    {
+        get
+        {
+            lock (_lock) return _tokens;
+        }
+    }
+
+    public double MaxTokens => _maxTokens;
+
     public int RequestsLastMinute 
     { 
         get 
