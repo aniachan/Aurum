@@ -833,11 +833,34 @@ public class DashboardWindow : Window, IDisposable
                 // Full market data available - show chart button
                 if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
                 {
-                    plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
+                    if (ImGui.GetIO().KeyShift)
+                    {
+                        plugin.ChartWindow.IsOpen = true;
+                        plugin.ChartWindow.AddComparisonData(profit.MarketData, profit.Recipe.ItemName);
+                    }
+                    else
+                    {
+                        plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
+                    }
                 }
+                
+                if (ImGui.BeginPopupContextItem($"ChartContext_{profit.Recipe.RecipeId}"))
+                {
+                    if (ImGui.Selectable("Open Chart"))
+                    {
+                        plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
+                    }
+                    if (ImGui.Selectable("Add to Comparison"))
+                    {
+                        plugin.ChartWindow.IsOpen = true;
+                        plugin.ChartWindow.AddComparisonData(profit.MarketData, profit.Recipe.ItemName);
+                    }
+                    ImGui.EndPopup();
+                }
+
                 if (ImGui.IsItemHovered())
                 {
-                    ImGui.SetTooltip("View Price History");
+                    ImGui.SetTooltip("View Price History\n(Shift+Click to add to comparison)\n(Right-click for options)");
                 }
             }
             else
