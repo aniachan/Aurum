@@ -57,6 +57,23 @@ public class ProfitService
             // Calculate profit
             var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
             
+            // Save to database cache
+            if (profit != null)
+            {
+                try
+                {
+                    Plugin.Instance?.DatabaseService?.UpsertRecipeCache(recipe, profit);
+                    
+                    // Set item priority based on recommendation score
+                    var priority = Math.Max(1, profit.RecommendationScore);
+                    Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
+                }
+                catch (Exception cacheEx)
+                {
+                    log.Warning(cacheEx, $"Failed to cache profit for {recipe.ItemName}");
+                }
+            }
+            
             return profit;
         }
         catch (Exception ex)
@@ -101,6 +118,20 @@ public class ProfitService
                 if (profit != null)
                 {
                     results.Add(profit);
+                    
+                    // Save to database cache
+                    try
+                    {
+                        Plugin.Instance?.DatabaseService?.UpsertRecipeCache(recipe, profit);
+                        
+                        // Set item priority based on recommendation score
+                        var priority = Math.Max(1, profit.RecommendationScore);
+                        Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
+                    }
+                    catch (Exception cacheEx)
+                    {
+                        log.Warning(cacheEx, $"Failed to cache profit for {recipe.ItemName}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -517,4 +548,137 @@ public class ProfitService
             }
         };
     }
+    
+    /// <summary>
+    /// Load cached profit calculations from database
+    /// </summary>
+    public List<ProfitCalculation> LoadCachedProfits(int maxAgeHours = 24)
+    {
+        try
+        {
+            log.Information($"Loading cached profits (max age: {maxAgeHours}h)...");
+            var cachedData = Plugin.Instance?.DatabaseService?.GetAllCachedProfits(maxAgeHours);
+            
+            if (cachedData == null || !cachedData.Any())
+            {
+                log.Information("No cached profits found");
+                return new List<ProfitCalculation>();
+            }
+            
+            var results = new List<ProfitCalculation>();
+            var worldName = GetCurrentWorldName();
+            
+            foreach (var (recipeId, profit, lastAnalyzed) in cachedData)
+            {
+                // Get recipe details
+                var recipe = recipeService.GetRecipe(recipeId);
+                if (recipe == null)
+                {
+                    log.Warning($"Recipe {recipeId} not found, skipping cached profit");
+                    continue;
+                }
+                
+                // Reconstruct ProfitCalculation with full recipe data
+                profit.Recipe = recipe;
+                profit.CalculatedAt = DateTimeOffset.FromUnixTimeSeconds(lastAnalyzed).UtcDateTime;
+                profit.IsDataComplete = true;
+                
+                // Load cached MarketData for this item (last 7 days of data)
+                if (!string.IsNullOrEmpty(worldName))
+                {
+                    try
+                    {
+                        var cachedMarketData = LoadCachedMarketData(recipe.ResultItemId, worldName);
+                        if (cachedMarketData != null)
+                        {
+                            profit.MarketData = cachedMarketData;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Warning(ex, $"Failed to load cached market data for item {recipe.ResultItemId}");
+                    }
+                }
+                
+                // Set risk level based on score
+                profit.RiskLevel = profit.RiskScore switch
+                {
+                    <= 25 => RiskLevel.Low,
+                    <= 50 => RiskLevel.Medium,
+                    <= 75 => RiskLevel.High,
+                    _ => RiskLevel.VeryHigh
+                };
+                
+                results.Add(profit);
+            }
+            
+            log.Information($"Loaded {results.Count} cached profit calculations");
+            return results;
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, "Failed to load cached profits");
+            return new List<ProfitCalculation>();
+        }
+    }
+    
+    private string? GetCurrentWorldName()
+    {
+        try
+        {
+            var worldName = config.PreferredWorld;
+            if (string.IsNullOrEmpty(worldName) || worldName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            {
+                var currentWorld = Plugin.PlayerState?.CurrentWorld;
+                if (currentWorld?.Value.RowId != 0)
+                {
+                    worldName = currentWorld?.Value.Name.ToString();
+                }
+            }
+            return worldName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    private MarketData? LoadCachedMarketData(uint itemId, string worldName)
+    {
+        var worldId = universalisService.GetWorldIdByName(worldName);
+        if (worldId == 0) return null;
+        
+        // Get cached market data (7 days old max)
+        var marketData = Plugin.Instance?.DatabaseService?.GetMarketData((int)itemId, worldId, TimeSpan.FromDays(7));
+        if (marketData == null) return null;
+        
+        // Load historical snapshots (last 90 days)
+        var snapshots = Plugin.Instance?.DatabaseService?.GetMarketSnapshots((int)itemId, worldId, DateTime.UtcNow.AddDays(-90));
+        if (snapshots != null && snapshots.Any())
+        {
+            marketData.HistorySnapshots = snapshots;
+        }
+        
+        // Set world name
+        marketData.WorldName = worldName;
+        
+        // Recalculate SaleVelocity from cached RecentHistory if it's missing/zero
+        // This handles cases where the cached data was stored before analysis
+        if (marketData.SaleVelocity == 0 && marketData.RecentHistory.Any())
+        {
+            var oldestSale = marketData.RecentHistory.Min(s => s.Timestamp);
+            var newestSale = marketData.RecentHistory.Max(s => s.Timestamp);
+            var timeSpan = (newestSale - oldestSale).TotalDays;
+            
+            if (timeSpan > 0)
+            {
+                var totalQuantity = marketData.RecentHistory.Sum(s => (int)s.Quantity);
+                marketData.SaleVelocity = (float)(totalQuantity / timeSpan);
+                log.Debug($"Recalculated SaleVelocity for item {itemId}: {marketData.SaleVelocity:F2}/day from {totalQuantity} sales over {timeSpan:F1} days");
+            }
+        }
+        
+        return marketData;
+    }
 }
+

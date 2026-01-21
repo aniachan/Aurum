@@ -65,6 +65,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 2) ApplyMigration(connection, 2, Migration_2_AddHistoryMetrics);
             if (currentVersion < 3) ApplyMigration(connection, 3, Migration_3_AddPriorityScores);
             if (currentVersion < 4) ApplyMigration(connection, 4, Migration_4_AddSupplyDemandMetrics);
+            if (currentVersion < 5) ApplyMigration(connection, 5, Migration_5_AddGilPerHourColumn);
             
             log.Information("Database initialization complete");
         }
@@ -236,6 +237,17 @@ public class DatabaseService : IDisposable
         {
             var addDemandRatio = "ALTER TABLE MarketData ADD COLUMN demand_ratio REAL DEFAULT 0;";
             ExecuteNonQuery(connection, addDemandRatio, transaction);
+        }
+        catch { /* Column might already exist, ignore */ }
+    }
+    
+    private void Migration_5_AddGilPerHourColumn(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add gil_per_hour to RecipeCache for better caching
+        try
+        {
+            var addGilPerHour = "ALTER TABLE RecipeCache ADD COLUMN gil_per_hour INTEGER DEFAULT 0;";
+            ExecuteNonQuery(connection, addGilPerHour, transaction);
         }
         catch { /* Column might already exist, ignore */ }
     }
@@ -728,10 +740,10 @@ public class DatabaseService : IDisposable
                 command.CommandText = @"
                     INSERT OR REPLACE INTO RecipeCache (
                         recipe_id, item_id, last_analyzed, profit_snapshot, margin_snapshot, 
-                        risk_score, recommendation_score, ingredients_json
+                        risk_score, recommendation_score, gil_per_hour, ingredients_json
                     ) VALUES (
                         @recipeId, @itemId, @lastAnalyzed, @profit, @margin,
-                        @risk, @recommendation, @ingredientsJson
+                        @risk, @recommendation, @gilPerHour, @ingredientsJson
                     );
                 ";
 
@@ -742,6 +754,7 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@margin", profit.ProfitMargin);
                 command.Parameters.AddWithValue("@risk", profit.RiskScore);
                 command.Parameters.AddWithValue("@recommendation", profit.RecommendationScore);
+                command.Parameters.AddWithValue("@gilPerHour", profit.GilPerHour);
                 command.Parameters.AddWithValue("@ingredientsJson", JsonSerializer.Serialize(recipe.Ingredients));
                 
                 command.ExecuteNonQuery();
@@ -845,6 +858,50 @@ public class DatabaseService : IDisposable
                 log.Error(ex, $"Failed to get cached profit for recipe {recipeId}");
             }
             return null;
+        }
+    }
+    
+    public List<(uint RecipeId, ProfitCalculation Profit, long LastAnalyzed)> GetAllCachedProfits(int maxAgeHours = 24)
+    {
+        lock (dbLock)
+        {
+            var results = new List<(uint, ProfitCalculation, long)>();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                var cutoffTime = DateTimeOffset.UtcNow.AddHours(-maxAgeHours).ToUnixTimeSeconds();
+                command.CommandText = @"
+                    SELECT recipe_id, profit_snapshot, margin_snapshot, risk_score, 
+                           recommendation_score, gil_per_hour, last_analyzed
+                    FROM RecipeCache
+                    WHERE last_analyzed > @cutoff
+                    ORDER BY recommendation_score DESC
+                    LIMIT 1000
+                ";
+                command.Parameters.AddWithValue("@cutoff", cutoffTime);
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var profit = new ProfitCalculation
+                    {
+                        NetProfit = reader.GetInt32(1),
+                        ProfitMargin = reader.GetFloat(2),
+                        RiskScore = reader.GetInt32(3),
+                        RecommendationScore = reader.GetInt32(4),
+                        GilPerHour = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                    };
+                    results.Add(((uint)reader.GetInt32(0), profit, reader.GetInt64(6)));
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to get all cached profits");
+            }
+            return results;
         }
     }
     

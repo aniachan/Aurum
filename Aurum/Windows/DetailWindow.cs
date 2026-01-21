@@ -26,6 +26,19 @@ public class DetailWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
     }
+    
+    public override void PreDraw()
+    {
+        // Override title bar colors to gold
+        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f));
+    }
+    
+    public override void PostDraw()
+    {
+        ImGui.PopStyleColor(3);
+    }
 
     public void SetItem(ProfitCalculation item)
     {
@@ -486,7 +499,7 @@ public class DetailWindow : Window, IDisposable
         if (currentItem.RecommendationScore >= 75) scoreColor = new Vector4(0f, 1f, 0.5f, 1f); // Green
         else if (currentItem.RecommendationScore >= 50) scoreColor = new Vector4(1f, 1f, 0.5f, 1f); // Yellow
         else if (currentItem.RecommendationScore >= 25) scoreColor = new Vector4(1f, 0.7f, 0f, 1f); // Orange
-        else scoreColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+        else scoreColor = new Vector4(1f, 0.84f, 0f, 1f); // Gold
 
         ImGui.TextColored(scoreColor, $"{currentItem.RecommendationScore}/100");
 
@@ -507,7 +520,7 @@ public class DetailWindow : Window, IDisposable
         else
         {
             actionText = "Not Recommended";
-            actionColor = new Vector4(1f, 0.3f, 0.3f, 1f);
+            actionColor = new Vector4(1f, 0.84f, 0f, 1f);
         }
         
         ImGui.TextColored(actionColor, actionText);

@@ -23,6 +23,7 @@ public class DashboardWindow : Window, IDisposable
     private List<ProfitCalculation> profitResults = new();
     private List<ProfitCalculation> filteredResults = new();
     private bool isLoading = false;
+    private bool hasLoadedCache = false;
     private string searchText = string.Empty;
     private string selectedClass = "All";
     private int minLevel = 1;
@@ -31,6 +32,10 @@ public class DashboardWindow : Window, IDisposable
     private SortMode currentSort = SortMode.RecommendationScore;
     private bool showOnlyProfitable = true;
     private DateTime lastRefresh = DateTime.MinValue;
+    
+    // Column sorting
+    private string? sortColumn = null;
+    private bool sortAscending = false;
     
     // Pagination
     private int currentPage = 1;
@@ -42,7 +47,7 @@ public class DashboardWindow : Window, IDisposable
     private DateTime lastErrorTime = DateTime.MinValue;
 
     public DashboardWindow(Plugin plugin) 
-        : base("Aurum - Crafting Profit Calculator##Dashboard", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
+        : base("Aurum - Crafting Profit Calculator by aniachan##Dashboard", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         this.plugin = plugin;
         
@@ -52,17 +57,37 @@ public class DashboardWindow : Window, IDisposable
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
     }
+    
+    public override void PreDraw()
+    {
+        // Override title bar colors to gold
+        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f));
+        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f));
+    }
+    
+    public override void PostDraw()
+    {
+        ImGui.PopStyleColor(3);
+    }
 
     public void Dispose() { }
 
     public override void Draw()
     {
+        // Load cached data on first draw
+        if (!hasLoadedCache && !isLoading && !profitResults.Any())
+        {
+            hasLoadedCache = true;
+            _ = LoadCachedDataAsync();
+        }
+        
         DrawHeader();
         ImGui.Separator();
         
         if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.3f, 0.3f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.8f, 0.6f, 0f, 1f));
             ImGui.TextWrapped($"⚠️ {lastErrorMessage}");
             
             // Show suggestion if available
@@ -110,12 +135,12 @@ public class DashboardWindow : Window, IDisposable
         
         if (limiter.IsDegraded)
         {
-             apiColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+             apiColor = new Vector4(1f, 0.84f, 0f, 1f); // Gold
              statusText = "API: Degraded (Cache Only)";
         }
         else if (requests > limit * 0.9)
         {
-             apiColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+             apiColor = new Vector4(1f, 0.84f, 0f, 1f); // Gold
              statusText = $"API: {requests}/{limit} (1m)";
         }
         else if (requests > limit * 0.7)
@@ -149,13 +174,13 @@ public class DashboardWindow : Window, IDisposable
             
             if (limiter.TotalErrors > 0)
             {
-                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), $"Errors: {limiter.TotalErrors}");
+                ImGui.TextColored(new Vector4(1f, 0.84f, 0f, 1f), $"Errors: {limiter.TotalErrors}");
             }
             
             if (limiter.IsDegraded)
             {
                  ImGui.Separator();
-                 ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "Status: Degraded (High Error Rate)");
+                 ImGui.TextColored(new Vector4(1f, 0.84f, 0f, 1f), "Status: Degraded (High Error Rate)");
                  ImGui.Text("The plugin is temporarily avoiding API calls\nto prevent further errors.");
             }
             else 
@@ -178,7 +203,7 @@ public class DashboardWindow : Window, IDisposable
         if (cacheStats.HitRate > 80) cacheColor = new Vector4(0.3f, 1f, 0.3f, 1f); // Green for excellent
         else if (cacheStats.HitRate > 50) cacheColor = new Vector4(0.7f, 1f, 0.3f, 1f); // Yellow-Green for good
         else if (cacheStats.HitRate > 20) cacheColor = new Vector4(1f, 0.7f, 0f, 1f); // Orange for okay
-        else cacheColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red for poor
+        else cacheColor = new Vector4(1f, 0.84f, 0f, 1f); // Gold for poor
         
         ImGui.TextColored(cacheColor, $"Cache: {cacheStats.HitRate:F0}%");
         
@@ -202,7 +227,18 @@ public class DashboardWindow : Window, IDisposable
     {
         // Title and stats
         ImGui.Text("Market-Aware Crafting Profits");
-        ImGui.SameLine(ImGui.GetWindowWidth() - 200);
+        
+        // Calculate button widths to position them properly
+        float settingsWidth = ImGui.CalcTextSize("⚙️ Settings").X + ImGui.GetStyle().FramePadding.X * 2;
+        float refreshWidth = ImGui.CalcTextSize("🔄 Refresh").X + ImGui.GetStyle().FramePadding.X * 2;
+        float exportWidth = ImGui.CalcTextSize("📥 Export CSV").X + ImGui.GetStyle().FramePadding.X * 2;
+        float loadingWidth = ImGui.CalcTextSize("Loading...").X;
+        float spacing = ImGui.GetStyle().ItemSpacing.X;
+        float rightPadding = 5f; // Right padding
+        
+        float totalButtonWidth = settingsWidth + refreshWidth + exportWidth + (spacing * 2) + rightPadding;
+        
+        ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - totalButtonWidth);
         
         if (ImGui.Button("⚙️ Settings"))
         {
@@ -225,46 +261,62 @@ public class DashboardWindow : Window, IDisposable
         {
             _ = ExportToCsvAsync();
         }
-            
-            // Error Reporting Button (shows when an error has occurred recently)
-            if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
+        
+        // Error Reporting Button (shows when an error has occurred recently)
+        if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
+        {
+            ImGui.SameLine();
+            ImGui.PushFont(UiBuilder.IconFont);
+            if (ImGui.Button($"{FontAwesomeIcon.Bug.ToIconString()}##ReportError"))
             {
-                ImGui.SameLine();
-                ImGui.PushFont(UiBuilder.IconFont);
-                if (ImGui.Button($"{FontAwesomeIcon.Bug.ToIconString()}##ReportError"))
-                {
-                     // Open GitHub issues page with pre-filled title
-                     try 
+                 // Open GitHub issues page with pre-filled title
+                 try 
+                 {
+                     var title = $"[Bug] Error: {lastErrorMessage}";
+                     var url = $"https://github.com/Dicklesworthstone/Aurum/issues/new?title={Uri.EscapeDataString(title)}&body=Describe%20what%20you%20were%20doing%20when%20this%20occurred...";
+                     
+                     Process.Start(new ProcessStartInfo
                      {
-                         var title = $"[Bug] Error: {lastErrorMessage}";
-                         var url = $"https://github.com/Dicklesworthstone/Aurum/issues/new?title={Uri.EscapeDataString(title)}&body=Describe%20what%20you%20were%20doing%20when%20this%20occurred...";
-                         
-                         Process.Start(new ProcessStartInfo
-                         {
-                             FileName = url,
-                             UseShellExecute = true
-                         });
-                     }
-                     catch { /* Ignore navigation errors */ }
-                }
-                ImGui.PopFont();
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Report this error on GitHub");
+                         FileName = url,
+                         UseShellExecute = true
+                     });
+                 }
+                 catch { /* Ignore navigation errors */ }
             }
+            ImGui.PopFont();
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Report this error on GitHub");
+        }
         
         // Stats row
         if (profitResults.Any())
         {
             ImGui.Text($"Showing {filteredResults.Count} of {profitResults.Count} recipes");
-            ImGui.SameLine(ImGui.GetWindowWidth() - 300);
             
             var avgProfit = filteredResults.Any() ? (int)filteredResults.Average(p => p.RawProfit) : 0;
-            ImGui.Text($"Avg Profit: {FormatGil(avgProfit)}");
+            var profitText = $"Avg Profit: {FormatGil(avgProfit)}";
+            
+            // Calculate proper alignment for right-side stats
+            var cursorPos = ImGui.GetCursorPosX();
+            var availWidth = ImGui.GetContentRegionAvail().X;
             
             if (lastRefresh > DateTime.MinValue)
             {
                 var timeSinceRefresh = DateTime.UtcNow - lastRefresh;
-                ImGui.SameLine();
-                ImGui.TextDisabled($"(Updated {timeSinceRefresh.TotalMinutes:F0}m ago)");
+                var updateText = $"(Updated {timeSinceRefresh.TotalMinutes:F0}m ago)";
+                var padding = 10f; // Add some padding to the right
+                var combinedText = $"{profitText} {updateText}";
+                var textWidth = ImGui.CalcTextSize(combinedText).X + padding;
+                
+                ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
+                ImGui.Text(profitText);
+                ImGui.SameLine(0, ImGui.GetStyle().ItemSpacing.X);
+                ImGui.TextDisabled(updateText);
+            }
+            else
+            {
+                var textWidth = ImGui.CalcTextSize(profitText).X;
+                ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
+                ImGui.Text(profitText);
             }
         }
         else
@@ -278,17 +330,33 @@ public class DashboardWindow : Window, IDisposable
         ImGui.Text("Filters:");
         ImGui.SameLine();
         
-            // Search box
-            if (ImGui.InputTextWithHint("##search", "Search items...", ref searchText, 256))
+        // Calculate widths for all controls after search box
+        float classWidth = 100f;
+        float levelLabelWidth = ImGui.CalcTextSize("Level:").X;
+        float levelInputWidth = 60f;
+        float dashWidth = ImGui.CalcTextSize("-").X;
+        float minProfitLabelWidth = ImGui.CalcTextSize("Min Profit:").X;
+        float minProfitWidth = 80f;
+        float checkboxWidth = ImGui.CalcTextSize("Profitable Only").X + 30f; // checkbox + text
+        float spacing = ImGui.GetStyle().ItemSpacing.X;
+        
+        // Calculate remaining width for search box
+        float totalRightSideWidth = classWidth + levelLabelWidth + levelInputWidth + dashWidth + levelInputWidth + 
+                                    minProfitLabelWidth + minProfitWidth + checkboxWidth + (spacing * 9);
+        float searchWidth = Math.Max(150f, ImGui.GetContentRegionAvail().X - totalRightSideWidth);
+        
+        // Search box with dynamic width
+        ImGui.SetNextItemWidth(searchWidth);
+        if (ImGui.InputTextWithHint("##search", "Search items...", ref searchText, 256))
+        {
+            ApplyFilters();
+            if (!string.IsNullOrWhiteSpace(searchText) && !plugin.Configuration.RecentSearches.Contains(searchText))
             {
-                ApplyFilters();
-                if (!string.IsNullOrWhiteSpace(searchText) && !plugin.Configuration.RecentSearches.Contains(searchText))
-                {
-                   plugin.Configuration.RecentSearches.Insert(0, searchText);
-                   if (plugin.Configuration.RecentSearches.Count > 10) plugin.Configuration.RecentSearches.RemoveAt(10);
-                   plugin.Configuration.Save();
-                }
+               plugin.Configuration.RecentSearches.Insert(0, searchText);
+               if (plugin.Configuration.RecentSearches.Count > 10) plugin.Configuration.RecentSearches.RemoveAt(10);
+               plugin.Configuration.Save();
             }
+        }
         
         ImGui.SameLine();
         
@@ -357,7 +425,20 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.Combo("##sort", ref currentSortIndex, sortNames, sortNames.Length))
         {
             currentSort = (SortMode)currentSortIndex;
+            sortColumn = null; // Clear column sort when using dropdown
             ApplyFilters();
+        }
+        
+        ImGui.SameLine();
+        if (ImGui.Button("Reset Sort"))
+        {
+            sortColumn = null;
+            currentSort = SortMode.RecommendationScore;
+            ApplyFilters();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Reset to default sort (Recommendation Score)");
         }
     }
     
@@ -411,7 +492,54 @@ public class DashboardWindow : Window, IDisposable
             if (!plugin.Configuration.HiddenColumns.Contains("Score")) ImGui.TableSetupColumn("Score", ImGuiTableColumnFlags.WidthFixed, 80);
             if (!plugin.Configuration.HiddenColumns.Contains("Actions")) ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 50);
 
-            ImGui.TableHeadersRow();
+            // Draw custom clickable headers
+            ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
+            
+            if (!plugin.Configuration.HiddenColumns.Contains("Item"))
+            {
+                ImGui.TableSetColumnIndex(0);
+                DrawSortableHeader("Item");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Class"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Class");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Profit"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Profit");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Margin"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Margin");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Gil/Hr"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Gil/Hr");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Demand"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Demand");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Risk"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Risk");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Score"))
+            {
+                ImGui.TableNextColumn();
+                DrawSortableHeader("Score");
+            }
+            if (!plugin.Configuration.HiddenColumns.Contains("Actions"))
+            {
+                ImGui.TableNextColumn();
+                ImGui.Text("Actions");
+            }
             
             // Draw rows
             var pageItems = filteredResults
@@ -435,7 +563,7 @@ public class DashboardWindow : Window, IDisposable
         if (!plugin.Configuration.HiddenColumns.Contains("Item"))
         {
             ImGui.TableNextColumn();
-            if (ImGui.Selectable($"{profit.Recipe.ItemName}##{profit.Recipe.RecipeId}", false, ImGuiSelectableFlags.SpanAllColumns))
+            if (ImGui.Selectable($"{profit.Recipe.ItemName}##{profit.Recipe.RecipeId}", false))
             {
                 plugin.DetailWindow.SetItem(profit);
             }
@@ -486,7 +614,7 @@ public class DashboardWindow : Window, IDisposable
             ImGui.TableNextColumn();
             var profitColor = profit.RawProfit > 0 
                 ? new Vector4(0f, 1f, 0.5f, 1f)  // Green
-                : new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+                : new Vector4(1f, 0.84f, 0f, 1f); // Gold
             ImGui.TextColored(profitColor, FormatGil(profit.RawProfit));
         }
         
@@ -514,7 +642,7 @@ public class DashboardWindow : Window, IDisposable
                 var velocityColor = velocity >= 50 ? new Vector4(0f, 1f, 0.5f, 1f) :
                                    velocity >= 10 ? new Vector4(0.5f, 1f, 0.5f, 1f) :
                                    velocity >= 1 ? new Vector4(1f, 1f, 0.5f, 1f) :
-                                   new Vector4(1f, 0.5f, 0.5f, 1f);
+                                   new Vector4(1f, 0.84f, 0.5f, 1f);
                 
                 var icon = velocity >= 50 ? "🔥" :
                           velocity >= 10 ? "📈" :
@@ -548,8 +676,10 @@ public class DashboardWindow : Window, IDisposable
         if (!plugin.Configuration.HiddenColumns.Contains("Actions"))
         {
             ImGui.TableNextColumn();
+            
             if (profit.MarketData != null)
             {
+                // Full market data available - show chart button
                 if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
                 {
                     plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
@@ -559,6 +689,126 @@ public class DashboardWindow : Window, IDisposable
                     ImGui.SetTooltip("View Price History");
                 }
             }
+            else
+            {
+                // Cached data without market data - show fetch button
+                if (ImGui.Button($"📊##{profit.Recipe.RecipeId}"))
+                {
+                    _ = FetchAndShowChartAsync(profit.Recipe.ResultItemId, profit.Recipe.ItemName);
+                }
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("Fetch & View Chart");
+                }
+            }
+        }
+    }
+    
+    private void DrawSortableHeader(string columnName)
+    {
+        var isSorted = sortColumn == columnName;
+        var displayName = columnName;
+        
+        if (isSorted)
+        {
+            displayName += sortAscending ? " ▲" : " ▼"; // Up/down arrows
+        }
+        
+        if (ImGui.Selectable(displayName, isSorted))
+        {
+            if (sortColumn == columnName)
+            {
+                // Toggle direction
+                sortAscending = !sortAscending;
+            }
+            else
+            {
+                // New column
+                sortColumn = columnName;
+                sortAscending = false; // Default to descending (highest first)
+            }
+            ApplyFilters(); // Re-sort
+        }
+        
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip($"Click to sort by {columnName}");
+        }
+    }
+    
+    private async Task FetchAndShowChartAsync(uint itemId, string itemName)
+    {
+        try
+        {
+            // Get world name
+            var worldName = plugin.Configuration.PreferredWorld;
+            if (string.IsNullOrEmpty(worldName) || worldName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var currentWorld = Plugin.PlayerState.CurrentWorld;
+                    if (currentWorld.Value.RowId != 0)
+                    {
+                        worldName = currentWorld.Value.Name.ToString();
+                    }
+                }
+                catch { }
+            }
+            
+            if (string.IsNullOrEmpty(worldName) || worldName == "Auto")
+            {
+                Plugin.Log.Warning("Unable to determine world name for chart");
+                return;
+            }
+            
+            // Fetch market data
+            var marketData = await plugin.UniversalisService.GetMarketDataAsync(worldName, itemId);
+            if (marketData != null)
+            {
+                plugin.ChartWindow.SetMarketData(marketData, itemName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, $"Failed to fetch chart data for item {itemId}");
+        }
+    }
+    
+    private async Task LoadCachedDataAsync()
+    {
+        if (isLoading) return;
+        
+        isLoading = true;
+        
+        try
+        {
+            Plugin.Log.Information("Loading cached profit data...");
+            
+            // Load from database cache (last 24 hours)
+            await Task.Run(() =>
+            {
+                profitResults = plugin.ProfitService.LoadCachedProfits(24);
+            });
+            
+            if (profitResults.Any())
+            {
+                Plugin.Log.Information($"Loaded {profitResults.Count} cached profit calculations");
+                // Set last refresh to the oldest calculation time
+                lastRefresh = profitResults.Min(p => p.CalculatedAt);
+                ApplyFilters();
+            }
+            else
+            {
+                Plugin.Log.Information("No cached data found");
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, "Error loading cached data");
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
     
@@ -612,8 +862,8 @@ public class DashboardWindow : Window, IDisposable
                 return;
             }
             
-            // Get recipes to analyze (start with level 90+ for testing)
-            var recipes = plugin.RecipeService.GetRecipesByLevel(90, 100).Take(50).ToList();
+            // Get recipes to analyze - use filter settings if available, otherwise get recent level recipes
+            var recipes = plugin.RecipeService.GetRecipesByLevel(minLevel, maxLevel).Take(500).ToList();
             
             Plugin.Log.Information($"Analyzing {recipes.Count} recipes for {worldName}...");
             
@@ -669,17 +919,52 @@ public class DashboardWindow : Window, IDisposable
         // Reset page on filter change
         currentPage = 1;
         
-        // Apply sorting
-        filteredResults = currentSort switch
+        // Apply column-based sorting if active
+        if (sortColumn != null)
         {
-            SortMode.HighestProfit => filteredResults.OrderByDescending(p => p.RawProfit).ToList(),
-            SortMode.HighestMargin => filteredResults.OrderByDescending(p => p.ProfitMargin).ToList(),
-            SortMode.BestGilPerHour => filteredResults.OrderByDescending(p => p.GilPerHour).ToList(),
-            SortMode.FastestSelling => filteredResults.OrderByDescending(p => p.MarketData?.SaleVelocity ?? 0).ToList(),
-            SortMode.LowestCompetition => filteredResults.OrderBy(p => p.MarketData?.CurrentListings ?? int.MaxValue).ToList(),
-            SortMode.RecommendationScore => filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
-            _ => filteredResults
-        };
+            filteredResults = sortColumn switch
+            {
+                "Item" => sortAscending 
+                    ? filteredResults.OrderBy(p => p.Recipe.ItemName).ToList()
+                    : filteredResults.OrderByDescending(p => p.Recipe.ItemName).ToList(),
+                "Class" => sortAscending
+                    ? filteredResults.OrderBy(p => p.Recipe.CraftingClassName).ToList()
+                    : filteredResults.OrderByDescending(p => p.Recipe.CraftingClassName).ToList(),
+                "Profit" => sortAscending
+                    ? filteredResults.OrderBy(p => p.RawProfit).ToList()
+                    : filteredResults.OrderByDescending(p => p.RawProfit).ToList(),
+                "Margin" => sortAscending
+                    ? filteredResults.OrderBy(p => p.ProfitMargin).ToList()
+                    : filteredResults.OrderByDescending(p => p.ProfitMargin).ToList(),
+                "Gil/Hr" => sortAscending
+                    ? filteredResults.OrderBy(p => p.GilPerHour).ToList()
+                    : filteredResults.OrderByDescending(p => p.GilPerHour).ToList(),
+                "Demand" => sortAscending
+                    ? filteredResults.OrderBy(p => p.MarketData?.SaleVelocity ?? 0).ToList()
+                    : filteredResults.OrderByDescending(p => p.MarketData?.SaleVelocity ?? 0).ToList(),
+                "Risk" => sortAscending
+                    ? filteredResults.OrderBy(p => p.RiskScore).ToList()
+                    : filteredResults.OrderByDescending(p => p.RiskScore).ToList(),
+                "Score" => sortAscending
+                    ? filteredResults.OrderBy(p => p.RecommendationScore).ToList()
+                    : filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
+                _ => filteredResults
+            };
+        }
+        else
+        {
+            // Default sort by currentSort enum
+            filteredResults = currentSort switch
+            {
+                SortMode.HighestProfit => filteredResults.OrderByDescending(p => p.RawProfit).ToList(),
+                SortMode.HighestMargin => filteredResults.OrderByDescending(p => p.ProfitMargin).ToList(),
+                SortMode.BestGilPerHour => filteredResults.OrderByDescending(p => p.GilPerHour).ToList(),
+                SortMode.FastestSelling => filteredResults.OrderByDescending(p => p.MarketData?.SaleVelocity ?? 0).ToList(),
+                SortMode.LowestCompetition => filteredResults.OrderBy(p => p.MarketData?.CurrentListings ?? int.MaxValue).ToList(),
+                SortMode.RecommendationScore => filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
+                _ => filteredResults
+            };
+        }
     }
     
     private static string FormatGil(int amount)

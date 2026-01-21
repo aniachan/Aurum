@@ -14,12 +14,22 @@ using Dalamud.Bindings.ImPlot;
 
 namespace Aurum.Windows;
 
+public enum ChartType
+{
+    Line,
+    Bar,
+    Candle
+}
+
 public class ChartWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
     private MarketData? currentData;
     private string itemName = "Unknown Item";
     private int selectedTimeRange = 30; // Default 30 days, -1 for All
+    private ChartType selectedChartType = ChartType.Candle;
+    private bool showVolumeChart = true;
+    private bool useLogScale = false;
     private bool shouldFitHistory = true;
     private bool shouldFitDistribution = true;
 
@@ -32,14 +42,19 @@ public class ChartWindow : Window, IDisposable
 
     private readonly List<ChartSeries> comparisonSeries = new();
     
+    private bool isFetchingExtendedData = false;
+    private DateTime lastExtendedDataCheck = DateTime.MinValue;
+    
     private readonly Vector4[] SeriesColors = new[]
     {
-        new Vector4(0f, 0.8f, 1f, 1f),   // Cyan (Primary)
-        new Vector4(1f, 0.4f, 0.4f, 1f), // Red
-        new Vector4(0.4f, 1f, 0.4f, 1f), // Green
-        new Vector4(1f, 0.8f, 0f, 1f),   // Yellow
-        new Vector4(0.8f, 0.4f, 1f, 1f), // Purple
-        new Vector4(1f, 0.5f, 0f, 1f)    // Orange
+        new Vector4(0.2f, 0.7f, 1f, 1f),    // Soft Blue (Primary)
+        new Vector4(1f, 0.84f, 0f, 1f),    // Soft Gold
+        new Vector4(0.3f, 0.8f, 0.5f, 1f),  // Soft Green
+        new Vector4(1f, 0.75f, 0.2f, 1f),   // Soft Gold
+        new Vector4(0.75f, 0.4f, 1f, 1f),   // Soft Purple
+        new Vector4(1f, 0.55f, 0.2f, 1f),   // Soft Orange
+        new Vector4(0.4f, 0.85f, 1f, 1f),   // Light Blue
+        new Vector4(0.85f, 0.85f, 0.3f, 1f) // Muted Yellow
     };
 
     public ChartWindow(Plugin plugin) : base("Price History Chart##AurumCharts", ImGuiWindowFlags.None)
@@ -51,6 +66,24 @@ public class ChartWindow : Window, IDisposable
             MinimumSize = new Vector2(600, 400),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
+        
+        // Override Dalamud's default red title bar with gold
+        BgAlpha = 0.9f;
+        RespectCloseHotkey = true;
+    }
+    
+    public override void PreDraw()
+    {
+        // Override title bar colors to gold
+        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f)); // Dark gold
+        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f)); // Muted gold
+        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f)); // Faded gold
+    }
+    
+    public override void PostDraw()
+    {
+        // Pop the 3 style colors we pushed
+        ImGui.PopStyleColor(3);
     }
 
     public void SetMarketData(MarketData data, string name)
@@ -94,6 +127,14 @@ public class ChartWindow : Window, IDisposable
         IsOpen = true;
     }
 
+    public override void OnClose()
+    {
+        // Clear comparison series when window is closed so it starts fresh next time
+        comparisonSeries.Clear();
+        currentData = null;
+        base.OnClose();
+    }
+
     public void AddComparisonData(MarketData data, string name)
     {
         if (comparisonSeries.Any(s => s.Data.ItemId == data.ItemId)) return;
@@ -124,8 +165,24 @@ public class ChartWindow : Window, IDisposable
 
         ImGui.Text($"Price History: {itemName}");
         
-        // Time Range Selector
+        // Chart Type Selector
         ImGui.Separator();
+        ImGui.Text("Chart Type:");
+        ImGui.SameLine();
+        
+        if (ImGui.RadioButton("Line", selectedChartType == ChartType.Line)) selectedChartType = ChartType.Line;
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Bar", selectedChartType == ChartType.Bar)) selectedChartType = ChartType.Bar;
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Candle", selectedChartType == ChartType.Candle)) selectedChartType = ChartType.Candle;
+        
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+        ImGui.TextDisabled("|");
+        ImGui.SameLine();
+        
+        // Time Range Selector
         ImGui.Text("Time Range:");
         ImGui.SameLine();
         
@@ -137,7 +194,11 @@ public class ChartWindow : Window, IDisposable
         ImGui.SameLine();
         if (ImGui.RadioButton("90 Days", selectedTimeRange == 90)) selectedTimeRange = 90;
         ImGui.SameLine();
-        if (ImGui.RadioButton("All Time", selectedTimeRange == -1)) selectedTimeRange = -1;
+        if (ImGui.RadioButton("All Time", selectedTimeRange == -1)) 
+        {
+            selectedTimeRange = -1;
+            CheckAndFetchExtendedData();
+        }
 
         ImGui.SameLine();
         ImGui.Spacing();
@@ -146,6 +207,55 @@ public class ChartWindow : Window, IDisposable
         {
             shouldFitHistory = true;
             shouldFitDistribution = true;
+        }
+        
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+        ImGui.Checkbox("Show Volume", ref showVolumeChart);
+        
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+        ImGui.Checkbox("Log Scale", ref useLogScale);
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Use logarithmic scale for Y-axis (helpful when comparing items with different price ranges)");
+        }
+        
+        // Show comparison series management
+        if (comparisonSeries.Count > 1)
+        {
+            ImGui.SameLine();
+            ImGui.Spacing();
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), $"Comparing {comparisonSeries.Count} items");
+            
+            ImGui.Indent();
+            ChartSeries? toRemove = null;
+            foreach (var series in comparisonSeries)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, series.Color);
+                ImGui.Bullet();
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+                ImGui.Text(series.Name);
+                if (series != comparisonSeries[0])
+                {
+                    ImGui.SameLine();
+                    ImGui.PushID(series.Name);
+                    if (ImGui.SmallButton("Remove"))
+                    {
+                        toRemove = series;
+                    }
+                    ImGui.PopID();
+                }
+            }
+            if (toRemove != null)
+            {
+                comparisonSeries.Remove(toRemove);
+            }
+            ImGui.Unindent();
         }
 
         ImGui.Separator();
@@ -157,8 +267,12 @@ public class ChartWindow : Window, IDisposable
         else
         {
             // Export Controls
-            ImGui.SameLine(ImGui.GetWindowWidth() - 150);
-            if (ImGui.Button("📤 Export"))
+            var cursorPos = ImGui.GetCursorPosX();
+            var availWidth = ImGui.GetContentRegionAvail().X;
+            var buttonWidth = 100f;
+            var padding = 10f; // Match padding from dashboard
+            ImGui.SetCursorPosX(cursorPos + availWidth - buttonWidth - padding);
+            if (ImGui.Button("📤 Export", new Vector2(buttonWidth, 0)))
             {
                 ImGui.OpenPopup("ExportPopup");
             }
@@ -243,43 +357,152 @@ public class ChartWindow : Window, IDisposable
             shouldFitHistory = false;
         }
 
-        if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
+        var windowSize = ImGui.GetContentRegionAvail();
+        
+        // Check if we need extended data for this time range
+        if (selectedTimeRange >= 90 || selectedTimeRange == -1)
         {
-            // Setup axes
-            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit);
+            CheckAndFetchExtendedData();
+        }
+        
+        // Calculate heights for main chart and volume chart
+        float mainChartHeight = showVolumeChart ? windowSize.Y * 0.55f : windowSize.Y * 0.8f;
+        float volumeChartHeight = windowSize.Y * 0.25f;
+        
+        // Main price chart (no volume overlay)
+        if (ImPlot.BeginPlot("##PriceHistoryChart", new Vector2(-1, mainChartHeight), ImPlotFlags.None))
+        {
+            // Setup axes with cleaner styling (single Y-axis for price only)
+            ImPlot.SetupAxes("Time", "Price (Gil)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.RangeFit);
             ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
             
-            // Setup Y2 axis for Volume / Listings
-            ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
-
-            // Draw series in reverse order so the primary series (added first) is drawn last (on top)
-            for (int i = comparisonSeries.Count - 1; i >= 0; i--)
+            // Apply logarithmic scale if enabled (useful for comparing items with different price ranges)
+            if (useLogScale)
             {
-                DrawSeries(comparisonSeries[i]);
+                ImPlot.SetupAxisScale(ImAxis.Y1, ImPlotScale.Log10);
+                // For log scale, constrain to positive values only (log(0) is undefined)
+                ImPlot.SetupAxisLimitsConstraints(ImAxis.Y1, 1, double.PositiveInfinity);
+            }
+            else
+            {
+                // For linear scale, allow starting from 0
+                ImPlot.SetupAxisLimitsConstraints(ImAxis.Y1, 0, double.PositiveInfinity);
             }
             
-            // Crosshair
+            ImPlot.SetupAxisFormat(ImAxis.X1, "%m/%d");
+            ImPlot.SetupAxisFormat(ImAxis.Y1, "%.0f");
+            
+            // Enable legend with better positioning and styling
+            ImPlot.SetupLegend(ImPlotLocation.NorthWest, ImPlotLegendFlags.Outside | ImPlotLegendFlags.Horizontal);
+
+            // Draw all series with the same chart type
+            // First draw comparison series (non-primary), then primary on top
+            for (int i = comparisonSeries.Count - 1; i >= 1; i--)
+            {
+                DrawSeries(comparisonSeries[i], isPrimary: false, chartType: selectedChartType);
+            }
+            
+            // Draw primary series on top with selected chart type
+            if (comparisonSeries.Count > 0)
+            {
+                DrawSeries(comparisonSeries[0], isPrimary: true, chartType: selectedChartType);
+            }
+            
+            // Crosshair with improved tooltip
             if (ImPlot.IsPlotHovered())
             {
                 var mouse = ImPlot.GetPlotMousePos();
-                ImPlot.TagX(mouse.X, new Vector4(1, 1, 1, 0.5f));
-                ImPlot.TagY(mouse.Y, new Vector4(1, 1, 1, 0.5f));
+                var vLine = new[] { mouse.X };
+                ImPlot.SetNextLineStyle(new Vector4(0.7f, 0.7f, 0.7f, 0.4f), 1.0f);
+                ImPlot.PlotInfLines("##VCrosshair", ref vLine[0], 1);
 
                 ImGui.BeginTooltip();
                 var date = DateTimeOffset.FromUnixTimeSeconds((long)mouse.X).ToLocalTime();
-                ImGui.Text($"Date: {date:g}");
-                ImGui.Text($"Price: {mouse.Y:N0} Gil");
+                ImGui.TextColored(new Vector4(0.5f, 0.85f, 1f, 1f), $"📅 {date:MMM dd, yyyy HH:mm}");
+                ImGui.Spacing();
+                ImGui.TextColored(new Vector4(0.4f, 0.9f, 0.6f, 1f), $"💰 {mouse.Y:N0} Gil");
                 ImGui.EndTooltip();
+            }
+
+            // Get X-axis limits BEFORE ending the plot
+            var mainXLimits = ImPlot.GetPlotLimits(ImAxis.X1);
+
+            ImPlot.EndPlot();
+            
+            // Separate volume chart below
+            if (showVolumeChart)
+            {
+                DrawVolumeChart(volumeChartHeight, mainXLimits);
+            }
+        }
+        else if (showVolumeChart)
+        {
+            // If main chart didn't render, use default limits
+            var defaultLimits = new ImPlotRect();
+            DrawVolumeChart(volumeChartHeight, defaultLimits);
+        }
+
+        // Supply/Demand Analysis
+        DrawSupplyDemandAnalysis();
+    }
+
+    private void DrawVolumeChart(float height, ImPlotRect mainXLimits)
+    {
+        if (currentData?.RecentHistory == null) return;
+
+        var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
+        var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
+        
+        if (selectedTimeRange > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
+            history = history.Where(h => h.Timestamp >= cutoff);
+            snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
+        }
+
+        var historyList = history.ToList();
+        var snapshotList = snapshots.ToList();
+
+        if (ImPlot.BeginPlot("##VolumeChart", new Vector2(-1, height), ImPlotFlags.NoLegend | ImPlotFlags.NoMouseText))
+        {
+            ImPlot.SetupAxes("Time", "Volume", ImPlotAxisFlags.NoTickLabels, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+            
+            // Link X-axis to main chart for synchronized zoom/pan
+            ImPlot.SetupAxisLimits(ImAxis.X1, mainXLimits.X.Min, mainXLimits.X.Max, ImPlotCond.Always);
+            
+            // Draw Daily Sales Bars
+            var dailySales = historyList
+                .GroupBy(x => x.Timestamp.Date)
+                .OrderBy(g => g.Key)
+                .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+                .ToList();
+
+            if (dailySales.Any())
+            {
+                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+                double barWidth = 86400 * 0.75;
+
+                ImPlot.SetNextFillStyle(new Vector4(0.3f, 0.75f, 1f, 0.6f));
+                ImPlot.PlotBars("Daily Sales", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+            }
+            
+            // Draw Supply line overlay
+            if (snapshotList.Any())
+            {
+                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
+                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
+                
+                ImPlot.SetNextLineStyle(new Vector4(0.9f, 0.5f, 1f, 0.8f), 2.0f);
+                ImPlot.PlotLine("Supply", ref snapXs[0], ref snapYs[0], snapXs.Length);
             }
 
             ImPlot.EndPlot();
         }
-
-        // Only show detailed analysis for primary item
-        DrawSupplyDemandAnalysis();
     }
 
-    private void DrawSeries(ChartSeries series)
+    private void DrawSeries(ChartSeries series, bool isPrimary, ChartType chartType)
     {
         var data = series.Data;
         if (data.RecentHistory == null) return;
@@ -299,64 +522,183 @@ public class ChartWindow : Window, IDisposable
 
         if (!historyList.Any()) return;
 
-        // ---------------------------------------------------------
-        // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
-        // ---------------------------------------------------------
         ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
 
-        var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-        var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
-        
-        ImPlot.SetNextLineStyle(series.Color, 2.0f);
-        ImPlot.PlotLine($"{series.Name} Price", ref xs[0], ref ys[0], xs.Length);
-
-        // Only show detailed scatter/bars for the primary item to avoid clutter
-        if (series.Data == currentData)
+        // Draw based on chart type
+        if (chartType == ChartType.Candle)
         {
-            ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, series.Color);
-            ImPlot.PlotScatter($"{series.Name} Sales", ref xs[0], ref ys[0], xs.Length);
-
-            var hqItems = historyList.Where(x => x.IsHQ).ToList();
-            if (hqItems.Any())
-            {
-                var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
-                
-                ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
-                ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
-            }
+            DrawCandlestickChart(series, historyList);
+        }
+        else if (chartType == ChartType.Bar)
+        {
+            DrawBarChart(series, historyList);
+        }
+        else // Line chart
+        {
+            DrawLineChart(series, historyList);
             
-            // Draw Volume/Listings for primary item only
-            if (snapshotList.Any())
+            // HQ markers only on line charts for primary series
+            if (isPrimary)
             {
-                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
-                
-                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                ImPlot.SetNextLineStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.6f), 2.0f);
-                ImPlot.PlotLine("Listings (Supply)", ref snapXs[0], ref snapYs[0], snapXs.Length);
-                
-                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.2f));
-                ImPlot.PlotShaded("##SupplyArea", ref snapXs[0], ref snapYs[0], snapXs.Length, double.NegativeInfinity);
+                DrawHQMarkers(historyList);
             }
+        }
+    }
 
-            // Daily Sales Bars
-            var dailySales = historyList
-                .GroupBy(x => x.Timestamp.Date)
-                .OrderBy(g => g.Key)
-                .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+    private void DrawCandlestickChart(ChartSeries series, List<SaleRecord> historyList)
+    {
+        // Group into time buckets for candlesticks - smaller buckets to show more data
+        var bucketSize = selectedTimeRange switch
+            {
+                1 => TimeSpan.FromMinutes(30),   // 30-min candles for 1 day
+                7 => TimeSpan.FromHours(2),      // 2-hour candles for 7 days
+                30 => TimeSpan.FromHours(6),     // 6-hour candles for 30 days
+                90 => TimeSpan.FromHours(12),    // 12-hour candles for 90 days
+                _ => TimeSpan.FromDays(1)        // Daily for all time
+            };
+
+            var candles = historyList
+                .GroupBy(h => new DateTime((long)(h.Timestamp.Ticks / bucketSize.Ticks) * bucketSize.Ticks))
+                .Select(g => new
+                {
+                    Time = g.Key,
+                    Open = g.First().PricePerUnit,
+                    High = g.Max(x => x.PricePerUnit),
+                    Low = g.Min(x => x.PricePerUnit),
+                    Close = g.Last().PricePerUnit,
+                    Volume = g.Sum(x => x.Quantity)
+                })
+                .OrderBy(c => c.Time)
                 .ToList();
 
-            if (dailySales.Any())
+            if (candles.Any())
             {
-                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
-                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
-                double barWidth = 86400 * 0.8;
+                var bullColor = new Vector4(0.2f, 0.8f, 0.4f, 1.0f);   // Bright green for up
+                var bearColor = new Vector4(0.8f, 0.6f, 0f, 1.0f);  // Darker gold for down
+                var wickColor = new Vector4(0.6f, 0.6f, 0.6f, 0.9f);   // Gray for wicks
+                var syntheticWickColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded for synthetic
+                var interpolateColor = new Vector4(0.5f, 0.5f, 0.5f, 0.4f); // Faded gray for gaps
+                var candleWidth = bucketSize.TotalSeconds * 0.7; // 70% of time bucket
 
-                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
-                ImPlot.PlotBars("Daily Sales (Demand)", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+                // Draw interpolation line connecting candle closes (helps see trend through gaps)
+                var closeXs = candles.Select(c => (double)new DateTimeOffset(c.Time).ToUnixTimeSeconds()).ToArray();
+                var closeYs = candles.Select(c => (double)c.Close).ToArray();
+                ImPlot.SetNextLineStyle(interpolateColor, 2.0f);
+                ImPlot.PlotLine($"##{series.Name}_interpolate", ref closeXs[0], ref closeYs[0], closeXs.Length);
+
+                foreach (var candle in candles)
+                {
+                    var time = (double)new DateTimeOffset(candle.Time).ToUnixTimeSeconds();
+                    var isBull = candle.Close > candle.Open;  // Strictly greater for green
+                    var bodyColor = isBull ? bullColor : bearColor;
+
+                    // Generate synthetic wick if we don't have real high/low data
+                    // Add padding to make wicks visible even on flat candles
+                    var wickHigh = candle.High;
+                    var wickLow = candle.Low;
+                    var isSyntheticWick = false;
+                    
+                    // If candle is completely flat (same open/high/low/close), add synthetic wick
+                    if (Math.Abs(wickHigh - wickLow) < 0.01)
+                    {
+                        var wickSize = Math.Max(5u, (uint)(candle.Close * 0.03)); // 3% wick for visibility
+                        wickHigh = candle.Close + wickSize;
+                        wickLow = candle.Close - wickSize;
+                        isSyntheticWick = true;
+                    }
+
+                    // Always draw wick (high-low line) - use dotted style for synthetic wicks
+                    var wickX = new[] { time, time };
+                    var wickY = new[] { (double)wickLow, (double)wickHigh };
+                    
+                    if (isSyntheticWick)
+                    {
+                        // Dotted/dashed line for synthetic wicks
+                        ImPlot.SetNextLineStyle(syntheticWickColor, 2.0f);
+                    }
+                    else
+                    {
+                        // Solid line for real wicks
+                        ImPlot.SetNextLineStyle(wickColor, 1.5f);
+                    }
+                    ImPlot.PlotLine($"##wick{time}", ref wickX[0], ref wickY[0], 2);
+
+                    // Draw body (open to close)
+                    var bodyX = new[] { time, time };
+                    var bodyY = new[] { (double)candle.Open, (double)candle.Close };
+                    
+                    // Keep bodies narrow - scale with time period
+                    var bodyThickness = selectedTimeRange switch
+                    {
+                        1 => 4f,   // Very thin for intraday
+                        7 => 6f,   // Thin for weekly
+                        30 => 8f,  // Medium for monthly
+                        90 => 10f, // Slightly thicker for quarterly
+                        _ => 12f   // Thicker for long term
+                    };
+                    
+                    // If open == close (flat candle), we still draw the line - it will appear as a horizontal dash
+                    ImPlot.SetNextLineStyle(bodyColor, bodyThickness);
+                    ImPlot.PlotLine($"##body{time}", ref bodyX[0], ref bodyY[0], 2);
+                }
             }
+    }
+
+    private void DrawBarChart(ChartSeries series, List<SaleRecord> historyList)
+    {
+        // Group sales by time buckets for bars
+        var bucketSize = selectedTimeRange switch
+        {
+            1 => TimeSpan.FromMinutes(30),
+            7 => TimeSpan.FromHours(2),
+            30 => TimeSpan.FromHours(6),
+            90 => TimeSpan.FromDays(1),
+            _ => TimeSpan.FromDays(1)
+        };
+
+        var bars = historyList
+            .GroupBy(h => new DateTime((long)(h.Timestamp.Ticks / bucketSize.Ticks) * bucketSize.Ticks))
+            .Select(g => new
+            {
+                Time = g.Key,
+                AvgPrice = g.Average(x => x.PricePerUnit)
+            })
+            .OrderBy(c => c.Time)
+            .ToList();
+
+        if (bars.Any())
+        {
+            var barXs = bars.Select(b => (double)new DateTimeOffset(b.Time).ToUnixTimeSeconds()).ToArray();
+            var barYs = bars.Select(b => (double)b.AvgPrice).ToArray();
+            double barWidth = bucketSize.TotalSeconds * 0.7;
+
+            ImPlot.SetNextFillStyle(new Vector4(0.3f, 0.75f, 1f, 0.7f));
+            ImPlot.PlotBars($"{series.Name}", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+        }
+    }
+
+    private void DrawLineChart(ChartSeries series, List<SaleRecord> historyList)
+    {
+        var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
+        var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
+        
+        if (xs.Length > 0)
+        {
+            ImPlot.SetNextLineStyle(series.Color, 2.0f);
+            ImPlot.PlotLine($"{series.Name}", ref xs[0], ref ys[0], xs.Length);
+        }
+    }
+
+    private void DrawHQMarkers(List<SaleRecord> historyList)
+    {
+        var hqItems = historyList.Where(x => x.IsHQ).ToList();
+        if (hqItems.Any())
+        {
+            var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
+            var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
+            
+            ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 5, new Vector4(1f, 0.85f, 0.1f, 0.9f), 1.0f, new Vector4(1f, 0.65f, 0f, 0.7f));
+            ImPlot.PlotScatter("HQ", ref hqXs[0], ref hqYs[0], hqXs.Length);
         }
     }
 
@@ -416,7 +758,7 @@ public class ChartWindow : Window, IDisposable
             Vector4 ratioColor = new Vector4(0f, 1f, 0f, 1f); // Good
             if (ratio > 7) ratioColor = new Vector4(1f, 1f, 0f, 1f); // Slow
             if (ratio > 30) ratioColor = new Vector4(1f, 0.5f, 0f, 1f); // Very Slow
-            if (ratio > 90) ratioColor = new Vector4(1f, 0f, 0f, 1f); // Dead
+            if (ratio > 90) ratioColor = new Vector4(1f, 0.84f, 0f, 1f); // Dead
             
             ImGui.TextColored(ratioColor, $"{ratio:F1} days");
             
@@ -474,29 +816,30 @@ public class ChartWindow : Window, IDisposable
             shouldFitDistribution = false;
         }
 
-        if (ImPlot.BeginPlot("Price Distribution (Market Depth)", new Vector2(-1, 400), ImPlotFlags.None))
+        if (ImPlot.BeginPlot("##PriceDistributionChart", new Vector2(-1, 400), ImPlotFlags.None))
         {
-            ImPlot.SetupAxes("Price (Gil)", "Volume (Qty)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxes("Price (Gil)", "Volume (Qty)", ImPlotAxisFlags.None, ImPlotAxisFlags.None);
+            ImPlot.SetupAxisFormat(ImAxis.X1, "%'.0f");
+            ImPlot.SetupLegend(ImPlotLocation.NorthEast, ImPlotLegendFlags.None);
             
-            // Histogram
-            ImPlot.SetNextFillStyle(new Vector4(0.4f, 0.7f, 0.9f, 0.5f));
+            // Histogram with gradient-like appearance
+            ImPlot.SetNextFillStyle(new Vector4(0.35f, 0.7f, 0.95f, 0.65f));
             ImPlot.PlotBars("Volume at Price", ref buckets[0], ref counts[0], bucketCount + 1, bucketSize);
 
-            // Highlight Current Min Price (Current Market Price)
+            // Highlight Current Min Price (Market Price) with cleaner line
             double currentMin = (double)currentData.MinPrice;
-            ImPlot.SetNextLineStyle(new Vector4(0f, 1f, 0f, 1f), 2.0f);
+            ImPlot.SetNextLineStyle(new Vector4(0.25f, 0.85f, 0.45f, 0.9f), 2.5f);
             double[] minLineX = { currentMin, currentMin };
             double[] minLineY = { 0, counts.Max() * 1.1 }; // Go a bit above max
-            ImPlot.PlotLine("Current Min Price", ref minLineX[0], ref minLineY[0], 2);
+            ImPlot.PlotLine("Market Price", ref minLineX[0], ref minLineY[0], 2);
 
-            // Highlight Outliers (Visual)
-            // Simple logic: Highlight anything > 3x MinPrice as potential outlier
+            // Highlight Outliers with softer color
             double outlierThreshold = currentMin * 3.0;
             if (maxPrice > outlierThreshold)
             {
-                 ImPlot.SetNextLineStyle(new Vector4(1f, 0f, 0f, 0.8f), 2.0f);
+                 ImPlot.SetNextLineStyle(new Vector4(1f, 0.84f, 0.4f, 0.7f), 2.0f);
                  double[] outlierX = { outlierThreshold, outlierThreshold };
-                 ImPlot.PlotLine("High Price Warning (>3x Min)", ref outlierX[0], ref minLineY[0], 2);
+                 ImPlot.PlotLine("High Price Warning", ref outlierX[0], ref minLineY[0], 2);
             }
             
             // Add NQ vs HQ distribution if useful later
@@ -557,6 +900,95 @@ public class ChartWindow : Window, IDisposable
         catch (Exception)
         {
             // Silently fail for now or log if logger available
+        }
+    }
+    
+    private void CheckAndFetchExtendedData()
+    {
+        // Don't check too frequently (once every 3 seconds max)
+        if (isFetchingExtendedData || (DateTime.UtcNow - lastExtendedDataCheck).TotalSeconds < 3)
+            return;
+            
+        lastExtendedDataCheck = DateTime.UtcNow;
+        
+        if (currentData == null)
+            return;
+        
+        // Check if we have snapshots data
+        var hasSnapshots = currentData.HistorySnapshots != null && currentData.HistorySnapshots.Any();
+        var hasHistory = currentData.RecentHistory != null && currentData.RecentHistory.Any();
+        
+        if (!hasHistory)
+            return;
+        
+        // Always try to load snapshots if we don't have them
+        if (!hasSnapshots)
+        {
+            Plugin.Log.Information($"No snapshot data available for {itemName}, fetching...");
+            _ = FetchExtendedHistoricalDataAsync();
+            return;
+        }
+        
+        // Check data coverage
+        var oldestHistory = currentData.RecentHistory?.Any() == true ? currentData.RecentHistory.Min(h => h.Timestamp) : DateTime.UtcNow;
+        var oldestSnapshot = currentData.HistorySnapshots?.Any() == true ? currentData.HistorySnapshots.Min(s => s.Timestamp) : DateTime.UtcNow;
+        var oldestData = oldestHistory < oldestSnapshot ? oldestHistory : oldestSnapshot;
+        var dataAge = DateTime.UtcNow - oldestData;
+        
+        Plugin.Log.Debug($"Data age for {itemName}: {dataAge.TotalDays:F1} days (history: {currentData.RecentHistory?.Count ?? 0}, snapshots: {currentData.HistorySnapshots?.Count ?? 0})");
+        
+        // If viewing 90+ days or all time, try to get at least 90 days of data
+        if ((selectedTimeRange >= 90 || selectedTimeRange == -1) && dataAge.TotalDays < 85)
+        {
+            Plugin.Log.Information($"Need more data for {itemName} (only {dataAge.TotalDays:F1} days available)");
+            _ = FetchExtendedHistoricalDataAsync();
+        }
+    }
+    
+    private async System.Threading.Tasks.Task FetchExtendedHistoricalDataAsync()
+    {
+        if (isFetchingExtendedData || currentData == null) return;
+        
+        isFetchingExtendedData = true;
+        
+        try
+        {
+            Plugin.Log.Information($"Fetching extended historical data for {itemName} (Item ID: {currentData.ItemId})...");
+            
+            // Get world ID
+            var worldId = plugin.UniversalisService.GetWorldIdByName(currentData.WorldName);
+            if (worldId == 0)
+            {
+                Plugin.Log.Warning($"Could not determine world ID for {currentData.WorldName}");
+                return;
+            }
+            
+            Plugin.Log.Information($"Loading snapshots for item {currentData.ItemId} on world {currentData.WorldName} (ID: {worldId})");
+            
+            // Load all available snapshots from database (up to 1 year)
+            var snapshots = await System.Threading.Tasks.Task.Run(() => 
+                plugin.DatabaseService?.GetMarketSnapshots((int)currentData.ItemId, worldId, DateTime.UtcNow.AddDays(-365))
+            );
+            
+            if (snapshots != null && snapshots.Any())
+            {
+                currentData.HistorySnapshots = snapshots;
+                var oldest = snapshots.Min(s => s.Timestamp);
+                var newest = snapshots.Max(s => s.Timestamp);
+                Plugin.Log.Information($"Loaded {snapshots.Count} historical snapshots from cache (range: {oldest:d} to {newest:d})");
+            }
+            else
+            {
+                Plugin.Log.Warning($"No historical snapshots found in database for item {currentData.ItemId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, "Failed to fetch extended historical data");
+        }
+        finally
+        {
+            isFetchingExtendedData = false;
         }
     }
 }

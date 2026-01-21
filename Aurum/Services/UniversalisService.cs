@@ -18,43 +18,26 @@ public class UniversalisService : IDisposable
     private readonly HttpClient httpClient;
     private readonly IPluginLog log;
     private readonly CacheService cache;
-    private readonly DatabaseService database; // Add DatabaseService dependency
+    private readonly DatabaseService database;
     private readonly RateLimiter rateLimiter;
     private readonly Configuration configuration;
-    private readonly RequestQueue requestQueue; // Add RequestQueue
+    private readonly RequestQueue requestQueue;
+    private readonly IDataManager dataManager;
     private readonly CancellationTokenSource disposeCts = new();
     private Task? processingTask;
 
     private const string BaseUrl = "https://universalis.app/api/v2";
-    private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
-    private string currentWorldName = string.Empty; // Track world name too
+    private int currentWorldId = 0;
+    private string currentWorldName = string.Empty;
     
-    // Simple world name to ID mapping (populated as we discover them)
-    private readonly Dictionary<string, int> worldNameToId = new(StringComparer.OrdinalIgnoreCase)
-    {
-        // Common NA worlds
-        ["Adamantoise"] = 73, ["Cactuar"] = 79, ["Faerie"] = 54, ["Gilgamesh"] = 63,
-        ["Jenova"] = 40, ["Midgardsormr"] = 65, ["Sargatanas"] = 99, ["Siren"] = 57,
-        // Common EU worlds  
-        ["Cerberus"] = 80, ["Louisoix"] = 83, ["Moogle"] = 71, ["Omega"] = 39,
-        ["Phantom"] = 401, ["Ragnarok"] = 97, ["Spriggan"] = 85,
-        // Common JP worlds
-        ["Aegis"] = 90, ["Atomos"] = 68, ["Carbuncle"] = 45, ["Garuda"] = 58,
-        ["Gungnir"] = 94, ["Kujata"] = 49, ["Tonberry"] = 72, ["Typhon"] = 50,
-        // Common OCE worlds
-        ["Bismarck"] = 22, ["Ravana"] = 21, ["Sephirot"] = 86, ["Sophia"] = 87,
-        ["Zurvan"] = 88,
-        // Add more as needed - these are the most common
-    };
-    
-    // Updated constructor to accept DatabaseService
-    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter, Configuration configuration)
+    public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter, Configuration configuration, IDataManager dataManager)
     {
         this.log = log;
         this.cache = cache;
         this.database = database;
         this.rateLimiter = rateLimiter;
         this.configuration = configuration;
+        this.dataManager = dataManager;
         this.requestQueue = new RequestQueue();
         
         httpClient = new HttpClient
@@ -73,23 +56,47 @@ public class UniversalisService : IDisposable
         this.currentWorldId = worldId;
     }
     
+    // Get world ID by name
+    public int GetWorldIdByName(string worldName)
+    {
+        var worldSheet = dataManager.GetExcelSheet<Lumina.Excel.Sheets.World>();
+        if (worldSheet != null)
+        {
+            var world = worldSheet.FirstOrDefault(w => 
+                w.Name.ToString().Equals(worldName, StringComparison.OrdinalIgnoreCase) && 
+                w.IsPublic);
+            
+            if (world.RowId != 0)
+            {
+                return (int)world.RowId;
+            }
+        }
+        return 0;
+    }
+    
     // Auto-detect world ID from world name if not set
     private void EnsureWorldId(string worldName)
     {
         if (currentWorldId == 0 || currentWorldName != worldName)
         {
-            // Try to use a known mapping or derive from API response
-            if (worldNameToId.TryGetValue(worldName, out var knownId))
+            // Look up world from Dalamud's data
+            var worldSheet = dataManager.GetExcelSheet<Lumina.Excel.Sheets.World>();
+            if (worldSheet != null)
             {
-                currentWorldId = knownId;
-                currentWorldName = worldName;
-            }
-            else
-            {
-                // We'll need to set it based on response or from a lookup
-                // For now, log it and hope we get it from the API
-                log.Debug($"World ID for '{worldName}' not yet known, will be determined from API response");
-                currentWorldName = worldName;
+                var world = worldSheet.FirstOrDefault(w => 
+                    w.Name.ToString().Equals(worldName, StringComparison.OrdinalIgnoreCase) && 
+                    w.IsPublic);
+                
+                if (world.RowId != 0)
+                {
+                    currentWorldId = (int)world.RowId;
+                    currentWorldName = worldName;
+                    log.Debug($"Resolved world '{worldName}' to ID {currentWorldId}");
+                }
+                else
+                {
+                    log.Warning($"Could not find world ID for '{worldName}' in game data");
+                }
             }
         }
     }

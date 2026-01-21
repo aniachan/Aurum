@@ -100,16 +100,27 @@ public class RefreshService : IDisposable
         var priorities = database.GetAllItemPriorities();
         var itemsToRefresh = new List<uint>();
         
-        // If no priorities yet, we might want to seed some? 
-        // For now, let's assume the user interacts with items and they get prioritized.
-        // OR we iterate the RecipeService for "current expansion" items to seed.
-        
+        // If no priorities yet, bootstrap with recent high-level recipes
         if (priorities.Count == 0)
         {
-            // Seed with some default interesting items if empty
-            // This is a simplified "bootstrap" step
-            log.Debug("No priorities found. Skipping refresh cycle.");
-            return;
+            log.Info("No priorities found. Bootstrapping with high-level recipes...");
+            
+            // Get level 90+ recipes to seed the priority system
+            var bootstrapRecipes = recipeService.GetRecipesByLevel(90, 100).Take(20).ToList();
+            foreach (var recipe in bootstrapRecipes)
+            {
+                // Give them medium priority to start
+                database.UpsertItemPriority((int)recipe.ResultItemId, 50);
+                priorities[(int)recipe.ResultItemId] = 50;
+            }
+            
+            log.Info($"Bootstrapped {bootstrapRecipes.Count} items with priority scores");
+            
+            if (priorities.Count == 0)
+            {
+                log.Debug("No recipes available for bootstrap. Skipping refresh cycle.");
+                return;
+            }
         }
 
         int refreshCount = 0;

@@ -74,7 +74,7 @@ public sealed class Plugin : IDalamudPlugin
         RateLimiter = new RateLimiter(Log, Configuration, ChatGui, DatabaseService);
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);
-        UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);
+        UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration, DataManager);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
         ProfitService = new ProfitService(Log, Configuration, RecipeService, UniversalisService, MarketAnalysisService);
         ShoppingListService = new ShoppingListService(DataManager, Log, RecipeService, UniversalisService);
