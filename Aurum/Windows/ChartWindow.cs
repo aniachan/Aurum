@@ -756,8 +756,10 @@ public class ChartWindow : Window, IDisposable
                 // Draw interpolation line connecting candle closes (helps see trend through gaps)
                 var closeXs = candles.Select(c => (double)new DateTimeOffset(c.Time).ToUnixTimeSeconds()).ToArray();
                 var closeYs = candles.Select(c => (double)c.Close).ToArray();
-                ImPlot.SetNextLineStyle(interpolateColor, 2.0f);
-                ImPlot.PlotLine($"##{series.Name}_interpolate", ref closeXs[0], ref closeYs[0], closeXs.Length);
+                
+                // Use series color for the line so it appears in the legend with the correct color
+                ImPlot.SetNextLineStyle(series.Color, 2.0f);
+                ImPlot.PlotLine(series.Name, ref closeXs[0], ref closeYs[0], closeXs.Length);
 
                 foreach (var candle in candles)
                 {
@@ -845,8 +847,12 @@ public class ChartWindow : Window, IDisposable
             var barYs = bars.Select(b => (double)b.AvgPrice).ToArray();
             double barWidth = bucketSize.TotalSeconds * 0.7;
 
-            ImPlot.SetNextFillStyle(new Vector4(0.3f, 0.75f, 1f, 0.7f));
-            ImPlot.PlotBars($"{series.Name}", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+            // Use series color with some transparency
+            var color = series.Color;
+            color.W = 0.7f; 
+
+            ImPlot.SetNextFillStyle(color);
+            ImPlot.PlotBars(series.Name, ref barXs[0], ref barYs[0], barXs.Length, barWidth);
         }
     }
 
