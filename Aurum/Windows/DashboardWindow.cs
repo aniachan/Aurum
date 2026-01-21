@@ -100,14 +100,71 @@ public class DashboardWindow : Window, IDisposable
     private void DrawStatusBar()
     {
         // API Stats
-        var requests = plugin.RateLimiter.RequestsLastMinute;
+        var limiter = plugin.RateLimiter;
+        var requests = limiter.RequestsLastMinute;
         var limit = plugin.Configuration.ApiRateLimitPerMinute;
-        var apiColor = requests > limit * 0.8 
-            ? new Vector4(1f, 0.7f, 0f, 1f) // Orange if near limit
-            : new Vector4(0.7f, 0.7f, 0.7f, 1f); // Grey otherwise
+        
+        // Determine color and status text
+        Vector4 apiColor;
+        string statusText;
+        
+        if (limiter.IsDegraded)
+        {
+             apiColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+             statusText = "API: Degraded (Cache Only)";
+        }
+        else if (requests > limit * 0.9)
+        {
+             apiColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+             statusText = $"API: {requests}/{limit} (1m)";
+        }
+        else if (requests > limit * 0.7)
+        {
+             apiColor = new Vector4(1f, 0.7f, 0f, 1f); // Orange
+             statusText = $"API: {requests}/{limit} (1m)";
+        }
+        else
+        {
+             apiColor = new Vector4(0.7f, 0.7f, 0.7f, 1f); // Grey
+             statusText = $"API: {requests}/{limit} (1m)";
+        }
 
-        ImGui.TextColored(apiColor, $"API Usage: {requests}/{limit} (1m)");
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Requests to Universalis API in the last minute");
+        ImGui.TextColored(apiColor, statusText);
+        
+        // Enhanced Tooltip
+        if (ImGui.IsItemHovered()) 
+        {
+            ImGui.BeginTooltip();
+            ImGui.Text("Universalis API Usage");
+            ImGui.Separator();
+            ImGui.Text($"Last Minute: {requests}/{limit}");
+            ImGui.Text($"Last Hour: {limiter.RequestsLastHour}");
+            ImGui.Text($"Today: {limiter.RequestsToday}");
+            ImGui.Text($"Total Session: {limiter.TotalRequests}");
+            
+            if (limiter.RateLimitedRequests > 0)
+            {
+                ImGui.TextColored(new Vector4(1f, 0.7f, 0f, 1f), $"Throttled: {limiter.RateLimitedRequests} times");
+            }
+            
+            if (limiter.TotalErrors > 0)
+            {
+                ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), $"Errors: {limiter.TotalErrors}");
+            }
+            
+            if (limiter.IsDegraded)
+            {
+                 ImGui.Separator();
+                 ImGui.TextColored(new Vector4(1f, 0.3f, 0.3f, 1f), "Status: Degraded (High Error Rate)");
+                 ImGui.Text("The plugin is temporarily avoiding API calls\nto prevent further errors.");
+            }
+            else 
+            {
+                 ImGui.TextColored(new Vector4(0.3f, 1f, 0.3f, 1f), "Status: Healthy");
+            }
+            
+            ImGui.EndTooltip();
+        }
 
         ImGui.SameLine();
         ImGui.TextColored(new Vector4(0.5f, 0.5f, 0.5f, 1f), "|");
