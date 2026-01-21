@@ -200,7 +200,7 @@
 ### UI Components - Price History Charts (ImPlot)
 - [x] **Design chart window**
   - [x] Create new ImGui window for charts
-  - [x] Integrate ImPlot library (already in Dalamud)
+  - [ ] Integrate ImPlot library (already in Dalamud. Use Dalamud.Bindings.ImPlot)
   - [x] Add window open/close button in dashboard
 
 - [ ] **Price history chart**
