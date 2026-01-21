@@ -14,17 +14,18 @@ public class DatabaseService : IDisposable
 {
     private readonly dynamic log; // Use dynamic to avoid dependency on Dalamud
     private readonly string connectionString;
+    private readonly string dbFilePath;
     private readonly object dbLock = new();
 
     public DatabaseService(dynamic log, string pluginDir)
     {
         this.log = log;
         
-        var dbPath = Path.Combine(pluginDir, "aurum.db");
+        this.dbFilePath = Path.Combine(pluginDir, "aurum.db");
         // Enable pooling explicitly, though it is often default.
-        this.connectionString = $"Data Source={dbPath};Pooling=True";
+        this.connectionString = $"Data Source={dbFilePath};Pooling=True";
         
-        log.Information($"Initializing database at: {dbPath}");
+        log.Information($"Initializing database at: {dbFilePath}");
         
         InitializeDatabase();
     }
@@ -807,6 +808,20 @@ public class DatabaseService : IDisposable
     {
         log.Information("Running database VACUUM...");
         ExecuteSafe("VACUUM;");
+    }
+    
+    public long GetDatabaseSize()
+    {
+        try 
+        {
+            var fileInfo = new FileInfo(dbFilePath);
+            return fileInfo.Length;
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, "Failed to get database size");
+            return 0;
+        }
     }
 
     public void Dispose()

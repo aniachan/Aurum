@@ -69,6 +69,21 @@ public class ConfigWindow : Window, IDisposable
             configuration.MarketDataCacheDurationSeconds = cacheDuration;
             configuration.Save();
         }
+        
+        ImGui.Separator();
+        ImGui.Text("Database Settings");
+        
+        var dbSize = Aurum.Plugin.Instance?.DatabaseService?.GetDatabaseSize() ?? 0;
+        ImGui.Text($"Database Size: {dbSize / 1024.0 / 1024.0:F2} MB");
+        
+        if (ImGui.Button("Optimize Database (VACUUM)"))
+        {
+            Aurum.Plugin.Instance?.DatabaseService?.Vacuum();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Reclaims unused space and defragments the database file.\nMay take a few seconds.");
+        }
 
         ImGui.Separator();
         ImGui.Text("API Usage Statistics");
