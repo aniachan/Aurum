@@ -38,6 +38,7 @@ public class ChartWindow : Window, IDisposable
     private bool shouldFitHistory = true;
     private bool shouldFitDistribution = true;
     private bool showColorCodedSupplyDemand = true;
+    private bool useStackedAreaChart = true;
 
     private class ChartSeries
     {
@@ -222,6 +223,11 @@ public class ChartWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.SameLine();
         ImGui.Checkbox("Show Volume", ref showVolumeChart);
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+        ImGui.Checkbox("Stacked Area", ref useStackedAreaChart);
         
         ImGui.SameLine();
         ImGui.Spacing();
@@ -696,29 +702,46 @@ public class ChartWindow : Window, IDisposable
             // Link X-axis to main chart for synchronized zoom/pan
             ImPlot.SetupAxisLimits(ImAxis.X1, mainXLimits.X.Min, mainXLimits.X.Max, ImPlotCond.Always);
             
-            // Draw Daily Sales Bars
+            // Calculate Data Points first
             var dailySales = historyList
                 .GroupBy(x => x.Timestamp.Date)
                 .OrderBy(g => g.Key)
                 .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
                 .ToList();
 
+            double[]? barXs = null, barYs = null;
+            double[]? snapXs = null, snapYs = null;
+            double barWidth = 86400 * 0.75;
+
             if (dailySales.Any())
             {
-                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
-                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
-                double barWidth = 86400 * 0.75;
+                barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+            }
 
+            if (snapshotList.Any())
+            {
+                snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
+                snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
+            }
+
+            // Draw Supply Area (Background) if enabled
+            if (useStackedAreaChart && snapXs != null && snapYs != null)
+            {
+                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 1f, 0.25f)); // Supply Area (Lighter, more transparent)
+                ImPlot.PlotShaded("Supply Area", ref snapXs[0], ref snapYs[0], snapXs.Length, 0);
+            }
+
+            // Draw Daily Sales Bars
+            if (barXs != null && barYs != null)
+            {
                 ImPlot.SetNextFillStyle(new Vector4(0.3f, 0.75f, 1f, 0.6f));
                 ImPlot.PlotBars("Daily Sales", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
             }
             
-            // Draw Supply line overlay
-            if (snapshotList.Any())
+            // Draw Supply Line (Foreground)
+            if (snapXs != null && snapYs != null)
             {
-                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp).ToUnixTimeSeconds()).ToArray();
-                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
-                
                 ImPlot.SetNextLineStyle(new Vector4(0.9f, 0.5f, 1f, 0.8f), 2.0f);
                 ImPlot.PlotLine("Supply", ref snapXs[0], ref snapYs[0], snapXs.Length);
             }
