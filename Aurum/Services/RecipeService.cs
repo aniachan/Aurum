@@ -18,6 +18,12 @@ public class RecipeService
     private Dictionary<uint, RecipeData> recipeCache = new();
     private Dictionary<uint, string> itemNameCache = new();
     private Dictionary<uint, uint> itemIconCache = new();
+    
+    // Indices for fast lookups without full loading
+    private Dictionary<uint, List<uint>> itemResultIndex = new();
+    private Dictionary<uint, List<uint>> jobIndex = new();
+    private Dictionary<int, List<uint>> levelIndex = new();
+    
     private bool isInitialized = false;
     
     // Crafting class IDs from CraftType sheet (NOT job IDs)
@@ -103,20 +109,15 @@ public class RecipeService
         int totalRecipes = 0;
         int skippedNonCrafting = 0;
         int skippedNoResult = 0;
-        int failed = 0;
         
-        // Debug: Check first few recipes
-        bool debugged = false;
+        // Clear indices
+        itemResultIndex.Clear();
+        jobIndex.Clear();
+        levelIndex.Clear();
         
         foreach (var recipe in recipeSheet)
         {
             totalRecipes++;
-            
-            if (!debugged && recipe.RowId > 0)
-            {
-                log.Info($"DEBUG First recipe: ID={recipe.RowId}, CraftType={recipe.CraftType.RowId}, ItemResult={recipe.ItemResult.RowId}");
-                debugged = true;
-            }
             
             if (recipe.RowId == 0)
                 continue;
@@ -135,22 +136,29 @@ public class RecipeService
                 continue;
             }
             
-            try
-            {
-                var recipeData = ConvertToRecipeData(recipe);
-                recipeCache[recipe.RowId] = recipeData;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                if (failed <= 5) // Only log first 5 errors to avoid spam
-                {
-                    log.Error(ex, $"Failed to convert recipe {recipe.RowId}: {ex.Message}");
-                }
-            }
+            // Build indices
+            var recipeId = recipe.RowId;
+            var resultItemId = recipe.ItemResult.RowId;
+            var jobType = recipe.CraftType.RowId;
+            var level = (int)recipe.RecipeLevelTable.Value.ClassJobLevel;
+            
+            // Index by Result Item
+            if (!itemResultIndex.ContainsKey(resultItemId))
+                itemResultIndex[resultItemId] = new List<uint>();
+            itemResultIndex[resultItemId].Add(recipeId);
+            
+            // Index by Job
+            if (!jobIndex.ContainsKey(jobType))
+                jobIndex[jobType] = new List<uint>();
+            jobIndex[jobType].Add(recipeId);
+            
+            // Index by Level
+            if (!levelIndex.ContainsKey(level))
+                levelIndex[level] = new List<uint>();
+            levelIndex[level].Add(recipeId);
         }
         
-        log.Info($"Loaded {recipeCache.Count} crafting recipes (scanned {totalRecipes}, skipped {skippedNonCrafting} non-crafting, {skippedNoResult} no-result, {failed} failed)");
+        log.Info($"Indexed {totalRecipes} recipes (skipped {skippedNonCrafting} non-crafting, {skippedNoResult} no-result). Recipes will be loaded on demand.");
     }
     
     /// <summary>
@@ -293,9 +301,13 @@ public class RecipeService
     /// </summary>
     private uint? FindRecipeForItem(uint itemId)
     {
-        // This will be populated as we load recipes
-        var recipe = recipeCache.Values.FirstOrDefault(r => r.ResultItemId == itemId);
-        return recipe?.RecipeId;
+        // Use index first
+        if (itemResultIndex.TryGetValue(itemId, out var recipeIds) && recipeIds.Count > 0)
+        {
+            return recipeIds[0];
+        }
+        
+        return null;
     }
     
     /// <summary>
@@ -305,8 +317,53 @@ public class RecipeService
     {
         if (!isInitialized)
             Initialize();
+            
+        // For backwards compatibility, or mass operations, we might need to load all
+        // But for performance, we should avoid this where possible
+        
+        // Return cached + load missing from indices
+        // This is heavy!
+        
+        // Strategy: Iterate all indices and load if missing
+        foreach (var list in itemResultIndex.Values)
+        {
+            foreach (var recipeId in list)
+            {
+                if (!recipeCache.ContainsKey(recipeId))
+                {
+                    LoadRecipe(recipeId);
+                }
+            }
+        }
         
         return recipeCache.Values;
+    }
+    
+    /// <summary>
+    /// Load a specific recipe by ID into cache
+    /// </summary>
+    private RecipeData? LoadRecipe(uint recipeId)
+    {
+        if (recipeCache.TryGetValue(recipeId, out var cached))
+            return cached;
+
+        var recipeSheet = dataManager.GetExcelSheet<Recipe>();
+        var recipe = recipeSheet?.GetRow(recipeId);
+        
+        if (recipe == null)
+            return null;
+            
+        try
+        {
+            var data = ConvertToRecipeData(recipe.Value);
+            recipeCache[recipeId] = data;
+            return data;
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, $"Failed to load recipe {recipeId}");
+            return null;
+        }
     }
     
     /// <summary>
@@ -317,7 +374,7 @@ public class RecipeService
         if (!isInitialized)
             Initialize();
         
-        return recipeCache.GetValueOrDefault(recipeId);
+        return LoadRecipe(recipeId);
     }
     
     /// <summary>
@@ -328,7 +385,15 @@ public class RecipeService
         if (!isInitialized)
             Initialize();
         
-        return recipeCache.Values.Where(r => r.ResultItemId == itemId);
+        if (itemResultIndex.TryGetValue(itemId, out var recipeIds))
+        {
+            foreach (var id in recipeIds)
+            {
+                var recipe = LoadRecipe(id);
+                if (recipe != null)
+                    yield return recipe;
+            }
+        }
     }
     
     /// <summary>
@@ -338,9 +403,27 @@ public class RecipeService
     {
         if (!isInitialized)
             Initialize();
+            
+        // Find job ID from name
+        var jobEntry = JobNames.FirstOrDefault(x => x.Value.Equals(className, StringComparison.OrdinalIgnoreCase));
+        if (jobEntry.Value == null) // KeyValuePair default is null value? No, struct.
+            yield break;
+            
+        // Check if className is valid
+        if (!JobNames.Values.Contains(className))
+             yield break;
+             
+        var jobId = JobNames.First(x => x.Value == className).Key;
         
-        return recipeCache.Values.Where(r => 
-            r.CraftingClassName.Equals(className, StringComparison.OrdinalIgnoreCase));
+        if (jobIndex.TryGetValue(jobId, out var recipeIds))
+        {
+            foreach (var id in recipeIds)
+            {
+                var recipe = LoadRecipe(id);
+                if (recipe != null)
+                    yield return recipe;
+            }
+        }
     }
     
     /// <summary>
@@ -351,8 +434,19 @@ public class RecipeService
         if (!isInitialized)
             Initialize();
         
-        return recipeCache.Values.Where(r => 
-            r.ClassJobLevel >= minLevel && r.ClassJobLevel <= maxLevel);
+        // Iterate levels in range
+        for (int lvl = minLevel; lvl <= maxLevel; lvl++)
+        {
+            if (levelIndex.TryGetValue(lvl, out var recipeIds))
+            {
+                foreach (var id in recipeIds)
+                {
+                    var recipe = LoadRecipe(id);
+                    if (recipe != null)
+                        yield return recipe;
+                }
+            }
+        }
     }
     
     /// <summary>
@@ -364,11 +458,35 @@ public class RecipeService
             Initialize();
         
         if (string.IsNullOrWhiteSpace(searchTerm))
-            return recipeCache.Values;
+        {
+            foreach (var r in GetAllRecipes())
+                yield return r;
+            yield break;
+        }
+        
+        // Search is tricky with lazy loading because we don't have names loaded
+        // BUT we have Item Names loaded in itemNameCache!
+        // So we can search items first, then find recipes for those items
         
         var term = searchTerm.ToLowerInvariant();
-        return recipeCache.Values.Where(r => 
-            r.ItemName.ToLowerInvariant().Contains(term));
+        
+        // Find items matching name
+        var matchingItemIds = itemNameCache
+            .Where(kvp => kvp.Value.ToLowerInvariant().Contains(term))
+            .Select(kvp => kvp.Key);
+            
+        foreach (var itemId in matchingItemIds)
+        {
+            if (itemResultIndex.TryGetValue(itemId, out var recipeIds))
+            {
+                foreach (var id in recipeIds)
+                {
+                    var recipe = LoadRecipe(id);
+                    if (recipe != null)
+                        yield return recipe;
+                }
+            }
+        }
     }
     
     /// <summary>
@@ -396,7 +514,7 @@ public class RecipeService
         if (!isInitialized)
             Initialize();
         
-        return recipeCache.Values.Any(r => r.ResultItemId == itemId);
+        return itemResultIndex.ContainsKey(itemId);
     }
     
     /// <summary>
@@ -407,13 +525,23 @@ public class RecipeService
         if (!isInitialized)
             Initialize();
         
+        // Count total recipes from indices
+        int totalRecipes = jobIndex.Values.Sum(list => list.Count);
+        
         return new RecipeServiceStats
         {
-            TotalRecipes = recipeCache.Count,
+            TotalRecipes = totalRecipes,
             TotalItems = itemNameCache.Count,
             RecipesByClass = JobNames.Values.ToDictionary(
                 className => className,
-                className => recipeCache.Values.Count(r => r.CraftingClassName == className)
+                className => 
+                {
+                    // Find job ID
+                    var entry = JobNames.FirstOrDefault(x => x.Value == className);
+                    if (entry.Value != null && jobIndex.ContainsKey(entry.Key))
+                        return jobIndex[entry.Key].Count;
+                    return 0;
+                }
             )
         };
     }
