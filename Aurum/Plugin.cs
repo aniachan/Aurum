@@ -115,18 +115,8 @@ public sealed class Plugin : IDalamudPlugin
         // Adds another button doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
         
-        // Subscribe to login events to set current world
-        ClientState.Login += OnLogin;
-        
-        // Set current world if already logged in
-#pragma warning disable CS0618 // Type or member is obsolete
-        if (ClientState.IsLoggedIn && ClientState.LocalPlayer != null)
-        {
-            var worldId = (int)ClientState.LocalPlayer.CurrentWorld.RowId;
-            UniversalisService.SetCurrentWorld(worldId);
-            Log.Information($"Set current world to {ClientState.LocalPlayer.CurrentWorld.Value.Name} (ID: {worldId})");
-        }
-#pragma warning restore CS0618 // Type or member is obsolete
+        // World ID is auto-detected from world name when market data is fetched
+        // No need to subscribe to login events
 
         Log.Information($"Aurum v{PluginInterface.Manifest.AssemblyVersion} initialized successfully!");
         
@@ -142,9 +132,6 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
-        // Unsubscribe from events
-        ClientState.Login -= OnLogin;
-        
         // Dispose services
         RefreshService?.Dispose();
         UniversalisService?.Dispose();
@@ -167,18 +154,6 @@ public sealed class Plugin : IDalamudPlugin
         
         Log.Information("Aurum disposed");
         FileLog?.Dispose();
-    }
-    
-    private void OnLogin()
-    {
-#pragma warning disable CS0618 // Type or member is obsolete
-        if (ClientState.LocalPlayer != null)
-        {
-            var worldId = (int)ClientState.LocalPlayer.CurrentWorld.RowId;
-            UniversalisService.SetCurrentWorld(worldId);
-            Log.Information($"Player logged in to {ClientState.LocalPlayer.CurrentWorld.Value.Name} (ID: {worldId})");
-        }
-#pragma warning restore CS0618 // Type or member is obsolete
     }
 
     private void OnCommand(string command, string args)

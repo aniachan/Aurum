@@ -56,9 +56,28 @@ namespace Aurum.IntegrationTests.Services
             // Assert
             // Recipe Level (90) -> 100 * 0.3 = 30
             // Category (Expert) -> 100 * 0.1 = 10
-            // Velocity (20) -> 100 * 0.4 = 40
+            // Velocity (20) -> 100 * 0.3 = 30  <-- Updated weight
             // Profit (150k) -> 100 * 0.2 = 20
-            // Total should be 100
+            // User Pref -> 0 * 0.1 = 0
+            // Total should be 90
+            Assert.Equal(90, score);
+        }
+
+        [Fact]
+        public void CalculatePriority_WithUserPreference_ReturnsBoostedScore()
+        {
+            // Arrange
+            _config.RecentSearches.Add("Test Item");
+            var recipe = CreateMockRecipe(90, true); 
+            var marketData = CreateMockMarketData(20, 150000); 
+
+            // Act
+            var score = _service.CalculatePriority(recipe, marketData);
+
+            // Assert
+            // Base score from previous test = 90
+            // User Preference -> 100 * 0.1 = 10
+            // Total = 100
             Assert.Equal(100, score);
         }
 

@@ -278,12 +278,17 @@ public class DashboardWindow : Window, IDisposable
         ImGui.Text("Filters:");
         ImGui.SameLine();
         
-        // Search box
-        ImGui.SetNextItemWidth(200);
-        if (ImGui.InputTextWithHint("##search", "Search items...", ref searchText, 256))
-        {
-            ApplyFilters();
-        }
+            // Search box
+            if (ImGui.InputTextWithHint("##search", "Search items...", ref searchText, 256))
+            {
+                ApplyFilters();
+                if (!string.IsNullOrWhiteSpace(searchText) && !plugin.Configuration.RecentSearches.Contains(searchText))
+                {
+                   plugin.Configuration.RecentSearches.Insert(0, searchText);
+                   if (plugin.Configuration.RecentSearches.Count > 10) plugin.Configuration.RecentSearches.RemoveAt(10);
+                   plugin.Configuration.Save();
+                }
+            }
         
         ImGui.SameLine();
         

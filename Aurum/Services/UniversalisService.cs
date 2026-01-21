@@ -27,6 +27,25 @@ public class UniversalisService : IDisposable
 
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0; // Need to track this, maybe pass in ctor or resolve dynamically?
+    private string currentWorldName = string.Empty; // Track world name too
+    
+    // Simple world name to ID mapping (populated as we discover them)
+    private readonly Dictionary<string, int> worldNameToId = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Common NA worlds
+        ["Adamantoise"] = 73, ["Cactuar"] = 79, ["Faerie"] = 54, ["Gilgamesh"] = 63,
+        ["Jenova"] = 40, ["Midgardsormr"] = 65, ["Sargatanas"] = 99, ["Siren"] = 57,
+        // Common EU worlds  
+        ["Cerberus"] = 80, ["Louisoix"] = 83, ["Moogle"] = 71, ["Omega"] = 39,
+        ["Phantom"] = 401, ["Ragnarok"] = 97, ["Spriggan"] = 85,
+        // Common JP worlds
+        ["Aegis"] = 90, ["Atomos"] = 68, ["Carbuncle"] = 45, ["Garuda"] = 58,
+        ["Gungnir"] = 94, ["Kujata"] = 49, ["Tonberry"] = 72, ["Typhon"] = 50,
+        // Common OCE worlds
+        ["Bismarck"] = 22, ["Ravana"] = 21, ["Sephirot"] = 86, ["Sophia"] = 87,
+        ["Zurvan"] = 88,
+        // Add more as needed - these are the most common
+    };
     
     // Updated constructor to accept DatabaseService
     public UniversalisService(IPluginLog log, CacheService cache, DatabaseService database, RateLimiter rateLimiter, Configuration configuration)
@@ -52,6 +71,27 @@ public class UniversalisService : IDisposable
     public void SetCurrentWorld(int worldId)
     {
         this.currentWorldId = worldId;
+    }
+    
+    // Auto-detect world ID from world name if not set
+    private void EnsureWorldId(string worldName)
+    {
+        if (currentWorldId == 0 || currentWorldName != worldName)
+        {
+            // Try to use a known mapping or derive from API response
+            if (worldNameToId.TryGetValue(worldName, out var knownId))
+            {
+                currentWorldId = knownId;
+                currentWorldName = worldName;
+            }
+            else
+            {
+                // We'll need to set it based on response or from a lookup
+                // For now, log it and hope we get it from the API
+                log.Debug($"World ID for '{worldName}' not yet known, will be determined from API response");
+                currentWorldName = worldName;
+            }
+        }
     }
 
     /// <summary>
@@ -93,6 +133,9 @@ public class UniversalisService : IDisposable
     /// </summary>
     public async Task<MarketData?> GetMarketDataAsync(string worldName, uint itemId)
     {
+        // Auto-detect world ID if not yet set
+        EnsureWorldId(worldName);
+        
         var cacheKey = $"market_{worldName}_{itemId}";
         
         // 1. Check Memory Cache first (fastest)
@@ -182,6 +225,9 @@ public class UniversalisService : IDisposable
     /// </summary>
     public async Task<Dictionary<uint, MarketData>> GetMarketDataBatchAsync(string worldName, IEnumerable<uint> itemIds)
     {
+        // Auto-detect world ID if not yet set
+        EnsureWorldId(worldName);
+        
         var allItems = itemIds.ToList();
         var results = new Dictionary<uint, MarketData>();
         

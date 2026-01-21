@@ -17,9 +17,10 @@ public class ItemPriorityService
     
     // Weight constants - could be moved to config later
     private const float WEIGHT_RECIPE_LEVEL = 0.3f;
-    private const float WEIGHT_MARKET_VELOCITY = 0.4f;
+    private const float WEIGHT_MARKET_VELOCITY = 0.3f;
     private const float WEIGHT_PROFIT_POTENTIAL = 0.2f;
     private const float WEIGHT_CATEGORY = 0.1f;
+    private const float WEIGHT_USER_PREFERENCE = 0.1f;
 
     // Level thresholds (Endwalker)
     private const int CURRENT_MAX_LEVEL = 90;
@@ -41,6 +42,7 @@ public class ItemPriorityService
         // 1. Static Heuristics (based on recipe data only)
         score += ScoreRecipeLevel(recipe) * WEIGHT_RECIPE_LEVEL;
         score += ScoreCategory(recipe) * WEIGHT_CATEGORY;
+        score += ScoreUserPreference(recipe) * WEIGHT_USER_PREFERENCE;
 
         // 2. Dynamic Heuristics (based on market data if available)
         if (lastKnownMarketData != null)
@@ -96,6 +98,15 @@ public class ItemPriorityService
         if (recipe.IsExpert) return 100f;
         
         return 50f; // Default neutral score
+    }
+
+    private float ScoreUserPreference(RecipeData recipe)
+    {
+        if (configuration.RecentSearches.Any(term => recipe.ItemName.Contains(term, StringComparison.OrdinalIgnoreCase)))
+        {
+            return 100f;
+        }
+        return 0f;
     }
 
     private float ScoreMarketVelocity(MarketData marketData)

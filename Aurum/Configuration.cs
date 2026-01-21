@@ -41,6 +41,9 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public SortMode DefaultSortMode { get; set; } = SortMode.RecommendationScore;
     public List<uint> FavoriteItems { get; set; } = new(); // User's pinned/favorite items
     
+    // User Preferences (Search History)
+    public List<string> RecentSearches { get; set; } = new();
+    
     // Notification Settings
     public bool EnablePriceAlerts { get; set; } = false;
     public List<uint> WatchedItems { get; set; } = new();  // ItemIds
