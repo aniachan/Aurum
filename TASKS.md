@@ -210,10 +210,10 @@
   - [ ] Zoom and pan controls
   - [ ] Crosshair with value tooltip
 
-- [ ] **Sale velocity chart**
-  - [ ] Bar chart showing sales per day
-  - [ ] Moving average trend line
-  - [ ] Highlight unusual spikes
+- [x] **Sale velocity chart**
+  - [x] Bar chart showing sales per day
+  - [x] Moving average trend line
+  - [x] Highlight unusual spikes
 
 - [ ] **Supply/demand chart**
   - [ ] Stacked area chart (listings vs sales)

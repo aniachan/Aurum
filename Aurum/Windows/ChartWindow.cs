@@ -82,7 +82,7 @@ public class ChartWindow : Window, IDisposable
             }
             else
             {
-                // Temporary placeholder until ImPlot is available
+                // Temporary placeholder until ImPlot is available TODO: Remove table. We have Implot now
                 ImGui.Text($"Price History Data ({historyList.Count} sales):");
                 
                 if (ImGui.BeginTable("HistoryTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
@@ -146,6 +146,98 @@ public class ChartWindow : Window, IDisposable
 
                     // Tooltip logic is handled by ImPlot automatically for basic values
                     
+                    ImPlot.EndPlot();
+                }
+
+                ImGui.Spacing();
+                ImGui.Separator();
+                
+                // Sale Velocity Chart
+                ImGui.Text("Sale Velocity (Daily Volume)");
+                
+                if (ImPlot.BeginPlot("Daily Sales Volume", new Vector2(-1, 200), ImPlotFlags.None))
+                {
+                    ImPlot.SetupAxes("Date", "Quantity Sold", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+                    ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+                    
+                    // Aggregate data by day
+                    var dailySales = historyList
+                        .GroupBy(x => x.Timestamp.Date)
+                        .OrderBy(g => g.Key)
+                        .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+                        .ToList();
+
+                    if (dailySales.Any())
+                    {
+                        var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                        var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+                        var count = dailySales.Count;
+                        var maYs = new double[count];
+
+                        // Calculate Moving Average (3-day) first
+                        for (int i = 0; i < count; i++)
+                        {
+                            int w = 0;
+                            double sum = 0;
+                            // Look back up to 2 days (window size 3)
+                            for (int j = Math.Max(0, i - 2); j <= i; j++) 
+                            { 
+                                sum += dailySales[j].Volume; 
+                                w++; 
+                            }
+                            maYs[i] = sum / w;
+                        }
+
+                        // Separate data into normal and spikes (Volume > 1.5x MA)
+                        var normalXs = new List<double>();
+                        var normalYs = new List<double>();
+                        var spikeXs = new List<double>();
+                        var spikeYs = new List<double>();
+
+                        for (int i = 0; i < count; i++)
+                        {
+                            // Simple spike detection: Volume > 1.5x Moving Average and significant volume (> 5 items)
+                            bool isSpike = (barYs[i] > maYs[i] * 1.5) && (barYs[i] > 5);
+                            
+                            if (isSpike)
+                            {
+                                spikeXs.Add(barXs[i]);
+                                spikeYs.Add(barYs[i]);
+                            }
+                            else
+                            {
+                                normalXs.Add(barXs[i]);
+                                normalYs.Add(barYs[i]);
+                            }
+                        }
+
+                        // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
+                        double barWidth = 86400 * 0.8; 
+
+                        if (normalXs.Any())
+                        {
+                            var nXs = normalXs.ToArray();
+                            var nYs = normalYs.ToArray();
+                            ImPlot.SetNextFillStyle(new Vector4(0.4f, 0.7f, 1.0f, 0.5f)); // Blue-ish
+                            ImPlot.PlotBars("Daily Volume", ref nXs[0], ref nYs[0], nXs.Length, barWidth);
+                        }
+
+                        if (spikeXs.Any())
+                        {
+                            var sXs = spikeXs.ToArray();
+                            var sYs = spikeYs.ToArray();
+                            ImPlot.SetNextFillStyle(new Vector4(1.0f, 0.3f, 0.3f, 0.7f)); // Red-ish
+                            ImPlot.PlotBars("High Activity", ref sXs[0], ref sYs[0], sXs.Length, barWidth);
+                        }
+
+                        // Plot MA line
+                        if (count >= 3)
+                        {
+                            ImPlot.SetNextLineStyle(new Vector4(1f, 0.6f, 0f, 1f), 2.0f);
+                            ImPlot.PlotLine("3-Day Avg", ref barXs[0], ref maYs[0], count);
+                        }
+                    }
+
                     ImPlot.EndPlot();
                 }
             }
