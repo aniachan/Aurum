@@ -63,6 +63,8 @@ public class DetailWindow : Window, IDisposable
             DrawMarketSnapshot();
             ImGui.Spacing();
             DrawProfitBreakdown();
+            ImGui.Spacing();
+            DrawRecentSales();
             
             // Right Column: Risk & Warnings
             ImGui.TableNextColumn();
@@ -180,6 +182,54 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Margin:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.ProfitMargin:F0}%");
+
+            ImGui.EndTable();
+        }
+    }
+
+    private void DrawRecentSales()
+    {
+        if (currentItem?.MarketData == null) return;
+        var sales = currentItem.MarketData.RecentHistory.Take(5).ToList(); // Show top 5 recent sales
+
+        if (!sales.Any()) return;
+
+        ImGui.TextDisabled("RECENT SALES");
+
+        if (ImGui.BeginTable("RecentSalesTable", 3, ImGuiTableFlags.BordersInnerH))
+        {
+            ImGui.TableSetupColumn("Price", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Buyer", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableHeadersRow();
+
+            foreach (var sale in sales)
+            {
+                ImGui.TableNextRow();
+                
+                // Price Column
+                ImGui.TableNextColumn();
+                ImGui.Text($"{sale.PricePerUnit:N0}");
+                if (sale.IsHQ)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(1, 1, 0, 1), ""); // HQ Icon
+                }
+
+                // Quantity Column
+                ImGui.TableNextColumn();
+                ImGui.Text($"{sale.Quantity}");
+
+                // Buyer Column
+                ImGui.TableNextColumn();
+                ImGui.Text(sale.BuyerName);
+                
+                // Show relative time in tooltip
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"Sold: {sale.Timestamp.ToLocalTime()}");
+                }
+            }
 
             ImGui.EndTable();
         }
