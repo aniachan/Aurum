@@ -13,6 +13,7 @@ namespace Aurum;
 public class FileLogger : IDisposable
 {
     private readonly string logFilePath;
+    private readonly string errorLogPath;
     private readonly string dalamudLogPath;
     private readonly System.Threading.Timer? syncTimer;
     
@@ -20,6 +21,7 @@ public class FileLogger : IDisposable
     {
         // Create log file path next to the DLL
         logFilePath = Path.Combine(pluginDirectory, "aurum.log");
+        errorLogPath = Path.Combine(pluginDirectory, "aurum_errors.log");
         
         // Dalamud log path
         var dalamudDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher");
@@ -34,7 +36,23 @@ public class FileLogger : IDisposable
                                            $"Monitoring Dalamud log at: {dalamudLogPath}\n" +
                                            $"Filtering for [Aurum] entries...\n\n");
             
+            // Initialize error log
+            if (!File.Exists(errorLogPath))
+            {
+                 File.WriteAllText(errorLogPath, $"========================================\n" +
+                                           $"AURUM ERROR LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                                           $"========================================\n" +
+                                           $"Contains only [Aurum] [Error] and [Fatal] entries\n\n");
+            }
+            else
+            {
+                 File.AppendAllText(errorLogPath, $"\n========================================\n" +
+                                           $"SESSION START - {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                                           $"========================================\n");
+            }
+
             dalamudLog.Information($"File logging enabled: {logFilePath}");
+            dalamudLog.Information($"Error logging enabled: {errorLogPath}");
             
             // Start periodic sync timer (every 2 seconds)
             syncTimer = new System.Threading.Timer(SyncLogsCallback, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
@@ -61,6 +79,7 @@ public class FileLogger : IDisposable
             
             using var reader = new StreamReader(dalamudStream);
             var newLines = new List<string>();
+            var newErrorLines = new List<string>();
             
             string? line;
             while ((line = reader.ReadLine()) != null)
@@ -69,6 +88,12 @@ public class FileLogger : IDisposable
                 if (line.Contains("[Aurum]"))
                 {
                     newLines.Add(line);
+
+                    // Separate capture for errors
+                    if (line.Contains("[Error]") || line.Contains("[Fatal]") || line.Contains("Exception"))
+                    {
+                        newErrorLines.Add(line);
+                    }
                 }
             }
             
@@ -80,6 +105,12 @@ public class FileLogger : IDisposable
             {
                 File.AppendAllLines(logFilePath, newLines);
             }
+
+            // Append new error lines to error log file
+            if (newErrorLines.Any())
+            {
+                File.AppendAllLines(errorLogPath, newErrorLines);
+            }
         }
         catch
         {
@@ -88,6 +119,7 @@ public class FileLogger : IDisposable
     }
     
     public string GetLogFilePath() => logFilePath;
+    public string GetErrorLogFilePath() => errorLogPath;
     
     public void Dispose()
     {
