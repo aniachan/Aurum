@@ -118,6 +118,24 @@ public class UniversalisService : IDisposable
             }
         }
         
+        // CHECK FOR DEGRADATION MODE
+        if (rateLimiter.IsDegraded)
+        {
+            // In degraded mode, we return stale data if available, or nothing.
+            // We DO NOT attempt a fresh network request.
+            if (currentWorldId != 0)
+            {
+                 var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+                 if (staleVal != null)
+                 {
+                     staleVal.IsCachedData = true;
+                     return staleVal;
+                 }
+            }
+            // If completely missing, return null to avoid hammering API
+            return null;
+        }
+        
         try
         {
             // Queue the request
@@ -205,6 +223,28 @@ public class UniversalisService : IDisposable
         if (uncachedItems.Count == 0)
         {
             log.Info($"All {allItems.Count} items found in cache");
+            return results;
+        }
+
+        // CHECK FOR DEGRADATION MODE
+        if (rateLimiter.IsDegraded)
+        {
+            log.Info("Degraded mode active: Skipping batch API request, checking for stale cache.");
+            
+            // In degraded mode, try to fetch stale data for uncached items
+            foreach (var itemId in uncachedItems)
+            {
+                if (currentWorldId != 0)
+                {
+                    var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+                    if (staleVal != null)
+                    {
+                         staleVal.IsCachedData = true;
+                         results[itemId] = staleVal;
+                    }
+                }
+            }
+            // Return whatever we found (partial results are better than nothing/blocking)
             return results;
         }
 

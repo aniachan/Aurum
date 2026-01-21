@@ -38,6 +38,12 @@ public class RateLimiter : IDisposable
     private long _dailyCount;
     private DateTime _lastDailyReset = DateTime.UtcNow.Date;
 
+    // Graceful degradation state
+    private bool _isDegraded;
+    private DateTime _degradedUntil;
+    private int _recentErrors;
+    private DateTime _lastErrorTime;
+
     private DateTime _pausedUntil = DateTime.MinValue;
     private DateTime _lastAlertTime = DateTime.MinValue;
 
@@ -68,6 +74,25 @@ public class RateLimiter : IDisposable
         {
             CheckDailyReset();
             return _dailyCount;
+        }
+    }
+
+    public bool IsDegraded
+    {
+        get
+        {
+            if (_isDegraded && DateTime.UtcNow > _degradedUntil)
+            {
+                // Auto-recover from degradation
+                _isDegraded = false;
+                _recentErrors = 0;
+                log.Info("API health recovered. Exiting graceful degradation mode.");
+                chat.Print(new SeStringBuilder()
+                    .AddUiForeground("[Aurum] ", 45)
+                    .AddText("API connection recovered. Resuming normal operations.")
+                    .Build());
+            }
+            return _isDegraded;
         }
     }
 
@@ -230,6 +255,30 @@ public class RateLimiter : IDisposable
     public void RecordError()
     {
         TotalErrors++;
+        
+        // Track recent errors for degradation logic
+        var now = DateTime.UtcNow;
+        if ((now - _lastErrorTime).TotalMinutes > 1)
+        {
+            // Reset recent error count if more than 1 minute passed since last error
+            _recentErrors = 0;
+        }
+        
+        _lastErrorTime = now;
+        _recentErrors++;
+
+        if (!_isDegraded && _recentErrors >= configuration.ApiErrorThreshold)
+        {
+            _isDegraded = true;
+            _degradedUntil = now.AddMinutes(configuration.ApiDegradationMinutes);
+            
+            log.Error($"High API error rate detected ({_recentErrors} in last minute). Entering graceful degradation mode until {_degradedUntil}.");
+            chat.Print(new SeStringBuilder()
+                .AddUiForeground("[Aurum] ", 45)
+                .AddUiForeground("WARNING: ", 522)
+                .AddText("High API error rate detected. Switching to cache-only mode for 5 minutes.")
+                .Build());
+        }
     }
 
     public void RecordRetry()
