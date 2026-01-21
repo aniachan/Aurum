@@ -57,6 +57,12 @@ public class ProfitService
             // Calculate profit
             var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
             
+            // Generate suggestions for alternative items to craft
+            if (profit != null)
+            {
+                await GenerateAlternativeSuggestionsAsync(recipe, profit, worldName);
+            }
+            
             // Save to database cache
             if (profit != null)
             {
@@ -143,6 +149,85 @@ public class ProfitService
         return results;
     }
     
+    /// <summary>
+    /// Generate alternative item suggestions for a recipe
+    /// </summary>
+    private async Task GenerateAlternativeSuggestionsAsync(RecipeData recipe, ProfitCalculation profit, string worldName)
+    {
+        // Only suggest if the current item has issues (low demand, low profit, or high risk)
+        bool needsSuggestion = profit.RecommendationScore < 50 || profit.RiskLevel >= RiskLevel.High || profit.ProfitMargin < 10;
+        
+        if (!needsSuggestion)
+        {
+            return;
+        }
+        
+        // Strategy 1: Same category, similar level
+        // Strategy 2: Same main ingredient (uses same materials)
+        
+        // For now, let's try Strategy 1: Same crafting class, same level range (+- 2 levels)
+        var nearbyRecipes = recipeService.GetRecipesByLevel(recipe.ClassJobLevel - 2, recipe.ClassJobLevel + 2)
+            .Where(r => r.CraftingClassJobId == recipe.CraftingClassJobId && r.RecipeId != recipe.RecipeId)
+            .Take(10) // Limit candidates
+            .ToList();
+            
+        foreach (var candidate in nearbyRecipes)
+        {
+            // Quick check: Is this candidate better?
+            // We need market data for it. This is expensive if we do it for many.
+            // Let's check cache first or limit to just a few checks.
+            
+            // To be safe, we'll just check 3 random ones for now to avoid hammering API
+            // Or prioritize ones we have cached data for?
+            
+            try
+            {
+                // Simple market check
+                var marketData = await universalisService.GetMarketDataAsync(worldName, candidate.ResultItemId);
+                if (marketData == null) continue;
+                
+                marketAnalysisService.AnalyzeMarket(marketData);
+                
+                // Compare basic metrics
+                bool isBetter = false;
+                string reason = "";
+                
+                // Is demand significantly better?
+                if (profit.MarketData != null && marketData.SaleVelocity > profit.MarketData.SaleVelocity * 2 && marketData.SaleVelocity > 1.0f)
+                {
+                    isBetter = true;
+                    reason = $"Higher demand ({marketData.SaleVelocity:F1} sales/day vs {profit.MarketData.SaleVelocity:F1})";
+                }
+                // Is it safer?
+                else if (marketData.RiskScore < profit.RiskScore - 20)
+                {
+                    isBetter = true;
+                    reason = $"Lower risk ({marketData.RiskLevel} vs {profit.RiskLevel})";
+                }
+                
+                if (isBetter && profit.MarketData != null)
+                {
+                    profit.MarketData.AlternativeSuggestions.Add(new AlternativeItemSuggestion
+                    {
+                        OriginalItemId = recipe.ResultItemId,
+                        SuggestedItemId = candidate.ResultItemId,
+                        SuggestedItemName = candidate.ItemName,
+                        Reason = reason,
+                        ScoreImprovement = marketData.RecommendationScore - profit.RecommendationScore,
+                        RiskDifference = marketData.RiskScore - profit.RiskScore
+                    });
+                }
+                
+                // Limit to 3 suggestions
+                if (profit.MarketData != null && profit.MarketData.AlternativeSuggestions.Count >= 3) break;
+            }
+            catch (Exception ex)
+            {
+                log.Warning(ex, $"Failed to analyze alternative candidate {candidate.ItemName}");
+            }
+        }
+    }
+
     /// <summary>
     /// Build complete ingredient tree with costs resolved recursively
     /// </summary>

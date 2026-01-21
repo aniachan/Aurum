@@ -66,6 +66,11 @@ public class MarketAnalysisService
         // Identify best time to sell (peak demand)
         CalculatePeakDemand(marketData);
 
+        // Generate alternative suggestions (if relevant)
+        // This requires access to RecipeService, which we don't have here directly.
+        // The ProfitService or a higher-level orchestrator should handle cross-item analysis.
+        // However, we can prep the data structure.
+
         // Generate final recommendation
         GenerateRecommendation(marketData);
     }
