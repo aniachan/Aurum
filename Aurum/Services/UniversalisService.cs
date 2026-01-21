@@ -55,6 +55,40 @@ public class UniversalisService : IDisposable
     }
 
     /// <summary>
+    /// Fetch market data for a single item (synchronous-like wrapper for compatibility)
+    /// </summary>
+    public MarketData? GetMarketData(uint itemId)
+    {
+        // TODO: This blocks thread which is bad, but needed for non-async callers for now.
+        // Ideally we should propagate async everywhere.
+        // For CLI or tools it's fine. For game loop, we need async.
+        // Assuming this is used in contexts where we can wait or it's cached.
+        
+        // We need worldName. If we don't have it, we can't fetch.
+        // For now, let's assume "Raiden" or get from config?
+        // Actually, let's use currentWorldId if available to map to name, or default.
+        
+        string worldName = "Raiden"; // Fallback default
+        if (currentWorldId > 0)
+        {
+             // TODO: Map ID to name. For now hardcode or use existing map if we had one.
+             // But UniversalisService doesn't have World map.
+             // We can just use the ID string for Universalis? It supports IDs too!
+             worldName = currentWorldId.ToString();
+        }
+
+        try 
+        {
+            return GetMarketDataAsync(worldName, itemId).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, $"Failed to get market data synchronously for {itemId}");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Fetch market data for a single item
     /// </summary>
     public async Task<MarketData?> GetMarketDataAsync(string worldName, uint itemId)

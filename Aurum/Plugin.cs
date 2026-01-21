@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
     public ItemPriorityService ItemPriorityService { get; init; }
     public RateLimiter RateLimiter { get; init; }
     public ProfitService ProfitService { get; init; }
+    public ShoppingListService ShoppingListService { get; init; }
     public RefreshService RefreshService { get; init; }
     
     // Static accessor for UI components if needed (use sparingly)
@@ -75,10 +76,12 @@ public sealed class Plugin : IDalamudPlugin
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);
         MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
         ProfitService = new ProfitService(Log, Configuration, RecipeService, UniversalisService, MarketAnalysisService);
+        ShoppingListService = new ShoppingListService(DataManager, Log, RecipeService, UniversalisService);
         RefreshService = new RefreshService(Log, Configuration, UniversalisService, DatabaseService, ItemPriorityService, RecipeService, ClientState);
         
         // Initialize recipe service asynchronously
         RecipeService.Initialize();
+        ShoppingListService.Initialize();
         
         // Run health check
         var healthCheck = new HealthCheck(this, Log);
