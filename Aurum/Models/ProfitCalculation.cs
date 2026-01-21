@@ -111,4 +111,5 @@ public class ProfitCalculation
     public DateTime CalculatedAt { get; set; }
     public CostMode CostMode { get; set; }
     public bool IsDataComplete { get; set; }     // False if missing market data
+    public bool IsStale { get; set; }            // True if data is from stale cache
 }

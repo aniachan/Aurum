@@ -790,6 +790,16 @@ public class DashboardWindow : Window, IDisposable
                           velocity >= 1 ? "➡️" : "🐌";
                 
                 ImGui.TextColored(velocityColor, $"{icon} {velocity:F1}/d");
+                
+                if (profit.IsStale)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), "⏰"); // Clock icon for stale data
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Data is stale (from cache). API might be unreachable.");
+                    }
+                }
             }
             else
             {

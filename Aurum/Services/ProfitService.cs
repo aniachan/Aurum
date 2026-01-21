@@ -572,8 +572,15 @@ public class ProfitService
         calculation.Recommendation = marketData.Recommendation;
         calculation.EstimatedSellTimeDays = marketData.EstimatedSellTimeDays;
         
-        return calculation;
-    }
+            // Set isStale flag
+            if (marketData.IsCachedData)
+            {
+                calculation.IsStale = true;
+            }
+            
+            return calculation;
+        }
+
     
     /// <summary>
     /// Calculate estimated gathering time for self-gathered materials
