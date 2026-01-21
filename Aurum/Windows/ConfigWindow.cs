@@ -199,6 +199,46 @@ public class ConfigWindow : Window, IDisposable
             configuration.ShowOnlyProfitableItems = showProfitable;
             configuration.Save();
         }
+
+        ImGui.Separator();
+        ImGui.Text("Category Filters");
+
+        var includeCombat = configuration.FilterIncludeCombat;
+        if (ImGui.Checkbox("Combat Gear", ref includeCombat))
+        {
+            configuration.FilterIncludeCombat = includeCombat;
+            configuration.Save();
+        }
+
+        var includeCraftGather = configuration.FilterIncludeCraftingGathering;
+        if (ImGui.Checkbox("Crafting & Gathering Gear", ref includeCraftGather))
+        {
+            configuration.FilterIncludeCraftingGathering = includeCraftGather;
+            configuration.Save();
+        }
+        
+        var includeFurniture = configuration.FilterIncludeFurniture;
+        if (ImGui.Checkbox("Furniture & Housing", ref includeFurniture))
+        {
+            configuration.FilterIncludeFurniture = includeFurniture;
+            configuration.Save();
+        }
+
+        var includeConsumables = configuration.FilterIncludeConsumables;
+        if (ImGui.Checkbox("Consumables (Food/Potions)", ref includeConsumables))
+        {
+            configuration.FilterIncludeConsumables = includeConsumables;
+            configuration.Save();
+        }
+
+        var includeMaterials = configuration.FilterIncludeMaterials;
+        if (ImGui.Checkbox("Crafting Materials", ref includeMaterials))
+        {
+            configuration.FilterIncludeMaterials = includeMaterials;
+            configuration.Save();
+        }
+
+        ImGui.Separator();
         
         // Sort Mode
         var sortMode = configuration.DefaultSortMode;

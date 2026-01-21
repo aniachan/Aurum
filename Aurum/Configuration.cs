@@ -38,6 +38,14 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     // Display Settings
     public bool ShowOnlyProfitableItems { get; set; } = true;
     public int MinimumProfitFilter { get; set; } = 1000;
+    
+    // Category Filters
+    public bool FilterIncludeCombat { get; set; } = true;
+    public bool FilterIncludeCraftingGathering { get; set; } = true;
+    public bool FilterIncludeFurniture { get; set; } = true;
+    public bool FilterIncludeConsumables { get; set; } = true;
+    public bool FilterIncludeMaterials { get; set; } = true;
+
     public SortMode DefaultSortMode { get; set; } = SortMode.RecommendationScore;
     public List<uint> FavoriteItems { get; set; } = new(); // User's pinned/favorite items
     

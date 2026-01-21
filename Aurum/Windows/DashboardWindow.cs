@@ -441,6 +441,62 @@ public class DashboardWindow : Window, IDisposable
             ApplyFilters();
         }
         
+        ImGui.SameLine();
+        
+        // Category Filter Popup
+        if (ImGui.Button("Categories..."))
+        {
+            ImGui.OpenPopup("CategoryFilters");
+        }
+
+        if (ImGui.BeginPopup("CategoryFilters"))
+        {
+            bool changed = false;
+
+            var includeCombat = plugin.Configuration.FilterIncludeCombat;
+            if (ImGui.Checkbox("Combat Gear", ref includeCombat))
+            {
+                plugin.Configuration.FilterIncludeCombat = includeCombat;
+                changed = true;
+            }
+
+            var includeCraftGather = plugin.Configuration.FilterIncludeCraftingGathering;
+            if (ImGui.Checkbox("Crafting & Gathering", ref includeCraftGather))
+            {
+                plugin.Configuration.FilterIncludeCraftingGathering = includeCraftGather;
+                changed = true;
+            }
+            
+            var includeFurniture = plugin.Configuration.FilterIncludeFurniture;
+            if (ImGui.Checkbox("Furniture", ref includeFurniture))
+            {
+                plugin.Configuration.FilterIncludeFurniture = includeFurniture;
+                changed = true;
+            }
+
+            var includeConsumables = plugin.Configuration.FilterIncludeConsumables;
+            if (ImGui.Checkbox("Consumables", ref includeConsumables))
+            {
+                plugin.Configuration.FilterIncludeConsumables = includeConsumables;
+                changed = true;
+            }
+
+            var includeMaterials = plugin.Configuration.FilterIncludeMaterials;
+            if (ImGui.Checkbox("Materials", ref includeMaterials))
+            {
+                plugin.Configuration.FilterIncludeMaterials = includeMaterials;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                plugin.Configuration.Save();
+                ApplyFilters();
+            }
+
+            ImGui.EndPopup();
+        }
+        
         // Sort options
         ImGui.Text("Sort by:");
         ImGui.SameLine();
@@ -943,6 +999,17 @@ public class DashboardWindow : Window, IDisposable
             if (p.RawProfit < minProfit)
                 return false;
             
+            // Category Filters
+            if (p.Recipe != null)
+            {
+                if (!plugin.Configuration.FilterIncludeCombat && p.Recipe.MainCategory == ItemMainCategory.Combat) return false;
+                if (!plugin.Configuration.FilterIncludeCraftingGathering && 
+                    (p.Recipe.MainCategory == ItemMainCategory.Crafting || p.Recipe.MainCategory == ItemMainCategory.Gathering)) return false;
+                if (!plugin.Configuration.FilterIncludeFurniture && p.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
+                if (!plugin.Configuration.FilterIncludeConsumables && p.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
+                if (!plugin.Configuration.FilterIncludeMaterials && p.Recipe.MainCategory == ItemMainCategory.Material) return false;
+            }
+
             return true;
         }).ToList();
         
