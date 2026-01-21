@@ -36,7 +36,9 @@ public class DashboardWindow : Window, IDisposable
     // private int itemsPerPage = 50; // Removed in favor of config
     
     private readonly string[] craftingClasses = { "All", "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
-    
+    private string lastErrorMessage = string.Empty;
+    private DateTime lastErrorTime = DateTime.MinValue;
+
     public DashboardWindow(Plugin plugin) 
         : base("Aurum - Crafting Profit Calculator##Dashboard", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
@@ -55,6 +57,15 @@ public class DashboardWindow : Window, IDisposable
     {
         DrawHeader();
         ImGui.Separator();
+        
+        if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalSeconds < 10)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.3f, 0.3f, 1f));
+            ImGui.TextWrapped($"⚠️ {lastErrorMessage}");
+            ImGui.PopStyleColor();
+            ImGui.Separator();
+        }
+
         DrawFilters();
         ImGui.Separator();
         
@@ -470,6 +481,8 @@ public class DashboardWindow : Window, IDisposable
         }
         catch (Exception ex)
         {
+            lastErrorMessage = ErrorMessageUtils.GetUserFriendlyMessage(ex);
+            lastErrorTime = DateTime.UtcNow;
             Plugin.Log.Error(ex, "Error refreshing market data");
         }
         finally
