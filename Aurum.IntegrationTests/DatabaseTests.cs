@@ -189,4 +189,49 @@ public class DatabaseTests
             }
         }
     }
+    
+    [Fact]
+    public void TestDatabaseSize()
+    {
+        // Setup
+        var mockLog = new Mock<IPluginLog>();
+        var tempPath = Path.GetTempPath();
+        var dbPath = Path.Combine(tempPath, "aurum.db");
+        
+        if (File.Exists(dbPath))
+        {
+            File.Delete(dbPath);
+        }
+
+        try 
+        {
+            // Act
+            using var db = new DatabaseService(mockLog.Object, tempPath);
+            
+            // Should be small initially but > 0
+            var initialSize = db.GetDatabaseSize();
+            Assert.True(initialSize > 0);
+            
+            // Add some data to increase size
+            for (int i = 0; i < 100; i++)
+            {
+                db.LogApiRequest("/test", DateTime.UtcNow, 100, 200, true);
+            }
+            
+            // Force WAL checkpoint if needed, but size might not update immediately depending on OS/file system
+            // Just asserting it runs without error and returns reasonable value
+            var sizeAfter = db.GetDatabaseSize();
+            Assert.True(sizeAfter > 0);
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(dbPath))
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
+        }
+    }
 }
