@@ -76,6 +76,8 @@ public class ProfitCalculation
     
     // Profit metrics
     public int RawProfit { get; set; }           // Net sale - cost (can be negative!) - Renamed back to RawProfit due to extensive usage
+    public int OpportunityCost { get; set; }     // Market value of ingredients (if sold directly)
+    public int ProfitVsMaterials { get; set; }   // Net sale - OpportunityCost
     public float ProfitMargin { get; set; }      // profit / sale_price * 100
     public int GilPerHour { get; set; }          // profit / craft_time
     

@@ -28,6 +28,7 @@ public class Configuration : IPluginConfiguration
     public CostMode DefaultCostMode { get; set; } = CostMode.Cheapest;
     public bool IncludeMarketTax { get; set; } = true;
     public bool UseHQPricesWhenAvailable { get; set; } = true;
+    public bool CalculateOpportunityCost { get; set; } = true;
     public int DefaultCraftingTimeSeconds { get; set; } = 20;
     
     // Display Settings
