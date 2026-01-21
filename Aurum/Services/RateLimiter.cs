@@ -12,7 +12,7 @@ public class RateLimiter : IDisposable
 {
     private readonly IPluginLog log;
     private readonly Configuration configuration;
-    private readonly DatabaseService database; // Add dependency for persistent tracking
+    private readonly DatabaseService? database; // Add dependency for persistent tracking
     
     // Token Bucket State
     private readonly object _lock = new();
@@ -66,7 +66,7 @@ public class RateLimiter : IDisposable
         }
     }
 
-    public RateLimiter(IPluginLog log, Configuration config, DatabaseService database)
+    public RateLimiter(IPluginLog log, Configuration config, DatabaseService? database = null)
     {
         this.log = log;
         this.configuration = config;

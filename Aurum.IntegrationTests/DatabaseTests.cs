@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using Aurum.Services;
-// using Dalamud.Plugin.Services;
+using Dalamud.Plugin.Services;
 using Moq;
 using Xunit;
 using Aurum.Models;
@@ -9,11 +9,11 @@ using System.Collections.Generic;
 
 namespace Aurum.IntegrationTests;
 
-public interface IPluginLog {
-    void Information(string message);
-    void Error(Exception ex, string message);
-    void Error(string message);
-}
+// public interface IPluginLog {
+//     void Information(string message);
+//     void Error(Exception ex, string message);
+//     void Error(string message);
+// }
 
 public class DatabaseTests
 {
