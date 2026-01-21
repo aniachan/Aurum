@@ -33,6 +33,8 @@ public class ConfigurationTests
         Assert.True(config.ShowOnlyProfitableItems);
         Assert.Equal(1000, config.MinimumProfitFilter);
         Assert.Equal(SortMode.RecommendationScore, config.DefaultSortMode);
+        Assert.NotNull(config.FavoriteItems);
+        Assert.Empty(config.FavoriteItems);
         
         // Notification Settings
         Assert.False(config.EnablePriceAlerts);

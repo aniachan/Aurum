@@ -61,6 +61,9 @@ public class ProfitCalculation
     // Recipe info
     public RecipeData Recipe { get; set; } = null!;
     
+    // Helper property to access ItemId consistently
+    public uint ItemId => Recipe?.ResultItemId ?? 0;
+
     // Market data
     public MarketData? MarketData { get; set; }
     

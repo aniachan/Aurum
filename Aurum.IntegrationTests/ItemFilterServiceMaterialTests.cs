@@ -2,6 +2,7 @@ using Aurum.Models;
 using Aurum.Services.Filtering;
 using Xunit;
 using System.Collections.Generic;
+using Aurum;
 
 namespace Aurum.UnitTests.Services.Filtering;
 
@@ -9,10 +10,12 @@ public class ItemFilterServiceMaterialTests
 {
     private ItemFilterService _filterService;
     private FilterCriteria _criteria;
+    private Configuration _config;
 
     public ItemFilterServiceMaterialTests()
     {
-        _filterService = new ItemFilterService();
+        _config = new Configuration();
+        _filterService = new ItemFilterService(_config);
         _criteria = new FilterCriteria();
         // Reset defaults
         _criteria.IncludeMaterials = true;

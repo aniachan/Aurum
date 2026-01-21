@@ -10,6 +10,13 @@ namespace Aurum.Services.Filtering;
 /// </summary>
 public class ItemFilterService
 {
+    private readonly Configuration _configuration;
+
+    public ItemFilterService(Configuration configuration)
+    {
+        _configuration = configuration;
+    }
+
     /// <summary>
     /// Filter a list of profit calculations based on criteria
     /// </summary>
@@ -69,6 +76,12 @@ public class ItemFilterService
             if (!criteria.IncludeCraftingGatheringGear && item.Recipe.MainCategory == ItemMainCategory.Crafting) return false;
             if (!criteria.IncludeFurniture && item.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
             if (!criteria.IncludeMaterials && item.Recipe.MainCategory == ItemMainCategory.Material) return false;
+        }
+
+        // 7. Favorites
+        if (criteria.OnlyFavorites)
+        {
+            if (_configuration == null || !_configuration.FavoriteItems.Contains(item.ItemId)) return false;
         }
 
         return true;

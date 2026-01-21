@@ -3,6 +3,7 @@ using Aurum.Services.Filtering;
 using Xunit;
 using System.Collections.Generic;
 using System.Linq;
+using Aurum;
 
 namespace Aurum.IntegrationTests;
 
@@ -10,10 +11,12 @@ public class ItemFilterServiceFurnitureTests
 {
     private ItemFilterService _filterService;
     private FilterCriteria _criteria;
+    private Configuration _config;
 
     public ItemFilterServiceFurnitureTests()
     {
-        _filterService = new ItemFilterService();
+        _config = new Configuration();
+        _filterService = new ItemFilterService(_config);
         _criteria = new FilterCriteria();
         // Reset defaults
         _criteria.IncludeFurniture = true;

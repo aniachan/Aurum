@@ -37,6 +37,7 @@ public class FilterCriteria
     public bool IncludeCraftingGatheringGear { get; set; } = true;
     public bool IncludeFurniture { get; set; } = true;
     public bool IncludeMaterials { get; set; } = true;
+    public bool OnlyFavorites { get; set; } = false;
 
     // Job/Level (Future expansion)
     public int MaxJobLevel { get; set; } = int.MaxValue;

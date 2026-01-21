@@ -38,6 +38,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool ShowOnlyProfitableItems { get; set; } = true;
     public int MinimumProfitFilter { get; set; } = 1000;
     public SortMode DefaultSortMode { get; set; } = SortMode.RecommendationScore;
+    public List<uint> FavoriteItems { get; set; } = new(); // User's pinned/favorite items
     
     // Notification Settings
     public bool EnablePriceAlerts { get; set; } = false;

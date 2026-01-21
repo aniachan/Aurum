@@ -3,16 +3,19 @@ using System.Collections.Generic;
 using Aurum.Models;
 using Aurum.Services.Filtering;
 using Xunit;
+using Aurum;
 
 namespace Aurum.IntegrationTests.Services.Filtering;
 
 public class ItemFilterServiceTests
 {
     private readonly ItemFilterService _service;
+    private readonly Configuration _config;
 
     public ItemFilterServiceTests()
     {
-        _service = new ItemFilterService();
+        _config = new Configuration();
+        _service = new ItemFilterService(_config);
     }
 
     private ProfitCalculation CreateMockItem(
