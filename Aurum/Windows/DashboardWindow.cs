@@ -331,8 +331,10 @@ public class DashboardWindow : Window, IDisposable
                     foreach (var warning in profit.Warnings)
                     {
                          var icon = UiUtils.GetWarningIcon(warning.Type);
+                         var color = UiUtils.GetWarningColor(warning.Level);
+
                          ImGui.PushFont(UiBuilder.IconFont);
-                         ImGui.Text(icon);
+                         ImGui.TextColored(color, icon);
                          ImGui.PopFont();
                          ImGui.SameLine();
                          ImGui.TextWrapped(warning.Message);

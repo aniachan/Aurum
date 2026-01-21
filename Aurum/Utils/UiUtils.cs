@@ -20,6 +20,16 @@ public static class UiUtils
         };
     }
 
+    public static Vector4 GetWarningColor(WarningLevel level)
+    {
+        return level switch
+        {
+            WarningLevel.Danger => new Vector4(1f, 0.3f, 0.3f, 1f),   // Red
+            WarningLevel.Warning => new Vector4(1f, 0.7f, 0f, 1f),    // Orange
+            _ => new Vector4(0.8f, 0.8f, 1f, 1f)                      // Light Blue/White
+        };
+    }
+
     public static string GetRiskIcon(RiskLevel level)
     {
         return level switch

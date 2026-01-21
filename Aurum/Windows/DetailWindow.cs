@@ -208,12 +208,7 @@ public class DetailWindow : Window, IDisposable
             foreach (var w in currentItem.Warnings)
             {
                 var warningIcon = UiUtils.GetWarningIcon(w.Type);
-                var warningColor = w.Level switch
-                {
-                    WarningLevel.Danger => new Vector4(1f, 0.3f, 0.3f, 1f),
-                    WarningLevel.Warning => new Vector4(1f, 0.7f, 0f, 1f),
-                    _ => new Vector4(0.8f, 0.8f, 1f, 1f)
-                };
+                var warningColor = UiUtils.GetWarningColor(w.Level);
 
                 ImGui.PushFont(UiBuilder.IconFont);
                 ImGui.TextColored(warningColor, warningIcon);
