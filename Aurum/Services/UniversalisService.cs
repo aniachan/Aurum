@@ -492,6 +492,14 @@ public class UniversalisService : IDisposable
         
         while (!disposeCts.Token.IsCancellationRequested)
         {
+            // Pausing processing if RateLimiter is in degraded mode (API is erroring)
+            // This allows requests to queue up without hammering the API until it recovers.
+            if (rateLimiter.IsDegraded)
+            {
+                await Task.Delay(5000, disposeCts.Token);
+                continue;
+            }
+
             // Use configured batch size for dequeuing, clamped to 100 max
             int batchSize = Math.Min(configuration.ApiBatchSize, 100);
             
