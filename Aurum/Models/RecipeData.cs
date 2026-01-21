@@ -53,6 +53,9 @@ public class RecipeData
     public bool IsExpert { get; set; }
     public bool IsSpecialist { get; set; }
     
+    // Derived Categories
+    public ItemMainCategory MainCategory { get; set; }
+
     // Estimated crafting time (for gil/hour calculations)
     public int EstimatedCraftTimeSeconds { get; set; } = 20;  // Default estimate
 }

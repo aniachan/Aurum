@@ -61,6 +61,13 @@ public class ItemFilterService
                 if (item.MarketData.Trend != PriceTrend.Rising) return false;
             }
         }
+        
+        // 6. Category Filtering
+        if (item.Recipe != null)
+        {
+            if (!criteria.IncludeCombatGear && item.Recipe.MainCategory == ItemMainCategory.Combat) return false;
+            if (!criteria.IncludeCraftingGatheringGear && item.Recipe.MainCategory == ItemMainCategory.Crafting) return false;
+        }
 
         return true;
     }

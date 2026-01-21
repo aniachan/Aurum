@@ -31,7 +31,11 @@ public class FilterCriteria
     public bool ExcludeStaleMarkets { get; set; } = true;
     public bool ExcludeMarketCrashRisks { get; set; } = false;
     public bool OnlyRisingTrends { get; set; } = false;
-    
+
+    // Categories
+    public bool IncludeCombatGear { get; set; } = true;
+    public bool IncludeCraftingGatheringGear { get; set; } = true;
+
     // Job/Level (Future expansion)
     public int MaxJobLevel { get; set; } = int.MaxValue;
 }

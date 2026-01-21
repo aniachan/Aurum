@@ -154,6 +154,86 @@ public class RecipeService
     }
     
     /// <summary>
+    /// Helper to determine the main category from Item data
+    /// </summary>
+    private ItemMainCategory DetermineMainCategory(Item item)
+    {
+        var uiCategoryId = item.ItemUICategory.RowId;
+
+        // 1. Weapons / Tools
+        if (uiCategoryId >= 1 && uiCategoryId <= 11) return ItemMainCategory.Combat; // Combat Weapons
+        if (uiCategoryId >= 84 && uiCategoryId <= 89) return ItemMainCategory.Combat; // New Jobs (RPR, SGE, VPR, PCT) - expanded range for safety
+        
+        // DoH/DoL Tools
+        // 12=CRP, 13=BSM, 14=ARM, 15=GSM, 16=LTW, 17=WVR, 18=ALC, 19=CUL
+        // 20=MIN, 21=BTN, 22=FSH
+        // 23=CRP_OFF ... 30=FSH_OFF
+        if (uiCategoryId >= 12 && uiCategoryId <= 33) return ItemMainCategory.Crafting; // Tools (Crafting & Gathering)
+
+        // 2. Armor & Accessories
+        // 34=Head, 35=Body, 36=Legs, 37=Hands, 38=Feet, 39=Waist(RIP)
+        // 40=Neck, 41=Ears, 42=Wrists, 43=Rings
+        if ((uiCategoryId >= 34 && uiCategoryId <= 39) || (uiCategoryId >= 40 && uiCategoryId <= 43))
+        {
+            // Check ClassJobCategory to see if it's for DoH/DoL
+            // This is a heuristic: If the ClassJobCategory includes CRA(31) or GAT(32) it's likely non-combat gear
+            // We'll peek at the ClassJobCategory if available
+            // Lumina Item -> ClassJobCategory -> Name or IsCrafting/Gathering
+            
+            // Note: We need to access ClassJobCategory.
+            // Since we passed the whole Item object, we can try to inspect it.
+            var cjc = item.ClassJobCategory.Value;
+            if (cjc.RowId != 0)
+            {
+                // CRP=9, BSM=10 ... CUL=16. MIN=17, BTN=18, FSH=19
+                // But ClassJobCategory is a set of bools for each job.
+                
+                // Fast check: If it has stats for CP (Crafting Points) or GP (Gathering Points), it's definitely Crafting/Gathering
+                // BaseParam[0] is usually Main Attribute, but CP/GP can be anywhere.
+                // Actually, let's check the Equippable Jobs.
+                
+                // If it's equippable by DoW/DoM, it's Combat.
+                // If equippable ONLY by DoH/DoL, it's Crafting.
+                
+                bool isDoW = cjc.GLA || cjc.PGL || cjc.MRD || cjc.LNC || cjc.ARC || cjc.ROG || cjc.THM || cjc.ACN;
+                // ... check all combat jobs ...
+                // Shortcuts:
+                // ClassJobCategory has boolean properties for every job.
+                
+                // Heuristic: If it gives CP or GP, it's for us.
+                // Param 11 = CP, Param 10 = GP ? Need to verify param IDs.
+                // Let's stick to the Category Name if possible? "Disciples of the Hand"
+                
+                if (cjc.Name.ExtractText().Contains("Disciple of the Hand") || cjc.Name.ExtractText().Contains("Disciple of the Land") || cjc.Name.ExtractText().Contains("Crafter") || cjc.Name.ExtractText().Contains("Gatherer"))
+                {
+                    return ItemMainCategory.Crafting; // Or Gathering, grouped for this task
+                }
+                
+                // Fallback: Check if it's strictly for DoH/DoL
+                if (!isDoW && (cjc.CRP || cjc.MIN)) // simple spot check
+                {
+                   return ItemMainCategory.Crafting;
+                }
+            }
+
+            return ItemMainCategory.Combat; // Default to combat for armor/accessories
+        }
+
+        // 3. Consumables
+        // 44=Medicine, 45=Ingredient, 46=Meal, 47=Seafood
+        if (uiCategoryId == 44 || uiCategoryId == 46 || uiCategoryId == 47) return ItemMainCategory.Consumable;
+        
+        // 4. Materials
+        // 48-60ish are materials
+        if (uiCategoryId >= 48 && uiCategoryId <= 60) return ItemMainCategory.Material;
+
+        return ItemMainCategory.Other;
+    }
+    
+    /// <summary>
+    /// Helper to determine the main category from UI category ID
+    
+    /// <summary>
     /// Convert Lumina Recipe to our RecipeData model
     /// </summary>
     private RecipeData ConvertToRecipeData(Recipe recipe)
@@ -177,7 +257,9 @@ public class RecipeService
             CanBeHQ = recipe.CanHq,
             IsExpert = recipe.IsExpert,
             IsSpecialist = recipe.IsSpecializationRequired,
-            RecipeLevelTable = recipe.RecipeLevelTable.RowId
+            RecipeLevelTable = recipe.RecipeLevelTable.RowId,
+            ItemCategory = recipe.ItemResult.Value.ItemUICategory.RowId,
+            MainCategory = DetermineMainCategory(recipe.ItemResult.Value)
         };
         
         // Load ingredients (materials)
