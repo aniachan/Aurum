@@ -14,6 +14,9 @@ public class Configuration : IPluginConfiguration
     public bool IsConfigWindowMovable { get; set; } = true;
     public float UIScale { get; set; } = 1.0f;
     public bool EnableAnimatedCharts { get; set; } = true;
+    public int RowsPerPage { get; set; } = 50;
+    public List<string> HiddenColumns { get; set; } = new();
+    public Theme ColorTheme { get; set; } = Theme.Default;
     
     // API Settings
     public string PreferredWorld { get; set; } = "Auto";  // or specific world name
@@ -62,4 +65,15 @@ public enum SortMode
     FastestSelling,
     LowestCompetition,
     RecommendationScore  // Weighted algorithm
+}
+
+/// <summary>
+/// Color themes for the UI
+/// </summary>
+public enum Theme
+{
+    Default,
+    Dark,
+    Light,
+    HighContrast
 }

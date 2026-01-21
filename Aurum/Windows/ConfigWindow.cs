@@ -63,6 +63,47 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
         }
 
+        var rowsPerPage = configuration.RowsPerPage;
+        if (ImGui.InputInt("Rows Per Page", ref rowsPerPage))
+        {
+             // Clamp to reasonable values
+            rowsPerPage = Math.Clamp(rowsPerPage, 5, 200);
+            configuration.RowsPerPage = rowsPerPage;
+            configuration.Save();
+        }
+        
+        var theme = configuration.ColorTheme;
+        if (ImGui.BeginCombo("Color Theme", theme.ToString()))
+        {
+            foreach (var t in Enum.GetValues<Theme>())
+            {
+                if (ImGui.Selectable(t.ToString(), theme == t))
+                {
+                    configuration.ColorTheme = t;
+                    configuration.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+        
+        if (ImGui.TreeNode("Column Visibility"))
+        {
+            var columns = new[] { "Item", "Class", "Profit", "Margin", "Gil/Hr", "Demand", "Risk", "Score", "Actions" };
+            foreach (var col in columns)
+            {
+                bool isVisible = !configuration.HiddenColumns.Contains(col);
+                if (ImGui.Checkbox(col, ref isVisible))
+                {
+                    if (isVisible)
+                        configuration.HiddenColumns.Remove(col);
+                    else
+                        configuration.HiddenColumns.Add(col);
+                    configuration.Save();
+                }
+            }
+            ImGui.TreePop();
+        }
+
         ImGui.Separator();
         ImGui.Text("API Settings");
 

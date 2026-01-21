@@ -31,7 +31,7 @@ public class DashboardWindow : Window, IDisposable
     
     // Pagination
     private int currentPage = 1;
-    private int itemsPerPage = 50;
+    // private int itemsPerPage = 50; // Removed in favor of config
     
     private readonly string[] craftingClasses = { "All", "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
     
@@ -250,6 +250,7 @@ public class DashboardWindow : Window, IDisposable
         }
 
         // Pagination controls
+        int itemsPerPage = plugin.Configuration.RowsPerPage;
         int totalPages = (int)Math.Ceiling(filteredResults.Count / (double)itemsPerPage);
         currentPage = Math.Clamp(currentPage, 1, totalPages);
         
@@ -260,18 +261,25 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.Button(">") && currentPage < totalPages) currentPage++;
         
         // Table header
-        if (ImGui.BeginTable("ProfitTable", 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        // Count visible columns to set table column count correctly
+        var allColumns = new[] { "Item", "Class", "Profit", "Margin", "Gil/Hr", "Demand", "Risk", "Score", "Actions" };
+        var visibleColumns = allColumns.Where(c => !plugin.Configuration.HiddenColumns.Contains(c)).ToList();
+        
+        if (ImGui.BeginTable("ProfitTable", visibleColumns.Count, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthFixed, 250);
-            ImGui.TableSetupColumn("Class", ImGuiTableColumnFlags.WidthFixed, 50);
-            ImGui.TableSetupColumn("Profit", ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("Margin", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("Gil/Hr", ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("Demand", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("Risk", ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("Score", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 50);
+            
+            // Define columns with original widths
+            if (!plugin.Configuration.HiddenColumns.Contains("Item")) ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthFixed, 250);
+            if (!plugin.Configuration.HiddenColumns.Contains("Class")) ImGui.TableSetupColumn("Class", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (!plugin.Configuration.HiddenColumns.Contains("Profit")) ImGui.TableSetupColumn("Profit", ImGuiTableColumnFlags.WidthFixed, 100);
+            if (!plugin.Configuration.HiddenColumns.Contains("Margin")) ImGui.TableSetupColumn("Margin", ImGuiTableColumnFlags.WidthFixed, 80);
+            if (!plugin.Configuration.HiddenColumns.Contains("Gil/Hr")) ImGui.TableSetupColumn("Gil/Hr", ImGuiTableColumnFlags.WidthFixed, 100);
+            if (!plugin.Configuration.HiddenColumns.Contains("Demand")) ImGui.TableSetupColumn("Demand", ImGuiTableColumnFlags.WidthFixed, 80);
+            if (!plugin.Configuration.HiddenColumns.Contains("Risk")) ImGui.TableSetupColumn("Risk", ImGuiTableColumnFlags.WidthFixed, 100);
+            if (!plugin.Configuration.HiddenColumns.Contains("Score")) ImGui.TableSetupColumn("Score", ImGuiTableColumnFlags.WidthFixed, 80);
+            if (!plugin.Configuration.HiddenColumns.Contains("Actions")) ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 50);
+
             ImGui.TableHeadersRow();
             
             // Draw rows
@@ -293,116 +301,143 @@ public class DashboardWindow : Window, IDisposable
         ImGui.TableNextRow();
         
         // Item name (Clickable to open details)
-        ImGui.TableNextColumn();
-        if (ImGui.Selectable($"{profit.Recipe.ItemName}##{profit.Recipe.RecipeId}", false, ImGuiSelectableFlags.SpanAllColumns))
+        if (!plugin.Configuration.HiddenColumns.Contains("Item"))
         {
-            plugin.DetailWindow.SetItem(profit);
-        }
-        
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.BeginTooltip();
-            ImGui.Text($"Recipe Level: {profit.Recipe.RecipeLevel}");
-            ImGui.Text($"Crafting Level: {profit.Recipe.ClassJobLevel}");
-            
-            // Risk Analysis Breakdown
-            if (profit.MarketData != null && !string.IsNullOrEmpty(profit.MarketData.RiskAnalysis))
+            ImGui.TableNextColumn();
+            if (ImGui.Selectable($"{profit.Recipe.ItemName}##{profit.Recipe.RecipeId}", false, ImGuiSelectableFlags.SpanAllColumns))
             {
-                ImGui.Separator();
-                ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), profit.MarketData.RiskAnalysis);
+                plugin.DetailWindow.SetItem(profit);
             }
             
-            if (profit.Warnings.Any())
+            if (ImGui.IsItemHovered())
             {
-                ImGui.Separator();
-                ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), "Warnings:");
-                foreach (var warning in profit.Warnings)
+                ImGui.BeginTooltip();
+                ImGui.Text($"Recipe Level: {profit.Recipe.RecipeLevel}");
+                ImGui.Text($"Crafting Level: {profit.Recipe.ClassJobLevel}");
+                
+                // Risk Analysis Breakdown
+                if (profit.MarketData != null && !string.IsNullOrEmpty(profit.MarketData.RiskAnalysis))
                 {
-                    ImGui.TextWrapped($"⚠️ {warning.Message}");
+                    ImGui.Separator();
+                    ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), profit.MarketData.RiskAnalysis);
                 }
+                
+                if (profit.Warnings.Any())
+                {
+                    ImGui.Separator();
+                    ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), "Warnings:");
+                    foreach (var warning in profit.Warnings)
+                    {
+                        ImGui.TextWrapped($"⚠️ {warning.Message}");
+                    }
+                }
+                ImGui.EndTooltip();
             }
-            ImGui.EndTooltip();
         }
         
         // Class
-        ImGui.TableNextColumn();
-        ImGui.Text(profit.Recipe.CraftingClassName);
+        if (!plugin.Configuration.HiddenColumns.Contains("Class"))
+        {
+            ImGui.TableNextColumn();
+            ImGui.Text(profit.Recipe.CraftingClassName);
+        }
         
         // Profit
-        ImGui.TableNextColumn();
-        var profitColor = profit.RawProfit > 0 
-            ? new Vector4(0f, 1f, 0.5f, 1f)  // Green
-            : new Vector4(1f, 0.3f, 0.3f, 1f); // Red
-        ImGui.TextColored(profitColor, FormatGil(profit.RawProfit));
+        if (!plugin.Configuration.HiddenColumns.Contains("Profit"))
+        {
+            ImGui.TableNextColumn();
+            var profitColor = profit.RawProfit > 0 
+                ? new Vector4(0f, 1f, 0.5f, 1f)  // Green
+                : new Vector4(1f, 0.3f, 0.3f, 1f); // Red
+            ImGui.TextColored(profitColor, FormatGil(profit.RawProfit));
+        }
         
         // Margin
-        ImGui.TableNextColumn();
-        ImGui.Text($"{profit.ProfitMargin:F1}%");
+        if (!plugin.Configuration.HiddenColumns.Contains("Margin"))
+        {
+            ImGui.TableNextColumn();
+            ImGui.Text($"{profit.ProfitMargin:F1}%");
+        }
         
         // Gil/Hour
-        ImGui.TableNextColumn();
-        ImGui.Text(FormatGil(profit.GilPerHour));
+        if (!plugin.Configuration.HiddenColumns.Contains("Gil/Hr"))
+        {
+            ImGui.TableNextColumn();
+            ImGui.Text(FormatGil(profit.GilPerHour));
+        }
         
         // Demand (sale velocity)
-        ImGui.TableNextColumn();
-        if (profit.MarketData != null)
+        if (!plugin.Configuration.HiddenColumns.Contains("Demand"))
         {
-            var velocity = profit.MarketData.SaleVelocity;
-            var velocityColor = velocity >= 50 ? new Vector4(0f, 1f, 0.5f, 1f) :
-                               velocity >= 10 ? new Vector4(0.5f, 1f, 0.5f, 1f) :
-                               velocity >= 1 ? new Vector4(1f, 1f, 0.5f, 1f) :
-                               new Vector4(1f, 0.5f, 0.5f, 1f);
-            
-            var icon = velocity >= 50 ? "🔥" :
-                      velocity >= 10 ? "📈" :
-                      velocity >= 1 ? "➡️" : "🐌";
-            
-            ImGui.TextColored(velocityColor, $"{icon} {velocity:F1}/d");
-        }
-        else
-        {
-            ImGui.TextDisabled("N/A");
+            ImGui.TableNextColumn();
+            if (profit.MarketData != null)
+            {
+                var velocity = profit.MarketData.SaleVelocity;
+                var velocityColor = velocity >= 50 ? new Vector4(0f, 1f, 0.5f, 1f) :
+                                   velocity >= 10 ? new Vector4(0.5f, 1f, 0.5f, 1f) :
+                                   velocity >= 1 ? new Vector4(1f, 1f, 0.5f, 1f) :
+                                   new Vector4(1f, 0.5f, 0.5f, 1f);
+                
+                var icon = velocity >= 50 ? "🔥" :
+                          velocity >= 10 ? "📈" :
+                          velocity >= 1 ? "➡️" : "🐌";
+                
+                ImGui.TextColored(velocityColor, $"{icon} {velocity:F1}/d");
+            }
+            else
+            {
+                ImGui.TextDisabled("N/A");
+            }
         }
         
         // Risk
-        ImGui.TableNextColumn();
-        var riskColor = profit.RiskLevel switch
+        if (!plugin.Configuration.HiddenColumns.Contains("Risk"))
         {
-            RiskLevel.Low => new Vector4(0f, 1f, 0.5f, 1f),
-            RiskLevel.Medium => new Vector4(1f, 1f, 0.5f, 1f),
-            RiskLevel.High => new Vector4(1f, 0.7f, 0f, 1f),
-            RiskLevel.VeryHigh => new Vector4(1f, 0.3f, 0.3f, 1f),
-            _ => new Vector4(1f, 1f, 1f, 1f)
-        };
+            ImGui.TableNextColumn();
+            var riskColor = profit.RiskLevel switch
+            {
+                RiskLevel.Low => new Vector4(0f, 1f, 0.5f, 1f),
+                RiskLevel.Medium => new Vector4(1f, 1f, 0.5f, 1f),
+                RiskLevel.High => new Vector4(1f, 0.7f, 0f, 1f),
+                RiskLevel.VeryHigh => new Vector4(1f, 0.3f, 0.3f, 1f),
+                _ => new Vector4(1f, 1f, 1f, 1f)
+            };
+            
+            var riskIcon = profit.RiskLevel switch
+            {
+                RiskLevel.Low => "🟢",
+                RiskLevel.Medium => "🟡",
+                RiskLevel.High => "🟠",
+                RiskLevel.VeryHigh => "🔴",
+                _ => "⚪"
+            };
+            
+            ImGui.TextColored(riskColor, $"{riskIcon} {profit.RiskLevel}");
+        }
         
-        var riskIcon = profit.RiskLevel switch
+        // Score (stars)
+        if (!plugin.Configuration.HiddenColumns.Contains("Score"))
         {
-            RiskLevel.Low => "🟢",
-            RiskLevel.Medium => "🟡",
-            RiskLevel.High => "🟠",
-            RiskLevel.VeryHigh => "🔴",
-            _ => "⚪"
-        };
-        
-        ImGui.TextColored(riskColor, $"{riskIcon} {profit.RiskLevel}");
-        
-            // Score (stars)
-        ImGui.TableNextColumn();
-        var stars = profit.RecommendationScore / 20; // 0-100 -> 0-5 stars
-        var starText = new string('⭐', Math.Clamp(stars, 0, 5));
-        ImGui.Text($"{starText} {profit.RecommendationScore}");
+            ImGui.TableNextColumn();
+            var stars = profit.RecommendationScore / 20; // 0-100 -> 0-5 stars
+            var starText = new string('⭐', Math.Clamp(stars, 0, 5));
+            ImGui.Text($"{starText} {profit.RecommendationScore}");
+        }
 
         // Chart Button
-        ImGui.TableNextColumn();
-        if (profit.MarketData != null)
+        if (!plugin.Configuration.HiddenColumns.Contains("Actions"))
         {
-            if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
+            ImGui.TableNextColumn();
+            if (profit.MarketData != null)
             {
-                plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
-            }
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip("View Price History");
+                if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
+                {
+                    plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
+                }
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("View Price History");
+                }
             }
         }
     }
