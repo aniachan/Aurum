@@ -149,10 +149,10 @@
   - [x] Split large requests into multiple batches
   - [x] Parallel batch processing with rate limiting
 
-- [ ] **Request deduplication**
-  - [ ] Track in-flight requests (don't duplicate)
-  - [ ] Merge duplicate requests from UI
-  - [ ] Return cached results for recent requests
+- [x] **Request deduplication**
+  - [x] Track in-flight requests (don't duplicate)
+  - [x] Merge duplicate requests from UI
+  - [x] Return cached results for recent requests
   - [ ] Implement request coalescing (wait 100ms for more)
 
 **Impact:** 10x faster for large recipe lists
