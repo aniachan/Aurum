@@ -94,142 +94,21 @@ public class ChartWindow : Window, IDisposable
         }
         else
         {
-            var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
-            var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
-            
-            if (selectedTimeRange > 0)
+            if (ImGui.BeginTabBar("ChartTabs"))
             {
-                var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
-                history = history.Where(h => h.Timestamp >= cutoff);
-                snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
-            }
-
-            var historyList = history.ToList();
-            var snapshotList = snapshots.ToList();
-
-            if (!historyList.Any())
-            {
-                ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), $"No sales found in the last {selectedTimeRange} days.");
-            }
-            else
-            {
-                // Aggregate data for Volume (Quantity) analysis
-                var dailySales = historyList
-                    .GroupBy(x => x.Timestamp.Date)
-                    .OrderBy(g => g.Key)
-                    .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
-                    .ToList();
-
-                // Draw Chart using ImPlot
-                if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
+                if (ImGui.BeginTabItem("Price History"))
                 {
-                    // Setup axes
-                    ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
-                    ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
-                    
-                    // Setup Y2 axis for Volume / Listings
-                    ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
-                    
-                    // ---------------------------------------------------------
-                    // PLOT 4: Listings Count (Supply) on Y2 Axis - Stacked Area-like
-                    // ---------------------------------------------------------
-                    if (snapshotList.Any())
-                    {
-                        var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                        var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
-                        
-                        ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                        ImPlot.SetNextLineStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.6f), 2.0f);
-                        ImPlot.PlotLine("Listings (Supply)", ref snapXs[0], ref snapYs[0], snapXs.Length);
-                        
-                        // Shade area under listings
-                        ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.2f));
-                        ImPlot.PlotShaded("##SupplyArea", ref snapXs[0], ref snapYs[0], snapXs.Length, double.NegativeInfinity);
-                    }
-
-                    // ---------------------------------------------------------
-                    // PLOT 2 (Background): Daily Volume Bars on Y2 Axis
-                    // ---------------------------------------------------------
-                    if (dailySales.Any())
-                    {
-                        var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
-                        var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
-                        
-                        // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
-                        double barWidth = 86400 * 0.8;
-
-                        ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                        
-                        // Make bars semi-transparent
-                        ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
-                        ImPlot.PlotBars("Daily Sales (Demand)", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
-                    }
-
-                    // ---------------------------------------------------------
-                    // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
-                    // ---------------------------------------------------------
-                    ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
-
-                    var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                    var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
-                    
-                    ImPlot.SetNextLineStyle(new Vector4(0f, 0.8f, 1f, 1f), 2.0f);
-                    ImPlot.PlotLine("Price", ref xs[0], ref ys[0], xs.Length);
-
-                    ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, new Vector4(0f, 0.8f, 1f, 1f));
-                    ImPlot.PlotScatter("Sales", ref xs[0], ref ys[0], xs.Length);
-
-                    var hqItems = historyList.Where(x => x.IsHQ).ToList();
-                    if (hqItems.Any())
-                    {
-                        var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                        var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
-                        
-                        ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
-                        ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
-                    }
-                    
-                    ImPlot.EndPlot();
+                    DrawHistoryChart();
+                    ImGui.EndTabItem();
                 }
 
-                // Supply/Demand Ratio Visualization
-                if (snapshotList.Any() && dailySales.Any())
+                if (ImGui.BeginTabItem("Price Distribution"))
                 {
-                    ImGui.Spacing();
-                    ImGui.Separator();
-                    ImGui.Text("Supply/Demand Analysis");
-                    
-                    // Simple gauge or ratio bar
-                    var lastSnapshot = snapshotList.Last();
-                    // Average daily sales over selected period
-                    var totalVolume = dailySales.Sum(x => x.Volume);
-                    var days = Math.Max(1, (dailySales.Max(x => x.Date) - dailySales.Min(x => x.Date)).TotalDays + 1);
-                    var avgDailyVolume = totalVolume / days;
-                    
-                    var ratio = avgDailyVolume > 0 ? lastSnapshot.ListingCount / avgDailyVolume : 999;
-                    
-                    ImGui.Text($"Current Listings: {lastSnapshot.ListingCount}");
-                    ImGui.SameLine(200);
-                    ImGui.Text($"Avg Daily Sales: {avgDailyVolume:F1}");
-                    
-                    ImGui.Text("S/D Ratio (Days to clear):");
-                    ImGui.SameLine();
-                    
-                    Vector4 ratioColor = new Vector4(0f, 1f, 0f, 1f); // Good
-                    if (ratio > 7) ratioColor = new Vector4(1f, 1f, 0f, 1f); // Slow
-                    if (ratio > 30) ratioColor = new Vector4(1f, 0.5f, 0f, 1f); // Very Slow
-                    if (ratio > 90) ratioColor = new Vector4(1f, 0f, 0f, 1f); // Dead
-                    
-                    ImGui.TextColored(ratioColor, $"{ratio:F1} days");
-                    
-                    // Progress bar for visual
-                    // 0 = instant, 30+ = full bar (bad)
-                    float progress = (float)Math.Clamp(ratio / 30.0, 0.0, 1.0);
-                    ImGui.ProgressBar(progress, new Vector2(-1, 20), "");
+                    DrawDistributionChart();
+                    ImGui.EndTabItem();
                 }
 
-                ImGui.Spacing();
-                ImGui.Separator();
+                ImGui.EndTabBar();
             }
         }
         
@@ -268,6 +147,224 @@ public class ChartWindow : Window, IDisposable
                 ImGui.Text("History Entries: 0 (null)");
             }
         }
+    }
+
+    private void DrawHistoryChart()
+    {
+        if (currentData?.RecentHistory == null) return;
+
+        var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
+        var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
+        
+        if (selectedTimeRange > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
+            history = history.Where(h => h.Timestamp >= cutoff);
+            snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
+        }
+
+        var historyList = history.ToList();
+        var snapshotList = snapshots.ToList();
+
+        if (!historyList.Any())
+        {
+            ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), $"No sales found in the last {selectedTimeRange} days.");
+            return;
+        }
+
+        // Aggregate data for Volume (Quantity) analysis
+        var dailySales = historyList
+            .GroupBy(x => x.Timestamp.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+            .ToList();
+
+        // Draw Chart using ImPlot
+        if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
+        {
+            // Setup axes
+            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+            
+            // Setup Y2 axis for Volume / Listings
+            ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
+            
+            // ---------------------------------------------------------
+            // PLOT 4: Listings Count (Supply) on Y2 Axis - Stacked Area-like
+            // ---------------------------------------------------------
+            if (snapshotList.Any())
+            {
+                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
+                
+                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
+                ImPlot.SetNextLineStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.6f), 2.0f);
+                ImPlot.PlotLine("Listings (Supply)", ref snapXs[0], ref snapYs[0], snapXs.Length);
+                
+                // Shade area under listings
+                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.2f));
+                ImPlot.PlotShaded("##SupplyArea", ref snapXs[0], ref snapYs[0], snapXs.Length, double.NegativeInfinity);
+            }
+
+            // ---------------------------------------------------------
+            // PLOT 2 (Background): Daily Volume Bars on Y2 Axis
+            // ---------------------------------------------------------
+            if (dailySales.Any())
+            {
+                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+                
+                // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
+                double barWidth = 86400 * 0.8;
+
+                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
+                
+                // Make bars semi-transparent
+                ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
+                ImPlot.PlotBars("Daily Sales (Demand)", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+            }
+
+            // ---------------------------------------------------------
+            // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
+            // ---------------------------------------------------------
+            ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
+
+            var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+            var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
+            
+            ImPlot.SetNextLineStyle(new Vector4(0f, 0.8f, 1f, 1f), 2.0f);
+            ImPlot.PlotLine("Price", ref xs[0], ref ys[0], xs.Length);
+
+            ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, new Vector4(0f, 0.8f, 1f, 1f));
+            ImPlot.PlotScatter("Sales", ref xs[0], ref ys[0], xs.Length);
+
+            var hqItems = historyList.Where(x => x.IsHQ).ToList();
+            if (hqItems.Any())
+            {
+                var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
+                
+                ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
+                ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
+            }
+            
+            ImPlot.EndPlot();
+        }
+
+        // Supply/Demand Ratio Visualization
+        if (snapshotList.Any() && dailySales.Any())
+        {
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Text("Supply/Demand Analysis");
+            
+            // Simple gauge or ratio bar
+            var lastSnapshot = snapshotList.Last();
+            // Average daily sales over selected period
+            var totalVolume = dailySales.Sum(x => x.Volume);
+            var days = Math.Max(1, (dailySales.Max(x => x.Date) - dailySales.Min(x => x.Date)).TotalDays + 1);
+            var avgDailyVolume = totalVolume / days;
+            
+            var ratio = avgDailyVolume > 0 ? lastSnapshot.ListingCount / avgDailyVolume : 999;
+            
+            ImGui.Text($"Current Listings: {lastSnapshot.ListingCount}");
+            ImGui.SameLine(200);
+            ImGui.Text($"Avg Daily Sales: {avgDailyVolume:F1}");
+            
+            ImGui.Text("S/D Ratio (Days to clear):");
+            ImGui.SameLine();
+            
+            Vector4 ratioColor = new Vector4(0f, 1f, 0f, 1f); // Good
+            if (ratio > 7) ratioColor = new Vector4(1f, 1f, 0f, 1f); // Slow
+            if (ratio > 30) ratioColor = new Vector4(1f, 0.5f, 0f, 1f); // Very Slow
+            if (ratio > 90) ratioColor = new Vector4(1f, 0f, 0f, 1f); // Dead
+            
+            ImGui.TextColored(ratioColor, $"{ratio:F1} days");
+            
+            // Progress bar for visual
+            // 0 = instant, 30+ = full bar (bad)
+            float progress = (float)Math.Clamp(ratio / 30.0, 0.0, 1.0);
+            ImGui.ProgressBar(progress, new Vector2(-1, 20), "");
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+    }
+
+    private void DrawDistributionChart()
+    {
+        if (currentData?.Listings == null || !currentData.Listings.Any())
+        {
+            ImGui.Text("No active listings available for distribution analysis.");
+            return;
+        }
+
+        var listings = currentData.Listings.OrderBy(x => x.PricePerUnit).ToList();
+        var minPrice = listings.First().PricePerUnit;
+        var maxPrice = listings.Last().PricePerUnit;
+        
+        // Determine buckets
+        // If spread is small, use exact prices. If large, bucketize.
+        // Let's create roughly 20-30 buckets max.
+        int bucketCount = 20;
+        double range = maxPrice - minPrice;
+        if (range == 0) range = 100; // Single price point
+        double bucketSize = Math.Max(1, range / bucketCount);
+
+        var buckets = new double[bucketCount + 1];
+        var counts = new double[bucketCount + 1];
+        
+        // Initialize bucket X values (start of each bucket)
+        for (int i = 0; i <= bucketCount; i++)
+        {
+            buckets[i] = minPrice + (i * bucketSize);
+        }
+
+        // Fill counts
+        foreach (var listing in listings)
+        {
+            int bucketIndex = (int)((listing.PricePerUnit - minPrice) / bucketSize);
+            if (bucketIndex < 0) bucketIndex = 0;
+            if (bucketIndex > bucketCount) bucketIndex = bucketCount;
+            counts[bucketIndex] += listing.Quantity; // Use Quantity for volume at price, or 1 for number of listings? Issue says "Histogram of listing prices" usually implies volume or count. Let's use Quantity (Depth).
+        }
+
+        if (ImPlot.BeginPlot("Price Distribution (Market Depth)", new Vector2(-1, 400), ImPlotFlags.None))
+        {
+            ImPlot.SetupAxes("Price (Gil)", "Volume (Qty)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+            
+            // Histogram
+            ImPlot.SetNextFillStyle(new Vector4(0.4f, 0.7f, 0.9f, 0.5f));
+            ImPlot.PlotBars("Volume at Price", ref buckets[0], ref counts[0], bucketCount + 1, bucketSize);
+
+            // Highlight Current Min Price (Current Market Price)
+            double currentMin = (double)currentData.MinPrice;
+            ImPlot.SetNextLineStyle(new Vector4(0f, 1f, 0f, 1f), 2.0f);
+            double[] minLineX = { currentMin, currentMin };
+            double[] minLineY = { 0, counts.Max() * 1.1 }; // Go a bit above max
+            ImPlot.PlotLine("Current Min Price", ref minLineX[0], ref minLineY[0], 2);
+
+            // Highlight Outliers (Visual)
+            // Simple logic: Highlight anything > 3x MinPrice as potential outlier
+            double outlierThreshold = currentMin * 3.0;
+            if (maxPrice > outlierThreshold)
+            {
+                 ImPlot.SetNextLineStyle(new Vector4(1f, 0f, 0f, 0.8f), 2.0f);
+                 double[] outlierX = { outlierThreshold, outlierThreshold };
+                 ImPlot.PlotLine("High Price Warning (>3x Min)", ref outlierX[0], ref minLineY[0], 2);
+            }
+            
+            // Add NQ vs HQ distribution if useful later
+            
+            ImPlot.EndPlot();
+        }
+
+        // Summary stats
+        ImGui.Separator();
+        ImGui.Text($"Min Price: {minPrice:N0}");
+        ImGui.SameLine(200);
+        ImGui.Text($"Max Price: {maxPrice:N0}");
+        ImGui.Text($"Total Listed Quantity: {listings.Sum(x => x.Quantity):N0}");
     }
 
     public void Dispose()
