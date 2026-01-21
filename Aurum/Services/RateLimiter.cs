@@ -214,27 +214,6 @@ public class RateLimiter : IDisposable
         
         CheckDailyReset();
         Interlocked.Increment(ref _dailyCount);
-
-        // Persistent logging
-        if (database != null)
-        {
-            // We fire and forget this task to avoid blocking the request thread
-            // or just rely on the database's internal locking/pooling which is fast enough
-            // For now, let's just do it synchronously inside this method as it's already async-context friendly mostly?
-            // Actually TrackRequest is called from WaitForTokenAsync which is async, but this method is void.
-            // Let's spawn a Task for DB logging to keep rate limiter snappy.
-            Task.Run(() => 
-            {
-               try 
-               {
-                   database.LogApiRequest(endpoint, now, 0, 0, true);
-               }
-               catch(Exception)
-               {
-                   // Swallow DB log errors to not crash app, maybe log to file
-               }
-            });
-        }
         
         // Lazy prune
         if (TotalRequests % 10 == 0)

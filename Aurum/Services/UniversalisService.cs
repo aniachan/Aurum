@@ -480,15 +480,26 @@ public class UniversalisService : IDisposable
     /// </summary>
     private async Task<MarketData?> FetchSingleItemInternalAsync(string worldName, uint itemId)
     {
-        try
+        var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
+        log.Info($"Fetching market data: {url}");
+        
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var statusCode = 0;
+        var success = false;
+        
+        try 
         {
-            var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
-            
-            // Note: Rate limiter wait moved to ProcessQueueAsync
-            
-            log.Info($"Fetching market data: {url}");
-            
             var response = await httpClient.GetAsync(url, disposeCts.Token);
+            statusCode = (int)response.StatusCode;
+            success = response.IsSuccessStatusCode;
+            
+            // Log to DB asynchronously
+            stopwatch.Stop();
+            var elapsedMs = stopwatch.ElapsedMilliseconds;
+            
+            // Fire and forget logging
+            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, elapsedMs, statusCode, success));
+            
             response.EnsureSuccessStatusCode();
             
             var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
@@ -517,6 +528,15 @@ public class UniversalisService : IDisposable
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            if (statusCode == 0 && ex is HttpRequestException hrex && hrex.StatusCode.HasValue)
+            {
+                statusCode = (int)hrex.StatusCode.Value;
+            }
+            
+            // Fire and forget logging for error case
+            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, stopwatch.ElapsedMilliseconds, statusCode, false));
+            
             log.Error(ex, $"Error fetching single item {itemId}");
             throw;
         }
@@ -528,14 +548,29 @@ public class UniversalisService : IDisposable
     private async Task<Dictionary<uint, MarketData>> FetchBatchItemsInternalAsync(string worldName, List<uint> itemIds)
     {
         var results = new Dictionary<uint, MarketData>();
+        
+        // Setup vars that need to be available for logging in catch
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var statusCode = 0;
+        var success = false;
+        
         try
         {
             var itemList = string.Join(",", itemIds);
             var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
             
             log.Info($"Fetching batch market data for {itemIds.Count} items");
-            
+
             var response = await httpClient.GetAsync(url, disposeCts.Token);
+            statusCode = (int)response.StatusCode;
+            success = response.IsSuccessStatusCode;
+            
+            stopwatch.Stop();
+            var elapsedMs = stopwatch.ElapsedMilliseconds;
+            
+            // Fire and forget logging
+            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, elapsedMs, statusCode, success));
+            
             response.EnsureSuccessStatusCode();
             
             var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
@@ -544,18 +579,19 @@ public class UniversalisService : IDisposable
                 PropertyNameCaseInsensitive = true
             });
             
-            if (apiResponse?.Items == null) return results;
-            
-            foreach (var kvp in apiResponse.Items)
+            if (apiResponse?.Items != null)
             {
-                var itemId = uint.Parse(kvp.Key);
-                var marketData = ConvertToMarketData(kvp.Value, worldName, itemId);
-                results[itemId] = marketData;
+                foreach (var kvp in apiResponse.Items)
+                {
+                    var itemId = uint.Parse(kvp.Key);
+                    var marketData = ConvertToMarketData(kvp.Value, worldName, itemId);
+                    results[itemId] = marketData;
+                    
+                    var cacheKey = $"market_{worldName}_{kvp.Key}";
+                    cache.Set(cacheKey, marketData);
+                }
                 
-                var cacheKey = $"market_{worldName}_{kvp.Key}";
-                cache.Set(cacheKey, marketData);
-                
-                if (currentWorldId != 0)
+                if (currentWorldId != 0 && results.Count > 0)
                 {
                     // Use bulk upsert for better performance
                     database.UpsertMarketDataBulk(results.Values, currentWorldId);
@@ -566,10 +602,21 @@ public class UniversalisService : IDisposable
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            if (statusCode == 0 && ex is HttpRequestException hrex && hrex.StatusCode.HasValue)
+            {
+                statusCode = (int)hrex.StatusCode.Value;
+            }
+            
+            // Fire and forget logging for error case
+            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, stopwatch.ElapsedMilliseconds, statusCode, false));
+
             log.Error(ex, "Error fetching batch items");
             throw;
         }
     }
+            
+
 }
 
 #region API Response Models
