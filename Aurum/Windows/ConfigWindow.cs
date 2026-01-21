@@ -156,6 +156,18 @@ public class ConfigWindow : Window, IDisposable
                 ? $"Cache will expire after {ts.Hours} hours and {ts.Minutes} minutes" 
                 : $"Cache will expire after {ts.Minutes} minutes");
         }
+
+        if (ImGui.Button("Clear Market Data Cache"))
+        {
+            Aurum.Plugin.Instance?.CacheService?.Clear();
+        }
+        
+        var cacheStats = Aurum.Plugin.Instance?.CacheService?.GetStats();
+        if (cacheStats != null)
+        {
+             ImGui.SameLine();
+             ImGui.TextDisabled($"({cacheStats.ActiveEntries} entries)");
+        }
         
         var maxConcurrent = configuration.MaxConcurrentApiRequests;
         if (ImGui.SliderInt("Max Concurrent API Requests", ref maxConcurrent, 1, 20))
