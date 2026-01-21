@@ -119,6 +119,7 @@ public class MarketData
     public int RecommendationScore { get; set; }         // 0-100 (weighted with demand)
     public int RecommendedQuantity { get; set; }         // Safe amount to craft
     public int MaxSafeQuantity { get; set; }             // Upper limit before oversupply
+    public string Recommendation { get; set; } = string.Empty; // Text recommendation
     
     // Competition analysis
     public Dictionary<uint, int> PriceDistribution { get; set; } = new();  // price -> count

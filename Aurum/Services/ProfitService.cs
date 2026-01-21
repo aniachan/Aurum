@@ -447,6 +447,7 @@ public class ProfitService
         calculation.Warnings = marketData.Warnings;
         calculation.RecommendedQuantity = marketData.RecommendedQuantity;
         calculation.MaxSafeQuantity = marketData.MaxSafeQuantity;
+        calculation.Recommendation = marketData.Recommendation;
         calculation.EstimatedSellTimeDays = marketData.EstimatedSellTimeDays;
         
         return calculation;

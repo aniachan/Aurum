@@ -62,6 +62,9 @@ public class MarketAnalysisService
         
         // Calculate quantity recommendations
         CalculateQuantityRecommendations(marketData);
+
+        // Generate final recommendation
+        GenerateRecommendation(marketData);
     }
     
     /// <summary>
@@ -456,6 +459,29 @@ public class MarketAnalysisService
         {
             marketData.RecommendedQuantity = 1;
             marketData.MaxSafeQuantity = 1;
+        }
+    }
+
+    /// <summary>
+    /// Generate a text recommendation
+    /// </summary>
+    private void GenerateRecommendation(MarketData marketData)
+    {
+        if (marketData.RiskLevel == RiskLevel.VeryHigh)
+        {
+            marketData.Recommendation = "Do Not Craft";
+        }
+        else if (marketData.RecommendationScore >= 75)
+        {
+            marketData.Recommendation = "Craft";
+        }
+        else if (marketData.RecommendationScore >= 50)
+        {
+            marketData.Recommendation = "Craft with Caution";
+        }
+        else
+        {
+             marketData.Recommendation = "Avoid";
         }
     }
 }

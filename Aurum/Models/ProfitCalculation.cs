@@ -102,6 +102,7 @@ public class ProfitCalculation
     // Recommendations
     public int RecommendedQuantity { get; set; }
     public int MaxSafeQuantity { get; set; }
+    public string Recommendation { get; set; } = string.Empty; // Text recommendation
     public float EstimatedSellTimeDays { get; set; }
     
     // Metadata
