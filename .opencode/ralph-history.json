@@ -2,38 +2,16 @@
   "iterations": [
     {
       "iteration": 1,
-      "startedAt": "2026-01-20T21:53:27.664Z",
-      "endedAt": "2026-01-20T21:55:54.244Z",
-      "durationMs": 145807,
+      "startedAt": "2026-01-21T08:19:34.100Z",
+      "endedAt": "2026-01-21T08:22:18.362Z",
+      "durationMs": 163367,
       "toolsUsed": {
-        "Bash": 8,
-        "Read": 7,
+        "Bash": 7,
+        "Read": 3,
         "Todo": 4,
-        "Glob": 2,
-        "Edit": 7
+        "Edit": 4
       },
       "filesModified": [
-        "TASKS.md",
-        "Aurum/Services/RateLimiter.cs",
-        "Aurum/Services/UniversalisService.cs"
-      ],
-      "exitCode": 0,
-      "completionDetected": false,
-      "errors": []
-    },
-    {
-      "iteration": 2,
-      "startedAt": "2026-01-20T21:55:56.121Z",
-      "endedAt": "2026-01-20T21:59:33.228Z",
-      "durationMs": 216340,
-      "toolsUsed": {
-        "Bash": 16,
-        "Read": 8,
-        "Todo": 5,
-        "Edit": 7
-      },
-      "filesModified": [
-        "Aurum/Services/RateLimiter.cs",
         "Aurum/Services/RequestQueue.cs",
         "Aurum/Services/UniversalisService.cs",
         "TASKS.md"
@@ -43,7 +21,7 @@
       "errors": []
     }
   ],
-  "totalDurationMs": 362147,
+  "totalDurationMs": 163367,
   "struggleIndicators": {
     "repeatedErrors": {},
     "noProgressIterations": 0,
