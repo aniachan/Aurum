@@ -82,45 +82,50 @@ public class ChartWindow : Window, IDisposable
             }
             else
             {
-                // Temporary placeholder until ImPlot is available TODO: Remove table. We have Implot now
-                ImGui.Text($"Price History Data ({historyList.Count} sales):");
-                
-                if (ImGui.BeginTable("HistoryTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
-                {
-                    ImGui.TableSetupScrollFreeze(0, 1);
-                    ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.WidthFixed, 150f);
-                    ImGui.TableSetupColumn("Price", ImGuiTableColumnFlags.WidthFixed, 100f);
-                    ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 50f);
-                    ImGui.TableHeadersRow();
+                // Aggregate data for Volume (Quantity) analysis
+                // We do this first so we can use it in the main plot if we want, or just keep it organized.
+                var dailySales = historyList
+                    .GroupBy(x => x.Timestamp.Date)
+                    .OrderBy(g => g.Key)
+                    .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+                    .ToList();
 
-                    // Show up to 100 entries to avoid lag if list is huge
-                    foreach (var entry in historyList.Take(100))
-                    {
-                        ImGui.TableNextRow();
-                        ImGui.TableNextColumn();
-                        ImGui.Text(entry.Timestamp.ToLocalTime().ToString("g"));
-                        ImGui.TableNextColumn();
-                        ImGui.Text(entry.PricePerUnit.ToString("N0"));
-                        ImGui.TableNextColumn();
-                        ImGui.Text(entry.Quantity.ToString());
-                    }
-                    ImGui.EndTable();
-                }
-                
-                if (historyList.Count > 100)
-                {
-                    ImGui.TextDisabled($"... and {historyList.Count - 100} more entries.");
-                }
-                
-                ImGui.Spacing();
-                
                 // Draw Chart using ImPlot
-                if (ImPlot.BeginPlot("Price History", new Vector2(-1, 300), ImPlotFlags.None))
+                // We use a bit more height since we are combining views
+                if (ImPlot.BeginPlot("Price History & Volume", new Vector2(-1, 400), ImPlotFlags.None))
                 {
                     // Setup axes
                     ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
                     ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
                     
+                    // Setup Y2 axis for Volume
+                    ImPlot.SetupAxis(ImAxis.Y2, "Daily Volume", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
+                    
+                    // ---------------------------------------------------------
+                    // PLOT 2 (Background): Daily Volume Bars on Y2 Axis
+                    // ---------------------------------------------------------
+                    if (dailySales.Any())
+                    {
+                        var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                        var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+                        
+                        // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
+                        double barWidth = 86400 * 0.8;
+
+                        // Switch to Y2 axis
+                        ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
+                        
+                        // Make bars semi-transparent so they don't obscure price lines too much
+                        ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
+                        ImPlot.PlotBars("Daily Volume", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+                    }
+
+                    // ---------------------------------------------------------
+                    // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
+                    // ---------------------------------------------------------
+                    // Switch back to Y1 axis (default, but good to be explicit after using Y2)
+                    ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
+
                     // Convert data to arrays for ImPlot
                     var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
                     var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
@@ -143,103 +148,12 @@ public class ChartWindow : Window, IDisposable
                         ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
                         ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
                     }
-
-                    // Tooltip logic is handled by ImPlot automatically for basic values
                     
                     ImPlot.EndPlot();
                 }
 
                 ImGui.Spacing();
                 ImGui.Separator();
-                
-                // Sale Velocity Chart
-                ImGui.Text("Sale Velocity (Daily Volume)");
-                
-                if (ImPlot.BeginPlot("Daily Sales Volume", new Vector2(-1, 200), ImPlotFlags.None))
-                {
-                    ImPlot.SetupAxes("Date", "Quantity Sold", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
-                    ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
-                    
-                    // Aggregate data by day
-                    var dailySales = historyList
-                        .GroupBy(x => x.Timestamp.Date)
-                        .OrderBy(g => g.Key)
-                        .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
-                        .ToList();
-
-                    if (dailySales.Any())
-                    {
-                        var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
-                        var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
-                        var count = dailySales.Count;
-                        var maYs = new double[count];
-
-                        // Calculate Moving Average (3-day) first
-                        for (int i = 0; i < count; i++)
-                        {
-                            int w = 0;
-                            double sum = 0;
-                            // Look back up to 2 days (window size 3)
-                            for (int j = Math.Max(0, i - 2); j <= i; j++) 
-                            { 
-                                sum += dailySales[j].Volume; 
-                                w++; 
-                            }
-                            maYs[i] = sum / w;
-                        }
-
-                        // Separate data into normal and spikes (Volume > 1.5x MA)
-                        var normalXs = new List<double>();
-                        var normalYs = new List<double>();
-                        var spikeXs = new List<double>();
-                        var spikeYs = new List<double>();
-
-                        for (int i = 0; i < count; i++)
-                        {
-                            // Simple spike detection: Volume > 1.5x Moving Average and significant volume (> 5 items)
-                            bool isSpike = (barYs[i] > maYs[i] * 1.5) && (barYs[i] > 5);
-                            
-                            if (isSpike)
-                            {
-                                spikeXs.Add(barXs[i]);
-                                spikeYs.Add(barYs[i]);
-                            }
-                            else
-                            {
-                                normalXs.Add(barXs[i]);
-                                normalYs.Add(barYs[i]);
-                            }
-                        }
-
-                        // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
-                        double barWidth = 86400 * 0.8; 
-
-                        if (normalXs.Any())
-                        {
-                            var nXs = normalXs.ToArray();
-                            var nYs = normalYs.ToArray();
-                            ImPlot.SetNextFillStyle(new Vector4(0.4f, 0.7f, 1.0f, 0.5f)); // Blue-ish
-                            ImPlot.PlotBars("Daily Volume", ref nXs[0], ref nYs[0], nXs.Length, barWidth);
-                        }
-
-                        if (spikeXs.Any())
-                        {
-                            var sXs = spikeXs.ToArray();
-                            var sYs = spikeYs.ToArray();
-                            ImPlot.SetNextFillStyle(new Vector4(1.0f, 0.3f, 0.3f, 0.7f)); // Red-ish
-                            ImPlot.PlotBars("High Activity", ref sXs[0], ref sYs[0], sXs.Length, barWidth);
-                        }
-
-                        // Plot MA line
-                        if (count >= 3)
-                        {
-                            ImPlot.SetNextLineStyle(new Vector4(1f, 0.6f, 0f, 1f), 2.0f);
-                            ImPlot.PlotLine("3-Day Avg", ref barXs[0], ref maYs[0], count);
-                        }
-                    }
-
-                    ImPlot.EndPlot();
-                }
             }
         }
         

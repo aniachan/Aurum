@@ -1,7 +1,7 @@
 # Aurum - FFXIV Crafting Profit Calculator
 
 <p align="center">
-  <img src="Data/goat.png" alt="Aurum" width="128"/>
+  <img src="Data/logo.png" alt="Aurum" width="128"/>
 </p>
 
 <p align="center">
