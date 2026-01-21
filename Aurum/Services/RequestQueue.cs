@@ -104,10 +104,53 @@ public class RequestQueue
 
             // Dedup partial: Check if single item requests already cover this batch
             // For now, complex partial dedup is hard (e.g. batch 1,2,3 requested, but 1,2 is pending).
-            // We only do exact match or exact subset match if trivial? 
-            // Actually, we can check if any *subset* is pending, but waiting for a subset doesn't satisfy the superset.
-            // But if we request {1}, and {1,2} is pending... we could hook into {1,2}?
-            // Too complex for now. Exact match is good 80/20 rule.
+            // But if we find a pending request that contains ANY of our items, we might want to wait?
+            // Actually, simplest improvement: If we are requesting {1, 2}, and {1} is pending, we should probably
+            // just enqueue {2} separately or wait for {1} then fetch {2}.
+            // However, that splits batches.
+            // Better approach: Since Universalis allows duplicate IDs in request (it just returns them once),
+            // we don't strictly *need* to dedup inside a batch, but we should avoid sending a request if it's already fully covered.
+            
+            // Check if there is already a pending request that covers this exact set of items or a superset?
+            // Since we key by "sorted joined IDs", we only catch exact matches.
+            // Let's iterate pending requests to find coverage?
+            // No, that's O(N) where N is queue size. Queue is small (<100), so maybe ok.
+            
+            foreach (var pending in _queue)
+            {
+                 if (pending.WorldName != worldName) continue;
+                 
+                 // If the pending request contains ALL of our items, we can piggyback!
+                 // (pending is superset of new request)
+                 if (!itemIds.Except(pending.ItemIds).Any())
+                 {
+                     // Upgrade priority if needed
+                     if (priority > pending.Priority)
+                     {
+                         // Remove, upgrade, re-add logic (same as above but for 'pending')
+                         _queue.Remove(pending);
+                         var upgraded = new QueuedRequest(worldName, pending.ItemIds, priority)
+                         {
+                             CompletionSource = pending.CompletionSource,
+                             Timestamp = pending.Timestamp
+                         };
+                         // Update map for the OLD key
+                         var oldKey = $"{worldName}:{string.Join(",", pending.ItemIds)}";
+                         _pendingRequests[oldKey] = upgraded;
+                         _queue.Add(upgraded);
+                         
+                         _queue.Sort((a, b) =>
+                         {
+                             int p = b.Priority.CompareTo(a.Priority);
+                             if (p != 0) return p;
+                             return a.Timestamp.CompareTo(b.Timestamp);
+                         });
+                         
+                         return upgraded.CompletionSource.Task;
+                     }
+                     return pending.CompletionSource.Task;
+                 }
+            }
 
             var request = new QueuedRequest(worldName, sortedIds, priority);
             _pendingRequests[key] = request;
