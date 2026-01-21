@@ -15,12 +15,12 @@ public class ItemPriorityService
     private readonly IPluginLog log;
     private readonly Configuration configuration;
     
-    // Weight constants - could be moved to config later
-    private const float WEIGHT_RECIPE_LEVEL = 0.3f;
-    private const float WEIGHT_MARKET_VELOCITY = 0.3f;
-    private const float WEIGHT_PROFIT_POTENTIAL = 0.2f;
-    private const float WEIGHT_CATEGORY = 0.1f;
-    private const float WEIGHT_USER_PREFERENCE = 0.1f;
+    // Weight constants - now using config
+    // private const float WEIGHT_RECIPE_LEVEL = 0.3f;
+    // private const float WEIGHT_MARKET_VELOCITY = 0.3f;
+    // private const float WEIGHT_PROFIT_POTENTIAL = 0.2f;
+    // private const float WEIGHT_CATEGORY = 0.1f;
+    // private const float WEIGHT_USER_PREFERENCE = 0.1f;
 
     // Level thresholds (Endwalker)
     private const int CURRENT_MAX_LEVEL = 90;
@@ -40,15 +40,15 @@ public class ItemPriorityService
         float score = 0;
 
         // 1. Static Heuristics (based on recipe data only)
-        score += ScoreRecipeLevel(recipe) * WEIGHT_RECIPE_LEVEL;
-        score += ScoreCategory(recipe) * WEIGHT_CATEGORY;
-        score += ScoreUserPreference(recipe) * WEIGHT_USER_PREFERENCE;
+        score += ScoreRecipeLevel(recipe) * configuration.WeightRecipeLevel;
+        score += ScoreCategory(recipe) * configuration.WeightCategory;
+        score += ScoreUserPreference(recipe) * configuration.WeightUserPreference;
 
         // 2. Dynamic Heuristics (based on market data if available)
         if (lastKnownMarketData != null)
         {
-            score += ScoreMarketVelocity(lastKnownMarketData) * WEIGHT_MARKET_VELOCITY;
-            score += ScoreProfitPotential(lastKnownMarketData) * WEIGHT_PROFIT_POTENTIAL;
+            score += ScoreMarketVelocity(lastKnownMarketData) * configuration.WeightMarketVelocity;
+            score += ScoreProfitPotential(lastKnownMarketData) * configuration.WeightProfitPotential;
         }
         else
         {

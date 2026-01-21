@@ -374,5 +374,59 @@ public class ConfigWindow : Window, IDisposable
                 ImGui.SetTooltip("Tokens replenish over time.\nRequests consume 1 token.\nEmpty bucket = Rate Limiting active.");
             }
         }
+        
+        ImGui.Separator();
+        ImGui.Text("Priority Weights");
+        ImGui.TextWrapped("Adjust how the recommendation engine prioritizes items. Total doesn't need to equal 100%.");
+
+        var wRecipeLevel = configuration.WeightRecipeLevel;
+        if (ImGui.SliderFloat("Recipe Level Weight", ref wRecipeLevel, 0f, 1f, "%.2f"))
+        {
+            configuration.WeightRecipeLevel = wRecipeLevel;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Higher level recipes get priority");
+
+        var wMarketVelocity = configuration.WeightMarketVelocity;
+        if (ImGui.SliderFloat("Market Velocity Weight", ref wMarketVelocity, 0f, 1f, "%.2f"))
+        {
+            configuration.WeightMarketVelocity = wMarketVelocity;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Items that sell often get priority");
+
+        var wProfit = configuration.WeightProfitPotential;
+        if (ImGui.SliderFloat("Profit Potential Weight", ref wProfit, 0f, 1f, "%.2f"))
+        {
+            configuration.WeightProfitPotential = wProfit;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Expensive items get priority");
+
+        var wCategory = configuration.WeightCategory;
+        if (ImGui.SliderFloat("Category Weight", ref wCategory, 0f, 1f, "%.2f"))
+        {
+            configuration.WeightCategory = wCategory;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Expert recipes get priority");
+
+        var wUserPref = configuration.WeightUserPreference;
+        if (ImGui.SliderFloat("User Preference Weight", ref wUserPref, 0f, 1f, "%.2f"))
+        {
+            configuration.WeightUserPreference = wUserPref;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Recently searched items get priority");
+        
+        if (ImGui.Button("Reset Weights to Defaults"))
+        {
+            configuration.WeightRecipeLevel = 0.3f;
+            configuration.WeightMarketVelocity = 0.3f;
+            configuration.WeightProfitPotential = 0.2f;
+            configuration.WeightCategory = 0.1f;
+            configuration.WeightUserPreference = 0.1f;
+            configuration.Save();
+        }
     }
 }

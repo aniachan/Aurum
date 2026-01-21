@@ -74,6 +74,13 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public int DatabaseVacuumFrequencyDays { get; set; } = 7; // Default weekly
     public DateTime LastDatabaseVacuum { get; set; } = DateTime.MinValue;
     
+    // Priority Calculation Weights
+    public float WeightRecipeLevel { get; set; } = 0.3f;
+    public float WeightMarketVelocity { get; set; } = 0.3f;
+    public float WeightProfitPotential { get; set; } = 0.2f;
+    public float WeightCategory { get; set; } = 0.1f;
+    public float WeightUserPreference { get; set; } = 0.1f;
+
     // The below exists just to make saving less cumbersome
     public void Save()
     {
