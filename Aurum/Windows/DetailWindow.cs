@@ -220,13 +220,28 @@ public class DetailWindow : Window, IDisposable
                 ImGui.PopFont();
                 
                 ImGui.SameLine();
-                ImGui.TextWrapped(w.Message);
                 
+                // If there are details, make the message part of a tree node, or add a small expander
                 if (!string.IsNullOrEmpty(w.Details))
                 {
-                    ImGui.Indent();
-                    ImGui.TextDisabled(w.Details);
-                    ImGui.Unindent();
+                    // Use the message as the header for the tree node
+                    // We need to style it to match the warning color
+                    ImGui.PushStyleColor(ImGuiCol.Text, warningColor);
+                    bool expanded = ImGui.TreeNodeEx($"##Details_{w.Type}_{w.GetHashCode()}", 
+                        ImGuiTreeNodeFlags.NoTreePushOnOpen | ImGuiTreeNodeFlags.FramePadding | ImGuiTreeNodeFlags.AllowItemOverlap, 
+                        w.Message);
+                    ImGui.PopStyleColor();
+
+                    if (expanded)
+                    {
+                        ImGui.Indent();
+                        ImGui.TextDisabled(w.Details);
+                        ImGui.Unindent();
+                    }
+                }
+                else
+                {
+                    ImGui.TextWrapped(w.Message);
                 }
             }
         }
