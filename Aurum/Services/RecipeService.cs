@@ -420,7 +420,7 @@ public class RecipeService
     /// <summary>
     /// Get recipe by ID
     /// </summary>
-    public RecipeData? GetRecipe(uint recipeId)
+    public virtual RecipeData? GetRecipe(uint recipeId)
     {
         if (!isInitialized)
             Initialize();

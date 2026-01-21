@@ -104,7 +104,7 @@ public class UniversalisService : IDisposable
     /// <summary>
     /// Fetch market data for a single item (synchronous-like wrapper for compatibility)
     /// </summary>
-    public MarketData? GetMarketData(uint itemId)
+    public virtual MarketData? GetMarketData(uint itemId)
     {
         // TODO: This blocks thread which is bad, but needed for non-async callers for now.
         // Ideally we should propagate async everywhere.

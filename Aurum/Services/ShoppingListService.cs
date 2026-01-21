@@ -38,9 +38,60 @@ public class ShoppingListService
     {
         if (isInitialized) return;
         
-        // TODO: In a real implementation, we would load vendor data from sheets
-        // For now we'll start empty and rely on future enhancements
+        try 
+        {
+            // TODO: Load vendor data from GilShop/GilShopItem sheets.
+            // Currently, the schema for connecting Items to Prices via GilShop is complex and requires
+            // further investigation into the sheet structure (GilShop vs GilShopItem).
+            // For the MVP, we are using a fallback list of common vendor items.
+            
+            /* 
+            var gilShopSheet = dataManager.GetExcelSheet<GilShop>();
+            if (gilShopSheet != null)
+            {
+                foreach (var shop in gilShopSheet)
+                {
+                    // Implementation for parsing GilShop to populate vendorItemPrices
+                    // will go here in a future update.
+                }
+            }
+            */
+            
+            // Fallback: Load common crafting materials sold by vendors
+            LoadCommonVendorItems();
+        }
+        catch (Exception ex)
+        {
+            log.Error(ex, "Failed to load vendor data");
+        }
+
         isInitialized = true;
+    }
+
+    private void LoadCommonVendorItems()
+    {
+        // Common crafting materials sold by vendors
+        // This is a manual stopgap until we get the sheet loading perfect
+        // Distilled Water
+        vendorItemPrices[930] = 4;
+        // Rock Salt
+        vendorItemPrices[931] = 3;
+        // Iron Ore
+        vendorItemPrices[5111] = 18;
+        // Copper Ore
+        vendorItemPrices[5106] = 2;
+        // Maple Log
+        vendorItemPrices[5361] = 9;
+        // Ash Log
+        vendorItemPrices[5364] = 18;
+        // Cotton Boll
+        vendorItemPrices[5344] = 10;
+        // Hemp
+        vendorItemPrices[5491] = 10;
+        // Cinnamon
+        vendorItemPrices[4819] = 4;
+        // Garlean Garlic
+        vendorItemPrices[4820] = 5;
     }
 
     /// <summary>
@@ -80,23 +131,32 @@ public class ShoppingListService
                 SourceType = MaterialSourceType.MarketBoard // Default to MB
             };
 
-            // Check if vendor purchasable (mock logic for now as we don't have full vendor sheets loaded yet)
-            // In future: Check GilShopItem sheet
-            if (vendorItemPrices.TryGetValue(itemId, out var vendorPrice))
+            // Check if vendor purchasable
+            bool hasVendorPrice = vendorItemPrices.TryGetValue(itemId, out var vendorPrice);
+            
+            // Always get MB price for comparison
+            var marketData = universalisService.GetMarketData(itemId);
+            int mbPrice = (marketData != null && marketData.MinPrice > 0) ? (int)marketData.MinPrice : int.MaxValue;
+            
+            if (hasVendorPrice)
             {
-                item.SourceType = MaterialSourceType.Vendor;
-                item.AveragePricePerUnit = (int)vendorPrice;
+                // If we have both, choose the cheaper one
+                if (mbPrice < vendorPrice)
+                {
+                    item.SourceType = MaterialSourceType.MarketBoard;
+                    item.AveragePricePerUnit = mbPrice;
+                }
+                else
+                {
+                    item.SourceType = MaterialSourceType.Vendor;
+                    item.AveragePricePerUnit = (int)vendorPrice;
+                }
             }
             else
             {
-                // Get MB price estimate
-                // We'll use a rough estimate if we don't have fresh data
-                // In a real flow, we might want to trigger a price update here
-                var marketData = universalisService.GetMarketData(itemId);
-                if (marketData != null && marketData.MinPrice > 0)
-                {
-                    item.AveragePricePerUnit = (int)marketData.MinPrice;
-                }
+                // Only MB available
+                item.SourceType = MaterialSourceType.MarketBoard;
+                item.AveragePricePerUnit = (mbPrice == int.MaxValue) ? 0 : mbPrice;
             }
 
             shoppingList.Items.Add(item);
