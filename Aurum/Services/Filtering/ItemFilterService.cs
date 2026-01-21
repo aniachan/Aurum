@@ -94,6 +94,9 @@ public class ItemFilterService
             
             // Recipe Level (RLvl) - e.g. Starred recipes have higher RLvl than Job Level
             if (item.Recipe.RecipeLevel < criteria.MinRecipeLevel || item.Recipe.RecipeLevel > criteria.MaxRecipeLevel) return false;
+
+            // Item Level (ILvl)
+            if (item.Recipe.ItemLevel < criteria.MinItemLevel || item.Recipe.ItemLevel > criteria.MaxItemLevel) return false;
         }
 
         return true;

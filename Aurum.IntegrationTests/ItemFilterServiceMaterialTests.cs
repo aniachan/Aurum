@@ -28,8 +28,8 @@ public class ItemFilterServiceMaterialTests
         _criteria.IncludeMaterials = false;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Material, ItemName = "Ingot" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Sword" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Material, ItemName = "Ingot", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Sword", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act
@@ -47,8 +47,8 @@ public class ItemFilterServiceMaterialTests
         _criteria.IncludeMaterials = true;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Material, ItemName = "Ingot" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Sword" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Material, ItemName = "Ingot", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Sword", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act

@@ -28,6 +28,8 @@ public class DashboardWindow : Window, IDisposable
     private string selectedClass = "All";
     private int minLevel = 1;
     private int maxLevel = 100;
+    private int minItemLevel = 1;
+    private int maxItemLevel = 999;
     private int minProfit = 0;
     private SortMode currentSort = SortMode.RecommendationScore;
     private bool showOnlyProfitable = true;
@@ -334,6 +336,7 @@ public class DashboardWindow : Window, IDisposable
         float classWidth = 100f;
         float levelLabelWidth = ImGui.CalcTextSize("Level:").X;
         float levelInputWidth = 60f;
+        float itemLevelLabelWidth = ImGui.CalcTextSize("ILvl:").X;
         float dashWidth = ImGui.CalcTextSize("-").X;
         float minProfitLabelWidth = ImGui.CalcTextSize("Min Profit:").X;
         float minProfitWidth = 80f;
@@ -342,7 +345,8 @@ public class DashboardWindow : Window, IDisposable
         
         // Calculate remaining width for search box
         float totalRightSideWidth = classWidth + levelLabelWidth + levelInputWidth + dashWidth + levelInputWidth + 
-                                    minProfitLabelWidth + minProfitWidth + checkboxWidth + (spacing * 9);
+                                    itemLevelLabelWidth + levelInputWidth + dashWidth + levelInputWidth +
+                                    minProfitLabelWidth + minProfitWidth + checkboxWidth + (spacing * 13);
         float searchWidth = Math.Max(150f, ImGui.GetContentRegionAvail().X - totalRightSideWidth);
         
         // Search box with dynamic width
@@ -393,6 +397,27 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.InputInt("##maxlevel", ref maxLevel))
         {
             maxLevel = Math.Clamp(maxLevel, 1, 100);
+            ApplyFilters();
+        }
+        
+        ImGui.SameLine();
+        
+        // Item Level range
+        ImGui.Text("ILvl:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(60);
+        if (ImGui.InputInt("##minitemlevel", ref minItemLevel))
+        {
+            minItemLevel = Math.Max(1, minItemLevel);
+            ApplyFilters();
+        }
+        ImGui.SameLine();
+        ImGui.Text("-");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(60);
+        if (ImGui.InputInt("##maxitemlevel", ref maxItemLevel))
+        {
+            maxItemLevel = Math.Max(1, maxItemLevel);
             ApplyFilters();
         }
         
@@ -572,6 +597,7 @@ public class DashboardWindow : Window, IDisposable
             {
                 ImGui.BeginTooltip();
                 ImGui.Text($"Recipe Level: {profit.Recipe.RecipeLevel}");
+                ImGui.Text($"Item Level: {profit.Recipe.ItemLevel}");
                 ImGui.Text($"Crafting Level: {profit.Recipe.ClassJobLevel}");
                 
                 // Risk Analysis Breakdown
@@ -905,6 +931,10 @@ public class DashboardWindow : Window, IDisposable
             if (p.Recipe.ClassJobLevel < minLevel || p.Recipe.ClassJobLevel > maxLevel)
                 return false;
             
+            // Item Level filter
+            if (p.Recipe.ItemLevel < minItemLevel || p.Recipe.ItemLevel > maxItemLevel)
+                return false;
+
             // Profitable only
             if (showOnlyProfitable && p.RawProfit <= 0)
                 return false;

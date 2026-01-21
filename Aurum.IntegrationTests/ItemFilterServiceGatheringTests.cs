@@ -27,7 +27,7 @@ public class ItemFilterServiceGatheringTests
         _criteria.IncludeCraftingGatheringGear = true;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Gathering, ItemName = "Gathering Item" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Gathering, ItemName = "Gathering Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act
@@ -45,8 +45,8 @@ public class ItemFilterServiceGatheringTests
         _criteria.IncludeCraftingGatheringGear = false;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Gathering, ItemName = "Gathering Item" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Gathering, ItemName = "Gathering Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act

@@ -29,9 +29,9 @@ public class ItemFilterServiceCategoryTests
         _criteria.IncludeCombatGear = false;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Combat Item", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Combat Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act
@@ -49,9 +49,9 @@ public class ItemFilterServiceCategoryTests
         _criteria.IncludeCraftingGatheringGear = false;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Combat Item", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ItemName = "Combat Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Crafting Item", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act
@@ -70,8 +70,8 @@ public class ItemFilterServiceCategoryTests
         _criteria.IncludeCraftingGatheringGear = true;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ClassJobLevel = 90, RecipeLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Combat, ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act

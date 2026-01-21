@@ -29,9 +29,9 @@ public class ItemFilterServiceFurnitureTests
         _criteria.IncludeFurniture = false;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Furniture, ItemName = "Table" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Hammer" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Furniture, ItemName = "Table", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Hammer", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act
@@ -49,8 +49,8 @@ public class ItemFilterServiceFurnitureTests
         _criteria.IncludeFurniture = true;
         var items = new List<ProfitCalculation>
         {
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Furniture, ItemName = "Table" }, RawProfit = 1000, IsDataComplete = true },
-            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Hammer" }, RawProfit = 1000, IsDataComplete = true }
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Furniture, ItemName = "Table", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Crafting, ItemName = "Hammer", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
         };
 
         // Act

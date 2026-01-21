@@ -23,8 +23,9 @@ public class ItemFilterServiceFavoriteTests
         return new ProfitCalculation
         {
             IsDataComplete = true,
-            Recipe = new RecipeData { ResultItemId = itemId, ItemName = $"Item {itemId}" },
-            MarketData = new MarketData()
+            Recipe = new RecipeData { ResultItemId = itemId, ItemName = $"Item {itemId}", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 },
+            MarketData = new MarketData(),
+            RawProfit = 1000 // Ensure it passes profit filter default
         };
     }
 

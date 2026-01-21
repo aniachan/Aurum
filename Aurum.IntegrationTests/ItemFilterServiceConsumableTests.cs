@@ -29,7 +29,10 @@ public class ItemFilterServiceConsumableTests
             RiskLevel = RiskLevel.Low,
             Recipe = new RecipeData
             {
-                MainCategory = category
+                MainCategory = category,
+                ClassJobLevel = 90,
+                RecipeLevel = 580,
+                ItemLevel = 580
             },
             MarketData = new MarketData
             {

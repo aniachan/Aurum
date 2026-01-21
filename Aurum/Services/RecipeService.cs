@@ -258,6 +258,7 @@ public class RecipeService
             CraftingClassName = JobNames.GetValueOrDefault(jobId, "Unknown"),
             RecipeLevel = (int)recipe.RecipeLevelTable.RowId,
             ClassJobLevel = (int)recipe.RecipeLevelTable.Value.ClassJobLevel,
+            ItemLevel = (int)recipe.ItemResult.Value.LevelItem.RowId,
             Difficulty = (int)recipe.RecipeLevelTable.Value.Difficulty,
             Quality = (int)recipe.RecipeLevelTable.Value.Quality,
             Durability = (int)recipe.RecipeLevelTable.Value.Durability,

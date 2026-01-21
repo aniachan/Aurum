@@ -45,6 +45,8 @@ public class FilterCriteria
     public int MaxJobLevel { get; set; } = int.MaxValue;
     public int MinRecipeLevel { get; set; } = 1;
     public int MaxRecipeLevel { get; set; } = int.MaxValue;
+    public int MinItemLevel { get; set; } = 1;
+    public int MaxItemLevel { get; set; } = int.MaxValue;
 }
 
 public enum SortStrategy

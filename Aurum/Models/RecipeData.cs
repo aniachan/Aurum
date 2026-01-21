@@ -33,6 +33,7 @@ public class RecipeData
     public string CraftingClassName { get; set; } = string.Empty;  // "CRP", "BSM", etc.
     public int RecipeLevel { get; set; }
     public int ClassJobLevel { get; set; }
+    public int ItemLevel { get; set; }
     public int Difficulty { get; set; }
     public int Quality { get; set; }
     public int Durability { get; set; }

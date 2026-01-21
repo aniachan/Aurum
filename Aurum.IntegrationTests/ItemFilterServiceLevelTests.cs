@@ -18,7 +18,7 @@ public class ItemFilterServiceLevelTests
         _service = new ItemFilterService(_config);
     }
 
-    private ProfitCalculation CreateMockItemWithRecipe(int classJobLevel, int recipeLevel)
+    private ProfitCalculation CreateMockItemWithRecipe(int classJobLevel, int recipeLevel, int itemLevel = 1)
     {
         return new ProfitCalculation
         {
@@ -29,6 +29,7 @@ public class ItemFilterServiceLevelTests
             {
                 ClassJobLevel = classJobLevel,
                 RecipeLevel = recipeLevel,
+                ItemLevel = itemLevel,
                 MainCategory = ItemMainCategory.Combat // Default valid category
             },
             MarketData = new MarketData()
@@ -77,6 +78,28 @@ public class ItemFilterServiceLevelTests
 
         Assert.Single(result);
         Assert.Equal(580, result[0].Recipe.RecipeLevel);
+    }
+
+    [Fact]
+    public void FilterItems_ShouldFilterByItemLevel()
+    {
+        var items = new List<ProfitCalculation>
+        {
+            CreateMockItemWithRecipe(90, 580, 500), // Too low
+            CreateMockItemWithRecipe(90, 580, 580), // Just right
+            CreateMockItemWithRecipe(90, 580, 600)  // Too high
+        };
+
+        var criteria = new FilterCriteria 
+        { 
+            MinItemLevel = 550,
+            MaxItemLevel = 590
+        };
+
+        var result = _service.FilterItems(items, criteria);
+
+        Assert.Single(result);
+        Assert.Equal(580, result[0].Recipe.ItemLevel);
     }
 
     [Fact]
