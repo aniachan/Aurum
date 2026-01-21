@@ -1,9 +1,0 @@
-{
-  "active": true,
-  "iteration": 1,
-  "maxIterations": 50,
-  "completionPromise": "NO_UNFINISHED_TASKS_REMAIN_00",
-  "prompt": "On each iteration:\r\n\r\n1. Open TASKS.md.\r\n2. If there is at least one unchecked task:\r\n   a. Select exactly ONE unchecked task.\r\n   b. Implement it.\r\n   c. Mark the task as completed in TASKS.md.\r\n   d. Commit the change to git.\r\n3. If there are NO unchecked tasks remaining:\r\n   Output exactly:\r\n   NO_UNFINISHED_TASKS_REMAIN_WOOT",
-  "startedAt": "2026-01-21T08:47:02.503Z",
-  "model": ""
-}
