@@ -99,7 +99,8 @@ public enum SortMode
     BestGilPerHour,
     FastestSelling,
     LowestCompetition,
-    RecommendationScore  // Weighted algorithm
+    RecommendationScore,  // Weighted algorithm
+    BestEfficiency        // Profit / Effort Ratio
 }
 
 /// <summary>

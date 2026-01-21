@@ -91,6 +91,7 @@ public class ProfitCalculation
     
     // Demand-adjusted scoring
     public int ProfitScore { get; set; }         // 0-100 based on profit alone
+    public float EfficiencyScore { get; set; }   // New metric: Profit per resource unit
     public int DemandScore { get; set; }         // 0-100 based on market analysis
     public int RecommendationScore { get; set; } // 0-100 weighted score
     

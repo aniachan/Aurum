@@ -466,7 +466,12 @@ public class ProfitService
         
         // Calculate profit score (0-100 based on profit alone)
         calculation.ProfitScore = CalculateProfitScore(calculation);
-        
+
+        // Calculate Efficiency Score
+        calculation.EfficiencyScore = calculation.TotalCraftCost > 0
+            ? (float)calculation.RawProfit / calculation.TotalCraftCost
+            : 0;
+
         // Get demand score from market analysis
         calculation.DemandScore = marketData.RecommendationScore;
         
