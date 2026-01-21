@@ -448,6 +448,50 @@ public class DashboardWindow : Window, IDisposable
             ImGui.OpenPopup("CategoryFilters");
         }
 
+        ImGui.SameLine();
+
+        // Column Visibility Popup
+        if (ImGui.Button("Columns..."))
+        {
+            ImGui.OpenPopup("ColumnVisibility");
+        }
+
+        if (ImGui.BeginPopup("ColumnVisibility"))
+        {
+            var allCols = new[] { "Item", "Class", "Profit", "Margin", "Gil/Hr", "Demand", "Risk", "Score", "Actions" };
+            bool changed = false;
+
+            ImGui.Text("Show/Hide Columns:");
+            ImGui.Separator();
+
+            foreach (var col in allCols)
+            {
+                // Logic: if it's NOT in HiddenColumns, it is visible
+                bool isVisible = !plugin.Configuration.HiddenColumns.Contains(col);
+                
+                if (ImGui.Checkbox(col, ref isVisible))
+                {
+                    if (isVisible)
+                    {
+                        plugin.Configuration.HiddenColumns.Remove(col);
+                    }
+                    else
+                    {
+                        if (!plugin.Configuration.HiddenColumns.Contains(col))
+                            plugin.Configuration.HiddenColumns.Add(col);
+                    }
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                plugin.Configuration.Save();
+            }
+
+            ImGui.EndPopup();
+        }
+
         if (ImGui.BeginPopup("CategoryFilters"))
         {
             bool changed = false;
