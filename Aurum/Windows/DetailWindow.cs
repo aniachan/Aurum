@@ -104,6 +104,16 @@ public class DetailWindow : Window, IDisposable
         
         ImGui.Spacing();
 
+        if (ImGui.Button("Add to Chart"))
+        {
+             if (currentItem?.MarketData != null)
+             {
+                 plugin.ChartWindow.IsOpen = true;
+                 plugin.ChartWindow.AddComparisonData(currentItem.MarketData, currentItem.Recipe.ItemName);
+             }
+        }
+        ImGui.SameLine();
+
         if (ImGui.Button("Universalis"))
         {
             if (currentItem?.MarketData != null)

@@ -21,6 +21,25 @@ public class ChartWindow : Window, IDisposable
     private string itemName = "Unknown Item";
     private int selectedTimeRange = 30; // Default 30 days, -1 for All
 
+    private class ChartSeries
+    {
+        public MarketData Data { get; init; } = null!;
+        public string Name { get; init; } = string.Empty;
+        public Vector4 Color { get; set; }
+    }
+
+    private readonly List<ChartSeries> comparisonSeries = new();
+    
+    private readonly Vector4[] SeriesColors = new[]
+    {
+        new Vector4(0f, 0.8f, 1f, 1f),   // Cyan (Primary)
+        new Vector4(1f, 0.4f, 0.4f, 1f), // Red
+        new Vector4(0.4f, 1f, 0.4f, 1f), // Green
+        new Vector4(1f, 0.8f, 0f, 1f),   // Yellow
+        new Vector4(0.8f, 0.4f, 1f, 1f), // Purple
+        new Vector4(1f, 0.5f, 0f, 1f)    // Orange
+    };
+
     public ChartWindow(Plugin plugin) : base("Price History Chart##AurumCharts", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
@@ -37,6 +56,14 @@ public class ChartWindow : Window, IDisposable
         currentData = data;
         itemName = name;
         
+        comparisonSeries.Clear();
+        comparisonSeries.Add(new ChartSeries 
+        { 
+            Data = data, 
+            Name = name,
+            Color = SeriesColors[0]
+        });
+
         // If we have access to database service (via plugin), we could fetch historical snapshots here
         // Ideally, MarketData would already have this populated or we fetch it on demand.
         // For now, let's assume if HistorySnapshots is empty, we might need to fetch it? 
@@ -63,6 +90,19 @@ public class ChartWindow : Window, IDisposable
         }
 
         IsOpen = true;
+    }
+
+    public void AddComparisonData(MarketData data, string name)
+    {
+        if (comparisonSeries.Any(s => s.Data.ItemId == data.ItemId)) return;
+        
+        int colorIndex = comparisonSeries.Count % SeriesColors.Length;
+        comparisonSeries.Add(new ChartSeries
+        {
+            Data = data,
+            Name = name,
+            Color = SeriesColors[colorIndex]
+        });
     }
 
     public override void Draw()
@@ -179,6 +219,112 @@ public class ChartWindow : Window, IDisposable
     {
         if (currentData?.RecentHistory == null) return;
 
+        if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
+        {
+            // Setup axes
+            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+            
+            // Setup Y2 axis for Volume / Listings
+            ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
+
+            foreach (var series in comparisonSeries)
+            {
+                DrawSeries(series);
+            }
+            
+            ImPlot.EndPlot();
+        }
+
+        // Only show detailed analysis for primary item
+        DrawSupplyDemandAnalysis();
+    }
+
+    private void DrawSeries(ChartSeries series)
+    {
+        var data = series.Data;
+        if (data.RecentHistory == null) return;
+
+        var history = data.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
+        var snapshots = data.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
+        
+        if (selectedTimeRange > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
+            history = history.Where(h => h.Timestamp >= cutoff);
+            snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
+        }
+
+        var historyList = history.ToList();
+        var snapshotList = snapshots.ToList();
+
+        if (!historyList.Any()) return;
+
+        // ---------------------------------------------------------
+        // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
+        // ---------------------------------------------------------
+        ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
+
+        var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+        var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
+        
+        ImPlot.SetNextLineStyle(series.Color, 2.0f);
+        ImPlot.PlotLine($"{series.Name} Price", ref xs[0], ref ys[0], xs.Length);
+
+        // Only show detailed scatter/bars for the primary item to avoid clutter
+        if (series.Data == currentData)
+        {
+            ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, series.Color);
+            ImPlot.PlotScatter($"{series.Name} Sales", ref xs[0], ref ys[0], xs.Length);
+
+            var hqItems = historyList.Where(x => x.IsHQ).ToList();
+            if (hqItems.Any())
+            {
+                var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
+                
+                ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
+                ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
+            }
+            
+            // Draw Volume/Listings for primary item only
+            if (snapshotList.Any())
+            {
+                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
+                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
+                
+                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
+                ImPlot.SetNextLineStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.6f), 2.0f);
+                ImPlot.PlotLine("Listings (Supply)", ref snapXs[0], ref snapYs[0], snapXs.Length);
+                
+                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.2f));
+                ImPlot.PlotShaded("##SupplyArea", ref snapXs[0], ref snapYs[0], snapXs.Length, double.NegativeInfinity);
+            }
+
+            // Daily Sales Bars
+            var dailySales = historyList
+                .GroupBy(x => x.Timestamp.Date)
+                .OrderBy(g => g.Key)
+                .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
+                .ToList();
+
+            if (dailySales.Any())
+            {
+                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
+                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
+                double barWidth = 86400 * 0.8;
+
+                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
+                ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
+                ImPlot.PlotBars("Daily Sales (Demand)", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
+            }
+        }
+    }
+
+    private void DrawSupplyDemandAnalysis()
+    {
+        if (currentData?.RecentHistory == null) return;
+        
         var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
         var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
         
@@ -194,8 +340,8 @@ public class ChartWindow : Window, IDisposable
 
         if (!historyList.Any())
         {
-            ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), $"No sales found in the last {selectedTimeRange} days.");
-            return;
+             ImGui.TextColored(new Vector4(1f, 0.5f, 0f, 1f), $"No sales found in the last {selectedTimeRange} days.");
+             return;
         }
 
         // Aggregate data for Volume (Quantity) analysis
@@ -204,78 +350,6 @@ public class ChartWindow : Window, IDisposable
             .OrderBy(g => g.Key)
             .Select(g => new { Date = g.Key, Volume = g.Sum(x => x.Quantity) })
             .ToList();
-
-        // Draw Chart using ImPlot
-        if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
-        {
-            // Setup axes
-            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
-            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
-            
-            // Setup Y2 axis for Volume / Listings
-            ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
-            
-            // ---------------------------------------------------------
-            // PLOT 4: Listings Count (Supply) on Y2 Axis - Stacked Area-like
-            // ---------------------------------------------------------
-            if (snapshotList.Any())
-            {
-                var snapXs = snapshotList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                var snapYs = snapshotList.Select(x => (double)x.ListingCount).ToArray();
-                
-                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                ImPlot.SetNextLineStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.6f), 2.0f);
-                ImPlot.PlotLine("Listings (Supply)", ref snapXs[0], ref snapYs[0], snapXs.Length);
-                
-                // Shade area under listings
-                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.4f, 0.8f, 0.2f));
-                ImPlot.PlotShaded("##SupplyArea", ref snapXs[0], ref snapYs[0], snapXs.Length, double.NegativeInfinity);
-            }
-
-            // ---------------------------------------------------------
-            // PLOT 2 (Background): Daily Volume Bars on Y2 Axis
-            // ---------------------------------------------------------
-            if (dailySales.Any())
-            {
-                var barXs = dailySales.Select(x => (double)new DateTimeOffset(x.Date).ToUnixTimeSeconds()).ToArray();
-                var barYs = dailySales.Select(x => (double)x.Volume).ToArray();
-                
-                // Width: 1 day in seconds is 86400. Use 0.8 * 86400 for slight gaps.
-                double barWidth = 86400 * 0.8;
-
-                ImPlot.SetAxes(ImAxis.X1, ImAxis.Y2);
-                
-                // Make bars semi-transparent
-                ImPlot.SetNextFillStyle(new Vector4(0.5f, 0.5f, 0.5f, 0.25f)); 
-                ImPlot.PlotBars("Daily Sales (Demand)", ref barXs[0], ref barYs[0], barXs.Length, barWidth);
-            }
-
-            // ---------------------------------------------------------
-            // PLOT 1 (Foreground): Price Line & Scatter on Y1 Axis
-            // ---------------------------------------------------------
-            ImPlot.SetAxes(ImAxis.X1, ImAxis.Y1);
-
-            var xs = historyList.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-            var ys = historyList.Select(x => (double)x.PricePerUnit).ToArray();
-            
-            ImPlot.SetNextLineStyle(new Vector4(0f, 0.8f, 1f, 1f), 2.0f);
-            ImPlot.PlotLine("Price", ref xs[0], ref ys[0], xs.Length);
-
-            ImPlot.SetNextMarkerStyle(ImPlotMarker.Circle, 4, new Vector4(1f, 1f, 1f, 0.8f), 1f, new Vector4(0f, 0.8f, 1f, 1f));
-            ImPlot.PlotScatter("Sales", ref xs[0], ref ys[0], xs.Length);
-
-            var hqItems = historyList.Where(x => x.IsHQ).ToList();
-            if (hqItems.Any())
-            {
-                var hqXs = hqItems.Select(x => (double)new DateTimeOffset(x.Timestamp.ToLocalTime()).ToUnixTimeSeconds()).ToArray();
-                var hqYs = hqItems.Select(x => (double)x.PricePerUnit).ToArray();
-                
-                ImPlot.SetNextMarkerStyle(ImPlotMarker.Diamond, 6, new Vector4(1f, 0.8f, 0f, 1f), 1f, new Vector4(1f, 0.5f, 0f, 1f));
-                ImPlot.PlotScatter("HQ Sales", ref hqXs[0], ref hqYs[0], hqXs.Length);
-            }
-            
-            ImPlot.EndPlot();
-        }
 
         // Supply/Demand Ratio Visualization
         if (snapshotList.Any() && dailySales.Any())
