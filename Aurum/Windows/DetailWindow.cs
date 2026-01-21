@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Windowing;
@@ -219,37 +220,83 @@ public class DetailWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.TextDisabled("INGREDIENT BREAKDOWN");
 
-        if (ImGui.BeginTable("CostDetailsTable", 3, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg))
+        if (ImGui.BeginTable("CostDetailsTable", 4, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
         {
             ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 30);
+            ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Unit", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableHeadersRow();
             
             foreach (var ingredient in currentItem.IngredientTree.RootIngredients)
             {
-                ImGui.TableNextRow();
-                
-                ImGui.TableNextColumn();
-                ImGui.Text(ingredient.ItemName);
-                if (ingredient.IsHQ)
-                {
-                    ImGui.SameLine();
-                    ImGui.TextColored(new Vector4(1, 1, 0, 1), "");
-                }
-                
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.SetTooltip($"Unit Cost: {ingredient.UnitCost:N0} gil\nSource: {ingredient.Source}");
-                }
-
-                ImGui.TableNextColumn();
-                ImGui.Text($"{ingredient.Quantity}");
-
-                ImGui.TableNextColumn();
-                ImGui.Text($"{ingredient.TotalCost:N0}");
+                DrawIngredientRow(ingredient);
             }
             ImGui.EndTable();
         }
+    }
+
+    private void DrawIngredientRow(IngredientCost ingredient)
+    {
+        ImGui.TableNextRow();
+        
+        ImGui.TableNextColumn();
+        bool hasSubIngredients = ingredient.SubIngredients != null && ingredient.SubIngredients.Any();
+        
+        if (hasSubIngredients)
+        {
+            bool open = ImGui.TreeNodeEx($"##Node_{ingredient.ItemId}_{ingredient.GetHashCode()}", 
+                ImGuiTreeNodeFlags.SpanFullWidth, ingredient.ItemName);
+                
+            if (ingredient.IsHQ)
+            {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(1, 1, 0, 1), "");
+            }
+
+            // Draw rest of the columns for the parent row
+            DrawIngredientColumns(ingredient);
+
+            if (open)
+            {
+                foreach (var sub in ingredient.SubIngredients!)
+                {
+                    DrawIngredientRow(sub);
+                }
+                ImGui.TreePop();
+            }
+        }
+        else
+        {
+            // Indent to align with tree node text
+            ImGui.Indent(ImGui.GetTreeNodeToLabelSpacing());
+            ImGui.Text(ingredient.ItemName);
+            if (ingredient.IsHQ)
+            {
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(1, 1, 0, 1), "");
+            }
+            ImGui.Unindent(ImGui.GetTreeNodeToLabelSpacing());
+            
+            DrawIngredientColumns(ingredient);
+        }
+    }
+
+    private void DrawIngredientColumns(IngredientCost ingredient)
+    {
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip($"Source: {ingredient.Source}");
+        }
+
+        ImGui.TableNextColumn();
+        ImGui.Text($"{ingredient.Quantity}");
+
+        ImGui.TableNextColumn();
+        ImGui.Text($"{ingredient.UnitCost:N0}");
+
+        ImGui.TableNextColumn();
+        ImGui.Text($"{ingredient.TotalCost:N0}");
     }
 
     private void DrawCurrentListings()
