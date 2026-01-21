@@ -70,6 +70,7 @@ public class ProfitCalculation
     
     // Sale price
     public uint ExpectedSalePrice { get; set; }  // What you'd list it for
+    public uint VendorPrice { get; set; }        // NPC sell price
     public uint MarketBoardTax { get; set; }     // 5% tax
     public uint NetSalePrice { get; set; }       // After tax
     

@@ -179,6 +179,13 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextColumn(); ImGui.Text("Expected Sale:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.ExpectedSalePrice:N0} gil");
 
+            if (currentItem.VendorPrice > 0)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn(); ImGui.Text("Vendor Price:");
+                ImGui.TableNextColumn(); ImGui.TextDisabled($"{currentItem.VendorPrice:N0} gil");
+            }
+
             ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Crafting Cost:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.TotalCraftCost:N0} gil");

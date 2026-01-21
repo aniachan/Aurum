@@ -342,6 +342,9 @@ public class ProfitService
             ? marketData.CurrentAveragePriceNQ
             : marketData.MinPrice;
         
+        // Get vendor sell price
+        calculation.VendorPrice = GetVendorPrice(recipe.ResultItemId);
+        
         // Apply HQ pricing if available and configured
         if (config.UseHQPricesWhenAvailable && recipe.CanBeHQ && marketData.CurrentAveragePriceHQ > 0)
         {
