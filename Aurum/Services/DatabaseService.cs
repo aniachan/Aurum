@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
-// using Dalamud.Plugin.Services;
+using Dalamud.Plugin.Services;
 using System.Threading.Tasks;
 using System.Text.Json;
 using Aurum.Models;
@@ -12,12 +12,12 @@ namespace Aurum.Services;
 
 public class DatabaseService : IDisposable
 {
-    private readonly dynamic log; // Use dynamic to avoid dependency on Dalamud
+    private readonly IPluginLog log;
     private readonly string connectionString;
     private readonly string dbFilePath;
     private readonly object dbLock = new();
 
-    public DatabaseService(dynamic log, string pluginDir)
+    public DatabaseService(IPluginLog log, string pluginDir)
     {
         this.log = log;
         

@@ -228,9 +228,10 @@ public class ChartWindow : Window, IDisposable
             // Setup Y2 axis for Volume / Listings
             ImPlot.SetupAxis(ImAxis.Y2, "Volume / Listings", ImPlotAxisFlags.AutoFit | ImPlotAxisFlags.AuxDefault);
 
-            foreach (var series in comparisonSeries)
+            // Draw series in reverse order so the primary series (added first) is drawn last (on top)
+            for (int i = comparisonSeries.Count - 1; i >= 0; i--)
             {
-                DrawSeries(series);
+                DrawSeries(comparisonSeries[i]);
             }
             
             ImPlot.EndPlot();
