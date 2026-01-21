@@ -553,6 +553,22 @@ public class DashboardWindow : Window, IDisposable
         ImGui.SameLine();
         if (ImGui.Button(">") && currentPage < totalPages) currentPage++;
         
+        ImGui.SameLine();
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 20); // Add some spacing
+        ImGui.Text("Rows per page:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(100);
+        int rowsPerPage = plugin.Configuration.RowsPerPage;
+        if (ImGui.InputInt("##RowsPerPage", ref rowsPerPage))
+        {
+            rowsPerPage = Math.Clamp(rowsPerPage, 5, 200);
+            if (rowsPerPage != plugin.Configuration.RowsPerPage)
+            {
+                plugin.Configuration.RowsPerPage = rowsPerPage;
+                plugin.Configuration.Save();
+            }
+        }
+        
         // Table header
         // Count visible columns to set table column count correctly
         var allColumns = new[] { "Item", "Class", "Profit", "Margin", "Gil/Hr", "Demand", "Risk", "Score", "Actions" };
