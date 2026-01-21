@@ -25,6 +25,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public int MaxCacheEntries { get; set; } = 1000;
     public int MaxConcurrentApiRequests { get; set; } = 5;
     public int ApiRateLimitPerMinute { get; set; } = 900; // 15 requests/second * 60 = 900
+    public int ApiRequestTimeoutSeconds { get; set; } = 30; // Default 30s timeout
     public int ApiErrorThreshold { get; set; } = 10; // Trigger degradation after 10 errors in a minute
     public int ApiDegradationMinutes { get; set; } = 5; // Stay degraded for 5 minutes
     

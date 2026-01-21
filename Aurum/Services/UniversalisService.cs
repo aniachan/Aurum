@@ -42,7 +42,7 @@ public class UniversalisService : IDisposable
         
         httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(10)
+            Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30)
         };
         httpClient.DefaultRequestHeaders.Add("User-Agent", "Aurum FFXIV Crafting Calculator/1.0");
 
@@ -663,6 +663,9 @@ public class UniversalisService : IDisposable
         var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
         log.Info($"Fetching market data: {url}");
         
+        // Update timeout based on config before request
+        httpClient.Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30);
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var statusCode = 0;
         var success = false;
@@ -739,6 +742,9 @@ public class UniversalisService : IDisposable
             var itemList = string.Join(",", itemIds);
             var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
             
+            // Update timeout based on config before request
+            httpClient.Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30);
+
             log.Info($"Fetching batch market data for {itemIds.Count} items");
 
             var response = await httpClient.GetAsync(url, disposeCts.Token);

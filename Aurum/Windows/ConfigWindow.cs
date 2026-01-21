@@ -183,6 +183,13 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
             Aurum.Plugin.Instance?.RateLimiter?.UpdateConfiguration();
         }
+
+        var timeout = configuration.ApiRequestTimeoutSeconds;
+        if (ImGui.SliderInt("API Request Timeout (Seconds)", ref timeout, 5, 60))
+        {
+            configuration.ApiRequestTimeoutSeconds = timeout;
+            configuration.Save();
+        }
         
         ImGui.Separator();
         ImGui.Text("Filtering & Sorting");
