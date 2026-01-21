@@ -181,6 +181,7 @@ public class ConfigWindow : Window, IDisposable
         {
             configuration.ApiRateLimitPerMinute = rateLimit;
             configuration.Save();
+            Aurum.Plugin.Instance?.RateLimiter?.UpdateConfiguration();
         }
         
         ImGui.Separator();

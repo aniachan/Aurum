@@ -21,8 +21,8 @@ public class RateLimiter : IDisposable
     // Token Bucket State
     private readonly object _lock = new();
     private double _tokens;
-    private readonly double _maxTokens;
-    private readonly double _refillRatePerSecond; // Tokens per second
+    private double _maxTokens;
+    private double _refillRatePerSecond; // Tokens per second
     private DateTime _lastRefillTime;
 
     // Endpoint Specific Limits
@@ -354,7 +354,23 @@ public class RateLimiter : IDisposable
 
     public void UpdateConfiguration()
     {
-        // TODO: Allow updating rate from config on the fly
+        lock (_lock)
+        {
+            double requestsPerMinute = configuration.ApiRateLimitPerMinute > 0 ? configuration.ApiRateLimitPerMinute : 900;
+            _refillRatePerSecond = requestsPerMinute / 60.0;
+            
+            // Adjust burst capacity based on new rate
+            // We keep the logic: Max(25, 2 * refillRate)
+            _maxTokens = Math.Max(25.0, _refillRatePerSecond * 2); 
+            
+            // Cap current tokens at new max
+            if (_tokens > _maxTokens)
+            {
+                _tokens = _maxTokens;
+            }
+            
+            log.Debug($"RateLimiter configuration updated. Rate: {_refillRatePerSecond:F2} req/s, Burst: {_maxTokens:F2}");
+        }
     }
 
     private class EndpointLimiter
