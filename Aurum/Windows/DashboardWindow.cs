@@ -172,10 +172,29 @@ public class DashboardWindow : Window, IDisposable
 
         // Cache Stats
         var cacheStats = plugin.CacheService.GetStats();
-        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), $"Cache Hit Rate: {cacheStats.HitRate:F1}%");
+        
+        // Color based on hit rate quality
+        Vector4 cacheColor;
+        if (cacheStats.HitRate > 80) cacheColor = new Vector4(0.3f, 1f, 0.3f, 1f); // Green for excellent
+        else if (cacheStats.HitRate > 50) cacheColor = new Vector4(0.7f, 1f, 0.3f, 1f); // Yellow-Green for good
+        else if (cacheStats.HitRate > 20) cacheColor = new Vector4(1f, 0.7f, 0f, 1f); // Orange for okay
+        else cacheColor = new Vector4(1f, 0.3f, 0.3f, 1f); // Red for poor
+        
+        ImGui.TextColored(cacheColor, $"Cache: {cacheStats.HitRate:F0}%");
+        
         if (ImGui.IsItemHovered()) 
         {
-            ImGui.SetTooltip($"Hits: {cacheStats.Hits}\nMisses: {cacheStats.Misses}\nActive Entries: {cacheStats.ActiveEntries}\nExpired: {cacheStats.ExpiredEntries}");
+            ImGui.BeginTooltip();
+            ImGui.Text("Cache Performance");
+            ImGui.Separator();
+            ImGui.Text($"Hit Rate: {cacheStats.HitRate:F1}%");
+            ImGui.Text($"Hits: {cacheStats.Hits}");
+            ImGui.Text($"Misses: {cacheStats.Misses}");
+            ImGui.Separator();
+            ImGui.Text($"Active Entries: {cacheStats.ActiveEntries}");
+            ImGui.Text($"Expired: {cacheStats.ExpiredEntries}");
+            ImGui.Text($"Total: {cacheStats.TotalEntries}");
+            ImGui.EndTooltip();
         }
     }
     
