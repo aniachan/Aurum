@@ -40,8 +40,11 @@ public class FilterCriteria
     public bool IncludeMaterials { get; set; } = true;
     public bool OnlyFavorites { get; set; } = false;
 
-    // Job/Level (Future expansion)
+    // Job/Level
+    public int MinJobLevel { get; set; } = 1;
     public int MaxJobLevel { get; set; } = int.MaxValue;
+    public int MinRecipeLevel { get; set; } = 1;
+    public int MaxRecipeLevel { get; set; } = int.MaxValue;
 }
 
 public enum SortStrategy

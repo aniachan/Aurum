@@ -86,6 +86,16 @@ public class ItemFilterService
             if (_configuration == null || !_configuration.FavoriteItems.Contains(item.ItemId)) return false;
         }
 
+        // 8. Level Range Filtering
+        if (item.Recipe != null)
+        {
+            // Class/Job Level
+            if (item.Recipe.ClassJobLevel < criteria.MinJobLevel || item.Recipe.ClassJobLevel > criteria.MaxJobLevel) return false;
+            
+            // Recipe Level (RLvl) - e.g. Starred recipes have higher RLvl than Job Level
+            if (item.Recipe.RecipeLevel < criteria.MinRecipeLevel || item.Recipe.RecipeLevel > criteria.MaxRecipeLevel) return false;
+        }
+
         return true;
     }
 
