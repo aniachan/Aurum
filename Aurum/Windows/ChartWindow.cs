@@ -32,6 +32,7 @@ public class ChartWindow : Window, IDisposable
     private bool useLogScale = false;
     private bool shouldFitHistory = true;
     private bool shouldFitDistribution = true;
+    private bool showColorCodedSupplyDemand = true;
 
     private class ChartSeries
     {
@@ -444,6 +445,136 @@ public class ChartWindow : Window, IDisposable
 
         // Supply/Demand Analysis
         DrawSupplyDemandAnalysis();
+
+        // New Color Coded S/D Analysis
+        if (showColorCodedSupplyDemand)
+        {
+            DrawColorCodedSupplyDemand();
+        }
+    }
+
+    private void DrawColorCodedSupplyDemand()
+    {
+        if (currentData?.RecentHistory == null) return;
+        
+        // This chart will show supply/demand ratio over time, color coded to show
+        // periods of oversupply (red) and undersupply (green).
+        
+        var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).AsEnumerable();
+        var snapshots = currentData.HistorySnapshots?.OrderBy(h => h.Timestamp).AsEnumerable() ?? Enumerable.Empty<MarketSnapshot>();
+        
+        if (selectedTimeRange > 0)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-selectedTimeRange);
+            history = history.Where(h => h.Timestamp >= cutoff);
+            snapshots = snapshots.Where(h => h.Timestamp >= cutoff);
+        }
+
+        var historyList = history.ToList();
+        var snapshotList = snapshots.ToList();
+        
+        if (!historyList.Any() || !snapshotList.Any()) return;
+        
+        // Calculate daily metrics to align supply and demand
+        var dailyMetrics = historyList
+            .GroupBy(x => x.Timestamp.Date)
+            .Select(g => new 
+            { 
+                Date = g.Key, 
+                SalesVolume = g.Sum(x => x.Quantity) 
+            })
+            .ToDictionary(k => k.Date, v => v.SalesVolume);
+            
+        // Interpolate snapshots to daily resolution for easier charting
+        var dailySupply = new Dictionary<DateTime, int>();
+        foreach(var snap in snapshotList)
+        {
+            // Simple nearest neighbor or just use snapshot for that day
+            dailySupply[snap.Timestamp.Date] = snap.ListingCount;
+        }
+        
+        // Merge keys
+        var allDates = dailyMetrics.Keys.Union(dailySupply.Keys).OrderBy(d => d).ToList();
+        
+        if (allDates.Count < 2) return;
+        
+        var timePoints = new List<double>();
+        var ratioPoints = new List<double>();
+        var colors = new List<Vector4>();
+        
+        foreach(var date in allDates)
+        {
+            if (!dailyMetrics.TryGetValue(date, out var sales)) sales = 0; // No sales that day
+            if (!dailySupply.TryGetValue(date, out var listings)) listings = 0; // No snapshot that day? Maybe skip or interpolate.
+            
+            // We need both for a ratio. If listings is missing, we can maybe carry forward previous?
+            // For now, let's just skip points with missing supply data as it's harder to infer.
+            if (listings == 0) continue; 
+            
+            // Avoid division by zero. If sales is 0, ratio is effectively infinite (oversupplied).
+            // Let's cap it at some high number for visualization.
+            double ratio = sales > 0 ? (double)listings / sales : 50.0;
+            if (ratio > 50) ratio = 50; // Cap at 50 days to clear
+            
+            timePoints.Add((double)new DateTimeOffset(date).ToUnixTimeSeconds());
+            ratioPoints.Add(ratio);
+        }
+        
+        if (timePoints.Count == 0) return;
+        
+        ImGui.Spacing();
+        ImGui.Text("Supply/Demand Ratio (Days to Clear) - Over Time");
+        
+        if (ImPlot.BeginPlot("##SDRatioChart", new Vector2(-1, 200), ImPlotFlags.None))
+        {
+            ImPlot.SetupAxes("Date", "Ratio (Listings/Sales)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
+            
+            var xs = timePoints.ToArray();
+            var ys = ratioPoints.ToArray();
+            
+            // We have to loop to set color for each bar if we want individual control
+            // Or we can use a custom rendering loop. 
+            // Actually, PlotBars allows color mapping? No.
+            // Let's use PlotShaded or just draw multiple bar series based on color classification?
+            // Drawing multiple series is easiest.
+            
+            var greenX = new List<double>(); var greenY = new List<double>();
+            var yellowX = new List<double>(); var yellowY = new List<double>();
+            var redX = new List<double>(); var redY = new List<double>();
+            
+            for(int i=0; i<xs.Length; i++)
+            {
+                if (ys[i] < 3) { greenX.Add(xs[i]); greenY.Add(ys[i]); }
+                else if (ys[i] < 14) { yellowX.Add(xs[i]); yellowY.Add(ys[i]); }
+                else { redX.Add(xs[i]); redY.Add(ys[i]); }
+            }
+            
+            double barWidth = 86400 * 0.8;
+            
+            if (greenX.Any())
+            {
+                var gX = greenX.ToArray(); var gY = greenY.ToArray();
+                ImPlot.SetNextFillStyle(new Vector4(0.2f, 0.8f, 0.4f, 0.7f));
+                ImPlot.PlotBars("Undersupplied (<3d)", ref gX[0], ref gY[0], gX.Length, barWidth);
+            }
+            
+            if (yellowX.Any())
+            {
+                var yX = yellowX.ToArray(); var yY = yellowY.ToArray();
+                ImPlot.SetNextFillStyle(new Vector4(1f, 0.84f, 0f, 0.7f));
+                ImPlot.PlotBars("Balanced (3-14d)", ref yX[0], ref yY[0], yX.Length, barWidth);
+            }
+            
+            if (redX.Any())
+            {
+                var rX = redX.ToArray(); var rY = redY.ToArray();
+                ImPlot.SetNextFillStyle(new Vector4(1f, 0.3f, 0.3f, 0.7f));
+                ImPlot.PlotBars("Oversupplied (>14d)", ref rX[0], ref rY[0], rX.Length, barWidth);
+            }
+            
+            ImPlot.EndPlot();
+        }
     }
 
     private void DrawVolumeChart(float height, ImPlotRect mainXLimits)
