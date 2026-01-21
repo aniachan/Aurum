@@ -208,6 +208,48 @@ public class DetailWindow : Window, IDisposable
 
             ImGui.EndTable();
         }
+
+        DrawCostDetails();
+    }
+
+    private void DrawCostDetails()
+    {
+        if (currentItem?.IngredientTree?.RootIngredients == null || !currentItem.IngredientTree.RootIngredients.Any()) return;
+
+        ImGui.Spacing();
+        ImGui.TextDisabled("INGREDIENT BREAKDOWN");
+
+        if (ImGui.BeginTable("CostDetailsTable", 3, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 30);
+            ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 60);
+            
+            foreach (var ingredient in currentItem.IngredientTree.RootIngredients)
+            {
+                ImGui.TableNextRow();
+                
+                ImGui.TableNextColumn();
+                ImGui.Text(ingredient.ItemName);
+                if (ingredient.IsHQ)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(1, 1, 0, 1), "");
+                }
+                
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"Unit Cost: {ingredient.UnitCost:N0} gil\nSource: {ingredient.Source}");
+                }
+
+                ImGui.TableNextColumn();
+                ImGui.Text($"{ingredient.Quantity}");
+
+                ImGui.TableNextColumn();
+                ImGui.Text($"{ingredient.TotalCost:N0}");
+            }
+            ImGui.EndTable();
+        }
     }
 
     private void DrawCurrentListings()
