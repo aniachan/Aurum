@@ -5,6 +5,7 @@ using System.Numerics;
 using System.IO;
 using System.Text;
 using Dalamud.Interface.Windowing;
+using Aurum.Utils;
 using Aurum.Models;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
@@ -82,16 +83,12 @@ public class ChartWindow : Window, IDisposable
     
     public override void PreDraw()
     {
-        // Override title bar colors to gold
-        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f)); // Dark gold
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f)); // Muted gold
-        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f)); // Faded gold
+        ThemeManager.PushWindowStyles(plugin.Configuration.ColorTheme);
     }
     
     public override void PostDraw()
     {
-        // Pop the 3 style colors we pushed
-        ImGui.PopStyleColor(3);
+        ThemeManager.PopWindowStyles();
     }
 
     public void SetMarketData(MarketData data, string name)

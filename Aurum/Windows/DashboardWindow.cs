@@ -62,15 +62,12 @@ public class DashboardWindow : Window, IDisposable
     
     public override void PreDraw()
     {
-        // Override title bar colors to gold
-        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f));
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f));
-        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f));
+        ThemeManager.PushWindowStyles(plugin.Configuration.ColorTheme);
     }
     
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(3);
+        ThemeManager.PopWindowStyles();
     }
 
     public void Dispose() { }

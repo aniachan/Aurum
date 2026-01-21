@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using Aurum.Utils;
 
 namespace Aurum.Windows;
 
@@ -31,10 +32,7 @@ public class ConfigWindow : Window, IDisposable
 
     public override void PreDraw()
     {
-        // Override title bar colors to gold
-        ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.4f, 0.3f, 0f, 0.8f));
-        ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.7f, 0.55f, 0f, 0.9f));
-        ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.4f, 0.3f, 0f, 0.5f));
+        ThemeManager.PushWindowStyles(configuration.ColorTheme);
         
         // Flags must be added or removed before Draw() is being called, or they won't apply
         if (configuration.IsConfigWindowMovable)
@@ -49,7 +47,7 @@ public class ConfigWindow : Window, IDisposable
     
     public override void PostDraw()
     {
-        ImGui.PopStyleColor(3);
+        ThemeManager.PopWindowStyles();
     }
 
     public override void Draw()
