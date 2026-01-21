@@ -71,6 +71,60 @@ public class ConfigWindow : Window, IDisposable
         }
         
         ImGui.Separator();
+        ImGui.Text("Filtering & Sorting");
+
+        var minProfit = configuration.MinimumProfitFilter;
+        if (ImGui.InputInt("Minimum Profit (Gil)", ref minProfit))
+        {
+            configuration.MinimumProfitFilter = minProfit;
+            configuration.Save();
+        }
+
+        var showProfitable = configuration.ShowOnlyProfitableItems;
+        if (ImGui.Checkbox("Show Only Profitable Items", ref showProfitable))
+        {
+            configuration.ShowOnlyProfitableItems = showProfitable;
+            configuration.Save();
+        }
+        
+        // Sort Mode
+        var sortMode = configuration.DefaultSortMode;
+        if (ImGui.BeginCombo("Default Sort Mode", sortMode.ToString()))
+        {
+            foreach (var mode in Enum.GetValues<SortMode>())
+            {
+                if (ImGui.Selectable(mode.ToString(), sortMode == mode))
+                {
+                    configuration.DefaultSortMode = mode;
+                    configuration.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+
+        // Risk Level
+        var riskLevel = configuration.MaxAcceptableRisk;
+        if (ImGui.BeginCombo("Max Acceptable Risk", riskLevel.ToString()))
+        {
+            foreach (var level in Enum.GetValues<Models.RiskLevel>())
+            {
+                if (ImGui.Selectable(level.ToString(), riskLevel == level))
+                {
+                    configuration.MaxAcceptableRisk = level;
+                    configuration.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+
+        var showHighRisk = configuration.ShowHighRiskItems;
+        if (ImGui.Checkbox("Show High Risk Items", ref showHighRisk))
+        {
+            configuration.ShowHighRiskItems = showHighRisk;
+            configuration.Save();
+        }
+
+        ImGui.Separator();
         ImGui.Text("Database Settings");
         
         var dbSize = Aurum.Plugin.Instance?.DatabaseService?.GetDatabaseSize() ?? 0;
