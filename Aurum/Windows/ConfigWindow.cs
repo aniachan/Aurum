@@ -143,11 +143,18 @@ public class ConfigWindow : Window, IDisposable
             ImGui.SetTooltip("If enabled, the dashboard will remember the last world you refreshed data for,\noverriding 'Auto' until you change it back.");
         }
 
-        var cacheDuration = configuration.MarketDataCacheDurationSeconds;
-        if (ImGui.InputInt("Market Data Cache Duration (Seconds)", ref cacheDuration))
+        var cacheDurationMinutes = configuration.MarketDataCacheDurationSeconds / 60;
+        if (ImGui.SliderInt("Market Data Cache Duration (Minutes)", ref cacheDurationMinutes, 5, 1440))
         {
-            configuration.MarketDataCacheDurationSeconds = cacheDuration;
+            configuration.MarketDataCacheDurationSeconds = cacheDurationMinutes * 60;
             configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            var ts = TimeSpan.FromMinutes(cacheDurationMinutes);
+            ImGui.SetTooltip(ts.Hours > 0 
+                ? $"Cache will expire after {ts.Hours} hours and {ts.Minutes} minutes" 
+                : $"Cache will expire after {ts.Minutes} minutes");
         }
         
         var maxConcurrent = configuration.MaxConcurrentApiRequests;
