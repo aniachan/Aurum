@@ -268,7 +268,8 @@ public class RecipeService
             IsSpecialist = recipe.IsSpecializationRequired,
             RecipeLevelTable = recipe.RecipeLevelTable.RowId,
             ItemCategory = recipe.ItemResult.Value.ItemUICategory.RowId,
-            MainCategory = DetermineMainCategory(recipe.ItemResult.Value)
+            MainCategory = DetermineMainCategory(recipe.ItemResult.Value),
+            EstimatedCraftTimeSeconds = EstimateCraftTime(recipe)
         };
         
         // Load ingredients (materials)
@@ -311,6 +312,26 @@ public class RecipeService
         return null;
     }
     
+    /// <summary>
+    /// Estimate craft time based on recipe characteristics
+    /// </summary>
+    private int EstimateCraftTime(Lumina.Excel.Sheets.Recipe recipe)
+    {
+        // Base time for most crafts
+        int baseTime = 20;
+
+        // Increase for higher difficulty/quality/durability
+        var difficulty = recipe.RecipeLevelTable.Value.Difficulty;
+        if (difficulty > 3000) baseTime += 20; // Expert/Master recipes
+        else if (difficulty > 1500) baseTime += 10;
+        
+        // Quick synthesis is faster, but we assume manual or macro for profit maximization usually
+        // If it's a very low level recipe relative to max, maybe assume faster?
+        // For now, let's keep it simple but slightly dynamic.
+        
+        return baseTime;
+    }
+
     /// <summary>
     /// Get all loaded recipes
     /// </summary>
