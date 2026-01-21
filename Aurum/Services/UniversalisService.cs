@@ -420,6 +420,18 @@ public class UniversalisService : IDisposable
         httpClient?.Dispose();
     }
 
+    private static void PropagateResult(Task<bool> source, TaskCompletionSource<bool> target)
+    {
+        if (source.Status == TaskStatus.RanToCompletion && source.Result)
+            target.TrySetResult(true);
+        else if (source.Status == TaskStatus.Canceled)
+            target.TrySetCanceled();
+        else if (source.Exception != null)
+            target.TrySetException(source.Exception);
+        else
+            target.TrySetResult(false);
+    }
+
     private async Task ProcessQueueAsync()
     {
         log.Info("UniversalisService queue processor started");
@@ -430,8 +442,44 @@ public class UniversalisService : IDisposable
             var request = requestQueue.DequeueBatch(maxItems: 100);
             if (request == null)
             {
+                // No requests? sleep for a bit
                 await Task.Delay(100, disposeCts.Token);
                 continue;
+            }
+
+            // COALESCING DELAY:
+            // If we pulled a request, there might be more incoming very soon (e.g. UI rendering a list).
+            // Wait a short window (e.g. 50-100ms) to see if more requests arrive, 
+            // so we can batch them into this one if possible.
+            if (request.ItemIds.Count < 100)
+            {
+                // Wait for potential coalescing
+                try 
+                {
+                    await Task.Delay(100, disposeCts.Token);
+                }
+                catch (OperationCanceledException) { break; }
+
+                // Check for more items for the SAME world
+                var secondRequest = requestQueue.DequeueBatchForWorld(request.WorldName, maxItems: 100 - request.ItemIds.Count);
+                if (secondRequest != null)
+                {
+                    // Merge!
+                    var combinedIds = request.ItemIds.Concat(secondRequest.ItemIds).Distinct().ToList();
+                    
+                    var superRequest = new QueuedRequest(request.WorldName, combinedIds, request.Priority > secondRequest.Priority ? request.Priority : secondRequest.Priority);
+                    
+                    // Propagate completion to both originals
+                    _ = superRequest.CompletionSource.Task.ContinueWith(t => 
+                    {
+                         PropagateResult(t, request.CompletionSource);
+                         PropagateResult(t, secondRequest.CompletionSource);
+                    });
+
+                    // Proceed with superRequest
+                    request = superRequest;
+                    log.Debug($"Coalesced requests: {combinedIds.Count} items");
+                }
             }
 
             // OPTIMIZATION: Re-check cache before fetching

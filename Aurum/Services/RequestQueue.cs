@@ -266,6 +266,83 @@ public class RequestQueue
         }
     }
 
+    /// <summary>
+    /// Dequeues a batch of requests specifically for the given world.
+    /// Used for coalescing subsequent requests into an existing batch.
+    /// </summary>
+    public QueuedRequest? DequeueBatchForWorld(string worldName, int maxItems = 100)
+    {
+        lock (_queueLock)
+        {
+            if (_queue.Count == 0) return null;
+
+            // Find first request for this world
+            var primaryIndex = _queue.FindIndex(r => r.WorldName == worldName);
+            if (primaryIndex == -1) return null;
+            
+            var primary = _queue[primaryIndex];
+            
+            // If it's already big enough, just return it
+            if (primary.ItemIds.Count >= maxItems)
+            {
+                RemoveRequest(primary);
+                return primary;
+            }
+
+            // Start building batch
+            var batchIds = new HashSet<uint>(primary.ItemIds);
+            var mergedRequests = new List<QueuedRequest> { primary };
+            
+            // Scan subsequent items
+            for (int i = primaryIndex + 1; i < _queue.Count; i++)
+            {
+                var candidate = _queue[i];
+                
+                if (candidate.WorldName != worldName) continue;
+                
+                if (batchIds.Count + candidate.ItemIds.Count > maxItems) continue;
+                
+                foreach (var id in candidate.ItemIds) batchIds.Add(id);
+                mergedRequests.Add(candidate);
+                
+                if (batchIds.Count >= maxItems) break;
+            }
+            
+            // If we only found the primary, just return it
+            if (mergedRequests.Count == 1)
+            {
+                RemoveRequest(primary);
+                return primary;
+            }
+            
+            // Create super request
+            var combinedIds = batchIds.ToList();
+            var superRequest = new QueuedRequest(primary.WorldName, combinedIds, primary.Priority);
+            
+            _ = superRequest.CompletionSource.Task.ContinueWith(t => 
+            {
+                foreach (var req in mergedRequests)
+                {
+                    if (t.Status == TaskStatus.RanToCompletion && t.Result)
+                        req.CompletionSource.TrySetResult(true);
+                    else if (t.Status == TaskStatus.Canceled)
+                        req.CompletionSource.TrySetCanceled();
+                    else if (t.Exception != null)
+                        req.CompletionSource.TrySetException(t.Exception);
+                    else
+                        req.CompletionSource.TrySetResult(false);
+                }
+            });
+
+            foreach (var req in mergedRequests)
+            {
+                RemoveRequest(req);
+            }
+            
+            return superRequest;
+        }
+    }
+
     private void RemoveRequest(QueuedRequest req)
     {
         _queue.Remove(req);
