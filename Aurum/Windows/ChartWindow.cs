@@ -11,6 +11,10 @@ using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 // Implot is now imported through dalamud. Fancy charts can now be added.
 using Dalamud.Bindings.ImPlot;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Drawing.Processing;
 
 namespace Aurum.Windows;
 
@@ -312,6 +316,11 @@ public class ChartWindow : Window, IDisposable
                 if (ImGui.Selectable("Save as CSV"))
                 {
                     ExportChartDataToCsv();
+                }
+
+                if (ImGui.Selectable("Save Chart as PNG"))
+                {
+                    SaveChartAsPng();
                 }
 
                 ImGui.EndPopup();
@@ -1240,6 +1249,100 @@ public class ChartWindow : Window, IDisposable
         catch (Exception)
         {
             // Silently fail for now or log if logger available
+        }
+    }
+    
+    private void SaveChartAsPng()
+    {
+        if (currentData?.RecentHistory == null) return;
+
+        try
+        {
+            var history = currentData.RecentHistory.OrderBy(h => h.Timestamp).ToList();
+            if (!history.Any()) return;
+
+            // Dimensions
+            int width = 1200;
+            int height = 800;
+            int margin = 60;
+            int chartWidth = width - (2 * margin);
+            int chartHeight = height - (2 * margin);
+
+            using (var image = new Image<Rgba32>(width, height))
+            {
+                // Fill background
+                image.Mutate(x => x.Fill(Color.FromRgb(30, 30, 30)));
+
+                // Calculate scales
+                var minTime = history.Min(h => h.Timestamp).Ticks;
+                var maxTime = history.Max(h => h.Timestamp).Ticks;
+                var timeRange = maxTime - minTime;
+
+                var minPrice = (float)history.Min(h => h.PricePerUnit);
+                var maxPrice = (float)history.Max(h => h.PricePerUnit);
+                // Add some padding to price range
+                minPrice = Math.Max(0, minPrice * 0.9f);
+                maxPrice *= 1.1f;
+                var priceRange = maxPrice - minPrice;
+
+                if (timeRange <= 0) timeRange = 1;
+                if (priceRange <= 0) priceRange = 100;
+
+                // Draw Grid Lines & Axes
+                var gridColor = Color.FromRgba(255, 255, 255, 30);
+                var axisColor = Color.White;
+                
+                // Draw Axes
+                image.Mutate(ctx => {
+                    // Y-Axis
+                    var yStart = new PointF(margin, margin);
+                    var yEnd = new PointF(margin, height - margin);
+                    ctx.DrawLine(axisColor, 2, yStart, yEnd);
+
+                    // X-Axis
+                    var xStart = new PointF(margin, height - margin);
+                    var xEnd = new PointF(width - margin, height - margin);
+                    ctx.DrawLine(axisColor, 2, xStart, xEnd);
+                });
+
+                // Plot Data Points
+                var points = new List<PointF>();
+                foreach (var entry in history)
+                {
+                    float x = margin + ((float)(entry.Timestamp.Ticks - minTime) / timeRange) * chartWidth;
+                    float y = (height - margin) - ((entry.PricePerUnit - minPrice) / priceRange) * chartHeight;
+                    points.Add(new PointF(x, y));
+                }
+
+                if (points.Count > 1)
+                {
+                    // Draw Line
+                    image.Mutate(x => x.DrawLine(Color.FromRgb(100, 200, 255), 2, points.ToArray()));
+                    
+                    // Draw Area (optional, simplified)
+                    // To do a filled area, we'd need to close the polygon loop down to the x-axis
+                }
+
+                // Add Title
+                // Note: Text drawing requires fonts, which might be tricky without bundling a font file.
+                // For a first pass, we'll skip text or use simple primitives if needed.
+                // However, users usually want context.
+                // We can try to use a system font if available, but ImageSharp.Drawing needs a Font object.
+                // Given the constraints, let's just save the graph lines for now.
+                
+                // Save
+                var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var sanitizedName = string.Join("_", itemName.Split(Path.GetInvalidFileNameChars()));
+                var filePath = Path.Combine(documentsPath, $"Aurum_Chart_{sanitizedName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+                
+                image.SaveAsPng(filePath);
+                
+                Plugin.Log.Information($"Chart saved to {filePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, "Failed to save chart as PNG");
         }
     }
     
