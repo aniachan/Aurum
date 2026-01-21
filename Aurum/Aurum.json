@@ -1,5 +1,5 @@
 {
-  "Author": "Aurum Development Team",
+  "Author": "aniachan",
   "Name": "Aurum",
   "Punchline": "Smart crafting profit calculator with market demand analysis.",
   "Description": "A professional market board analyzer that calculates crafting profits while warning you about market risks. Uses Universalis API to show real-time demand, supply/demand ratios, and price trends. Prevents you from crafting items that won't sell!",

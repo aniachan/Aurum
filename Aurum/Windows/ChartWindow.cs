@@ -2,9 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.IO;
+using System.Text;
 using Dalamud.Interface.Windowing;
 using Aurum.Models;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 // Implot is now imported through dalamud. Fancy charts can now be added.
 using Dalamud.Bindings.ImPlot;
 
@@ -94,6 +98,28 @@ public class ChartWindow : Window, IDisposable
         }
         else
         {
+            // Export Controls
+            ImGui.SameLine(ImGui.GetWindowWidth() - 150);
+            if (ImGui.Button("📤 Export"))
+            {
+                ImGui.OpenPopup("ExportPopup");
+            }
+
+            if (ImGui.BeginPopup("ExportPopup"))
+            {
+                if (ImGui.Selectable("Copy to Clipboard"))
+                {
+                    CopyChartDataToClipboard();
+                }
+                
+                if (ImGui.Selectable("Save as CSV"))
+                {
+                    ExportChartDataToCsv();
+                }
+
+                ImGui.EndPopup();
+            }
+
             if (ImGui.BeginTabBar("ChartTabs"))
             {
                 if (ImGui.BeginTabItem("Price History"))
@@ -370,5 +396,48 @@ public class ChartWindow : Window, IDisposable
     public void Dispose()
     {
         // Cleanup resources if needed
+    }
+
+    private void CopyChartDataToClipboard()
+    {
+        if (currentData?.RecentHistory == null) return;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Date,Price,Quantity,HQ");
+
+        foreach (var entry in currentData.RecentHistory.OrderBy(h => h.Timestamp))
+        {
+            sb.AppendLine($"{entry.Timestamp},{entry.PricePerUnit},{entry.Quantity},{entry.IsHQ}");
+        }
+
+        ImGui.SetClipboardText(sb.ToString());
+    }
+
+    private void ExportChartDataToCsv()
+    {
+        if (currentData?.RecentHistory == null) return;
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Date,Price,Quantity,HQ");
+
+            foreach (var entry in currentData.RecentHistory.OrderBy(h => h.Timestamp))
+            {
+                sb.AppendLine($"{entry.Timestamp},{entry.PricePerUnit},{entry.Quantity},{entry.IsHQ}");
+            }
+
+            var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var sanitizedName = string.Join("_", itemName.Split(Path.GetInvalidFileNameChars()));
+            var filePath = Path.Combine(documentsPath, $"Aurum_{sanitizedName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+
+            File.WriteAllText(filePath, sb.ToString());
+            
+            // Optional: Notify user (could add a notification service later)
+        }
+        catch (Exception)
+        {
+            // Silently fail for now or log if logger available
+        }
     }
 }
