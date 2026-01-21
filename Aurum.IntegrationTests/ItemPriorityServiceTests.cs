@@ -155,5 +155,25 @@ namespace Aurum.IntegrationTests.Services
             Assert.Equal(90, sorted[0].ClassJobLevel);
             Assert.Equal(10, sorted[1].ClassJobLevel);
         }
+        [Fact]
+        public void SortRecipesByPriority_WithLimit_ReturnsTopN()
+        {
+            // Arrange
+            var recipes = Enumerable.Range(1, 10).Select(i => CreateMockRecipe(i * 10)).ToList();
+            
+            // Mock market data so that higher level = higher score
+            MarketData? GetMarketData(RecipeData r) => CreateMockMarketData(10, (uint)(r.ClassJobLevel * 100));
+
+            // Act
+            var top3 = _service.SortRecipesByPriority(recipes, GetMarketData, 3);
+            var all = _service.SortRecipesByPriority(recipes, GetMarketData, 0);
+
+            // Assert
+            Assert.Equal(3, top3.Count);
+            Assert.Equal(10, all.Count);
+            Assert.Equal(100, top3[0].ClassJobLevel); // Highest level should be first
+            Assert.Equal(90, top3[1].ClassJobLevel);
+            Assert.Equal(80, top3[2].ClassJobLevel);
+        }
     }
 }

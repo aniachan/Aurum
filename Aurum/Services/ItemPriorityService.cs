@@ -151,17 +151,24 @@ public class ItemPriorityService
     }
 
     /// <summary>
-    /// Sorts a list of recipes by their priority score in descending order.
+    /// Sorts a list of recipes by their priority score in descending order, optionally limiting the result.
     /// </summary>
     /// <param name="recipes">The list of recipes to sort.</param>
     /// <param name="getMarketData">A function to retrieve the last known market data for a recipe (can return null).</param>
+    /// <param name="limit">Optional limit to return only the top N items. If 0 or less, returns all.</param>
     /// <returns>A new list of recipes sorted by priority.</returns>
-    public List<RecipeData> SortRecipesByPriority(IEnumerable<RecipeData> recipes, Func<RecipeData, MarketData?> getMarketData)
+    public List<RecipeData> SortRecipesByPriority(IEnumerable<RecipeData> recipes, Func<RecipeData, MarketData?> getMarketData, int limit = 0)
     {
-        return recipes
+        var query = recipes
             .Select(r => new { Recipe = r, Score = CalculatePriority(r, getMarketData(r)) })
             .OrderByDescending(x => x.Score)
-            .Select(x => x.Recipe)
-            .ToList();
+            .Select(x => x.Recipe);
+
+        if (limit > 0)
+        {
+            query = query.Take(limit);
+        }
+
+        return query.ToList();
     }
 }

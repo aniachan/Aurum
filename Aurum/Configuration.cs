@@ -52,6 +52,9 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     // Risk Tolerance
     public RiskLevel MaxAcceptableRisk { get; set; } = RiskLevel.Medium;
     public bool ShowHighRiskItems { get; set; } = true;
+
+    // Fetch Settings
+    public int TopItemsToFetch { get; set; } = 50; // Default limit for API fetches
     
     // The below exists just to make saving less cumbersome
     public void Save()

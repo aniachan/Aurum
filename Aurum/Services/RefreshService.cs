@@ -113,7 +113,7 @@ public class RefreshService : IDisposable
         }
 
         int refreshCount = 0;
-        int maxRefreshPerCycle = 5; // Conservative limit per minute to avoid API spam
+        int maxRefreshPerCycle = configuration.TopItemsToFetch; // Use configurable limit
 
         foreach (var kvp in priorities.OrderByDescending(x => x.Value)) // Highest priority first
         {
