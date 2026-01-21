@@ -372,18 +372,40 @@ public class ProfitService
             IsDataComplete = true
         };
         
-        // Determine sale price (average or min based on market)
-        calculation.ExpectedSalePrice = marketData.CurrentAveragePriceNQ > 0
-            ? marketData.CurrentAveragePriceNQ
-            : marketData.MinPrice;
-        
-        // Get vendor sell price
-        calculation.VendorPrice = GetVendorPrice(recipe.ResultItemId);
+        // Suggested Price - Undercut current lowest price by 1 gil, or use vendor price if higher
+        var lowestPrice = marketData.MinPrice;
+        if (lowestPrice > 0)
+        {
+            calculation.ExpectedSalePrice = lowestPrice > 1 ? lowestPrice - 1 : lowestPrice;
+        }
+        else if (marketData.CurrentAveragePriceNQ > 0)
+        {
+            // Fallback to average NQ price if no listings
+            calculation.ExpectedSalePrice = marketData.CurrentAveragePriceNQ;
+        }
+        else
+        {
+            // Fallback to vendor price * 3 (arbitrary markup if no market data)
+            calculation.ExpectedSalePrice = calculation.VendorPrice * 3;
+        }
+
+        // Ensure we don't go below vendor price (plus a small margin)
+        if (calculation.ExpectedSalePrice < calculation.VendorPrice)
+        {
+            calculation.ExpectedSalePrice = calculation.VendorPrice;
+        }
         
         // Apply HQ pricing if available and configured
         if (config.UseHQPricesWhenAvailable && recipe.CanBeHQ && marketData.CurrentAveragePriceHQ > 0)
         {
             calculation.ExpectedSalePrice = marketData.CurrentAveragePriceHQ;
+            
+            // Also check current listings for HQ specifically to undercut properly
+            var lowestHQ = marketData.Listings.Where(l => l.IsHQ).MinBy(l => l.PricePerUnit)?.PricePerUnit ?? 0;
+            if (lowestHQ > 0)
+            {
+                 calculation.ExpectedSalePrice = lowestHQ > 1 ? lowestHQ - 1 : lowestHQ;
+            }
         }
         
         // Calculate market board tax (5%)
