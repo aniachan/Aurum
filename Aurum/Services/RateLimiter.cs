@@ -140,16 +140,21 @@ public class RateLimiter : IDisposable
             {
                 RefillTokens();
 
-                // Simple priority handling:
-                // High priority requests can consume tokens even if low
-                // Low priority requests might need to wait for a "surplus" or just standard FIFO
-                // For now, let's just let High priority skip checks or reserve tokens?
-                // Actually, simple token bucket doesn't discriminate. 
-                // The discrimination happens in the RequestQueue usually.
-                // But we can implement a "reserve" system or check queue depth here if we wanted.
-                // Given the RequestQueue handles ordering, RateLimiter just needs to gate.
+                // High priority requests can consume tokens even if it means going into a slight deficit or skipping "fairness" checks
+                // For now, we allow High/Critical to proceed if we have *any* token, even if technically we should wait for a "full" token if fractional.
+                // But _tokens >= 1.0 check is already permissive enough.
+                // Let's reserve a portion of the burst for High priority?
+                // E.g. If tokens < 5.0 and Priority is Low/Background, force wait?
+                // This ensures we always have capacity for a burst of user interactions.
                 
-                if (_tokens >= 1.0)
+                double requiredThreshold = 1.0;
+                if (priority == RequestPriority.Background && _maxTokens > 10)
+                {
+                    // Background tasks must leave at least 20% of burst capacity for interactive usage
+                    requiredThreshold = Math.Max(1.0, _maxTokens * 0.2);
+                }
+
+                if (_tokens >= requiredThreshold)
                 {
                     // Check endpoint limit if applicable
                     if (endpoint != null)

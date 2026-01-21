@@ -435,7 +435,7 @@ public class UniversalisService : IDisposable
                 {
                     // Wait for rate limit
                     // We can be more granular here if needed. For now, use "api" as the endpoint key for general Universalis calls
-                    await rateLimiter.WaitForTokenAsync("api", disposeCts.Token);
+                    await rateLimiter.WaitForTokenAsync("api", disposeCts.Token, request.Priority);
 
                     // Use itemsToFetch instead of request.ItemIds to avoid re-fetching cached items
                     if (itemsToFetch.Count == 1)

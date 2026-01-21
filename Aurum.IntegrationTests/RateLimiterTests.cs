@@ -6,6 +6,7 @@ using Aurum.Services;
 using Aurum;
 using Dalamud.Plugin.Services;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Aurum.IntegrationTests
 {
@@ -90,6 +91,45 @@ namespace Aurum.IntegrationTests
 
             // It's hard to deterministically test small waits, but let's check counters
             Assert.Equal(51, limiter.TotalRequests);
+        }
+
+        [Fact]
+        public async Task WaitForTokenAsync_ReservesCapacity_ForInteractivePriority()
+        {
+            // Arrange
+            // Low refill rate but reasonable burst
+            _config.ApiRateLimitPerMinute = 60; // 1 req/sec
+            // Burst will be 25
+            var limiter = new RateLimiter(_mockLog.Object, _config, null);
+
+            // Calculate threshold: 20% of 25 = 5 tokens.
+            // If tokens < 5, Background requests should block.
+            
+            // Consume tokens until we are just below threshold.
+            // Start with 25. Consume 21. Remaining = 4.
+            for (int i = 0; i < 21; i++)
+            {
+                await limiter.WaitForTokenAsync("setup", default, RequestPriority.Normal);
+            }
+            
+            // Now verify Background blocks but Normal/High proceeds
+            
+            // 1. Normal/High should pass immediately (since > 1.0 token)
+            var sw = Stopwatch.StartNew();
+            await limiter.WaitForTokenAsync("normal", default, RequestPriority.Normal);
+            sw.Stop();
+            Assert.True(sw.ElapsedMilliseconds < 500, "Normal priority should not be blocked by reserve");
+            
+            // Now Remaining is approx 3.
+            
+            // 2. Background should block because 3 < 5
+            // It will wait until tokens refill to >= 5.
+            // We need +2 tokens. At 1 req/sec, that's 2 seconds.
+            sw.Restart();
+            await limiter.WaitForTokenAsync("background", default, RequestPriority.Background);
+            sw.Stop();
+            
+            Assert.True(sw.ElapsedMilliseconds >= 1900, $"Background should wait for reserve (actual: {sw.ElapsedMilliseconds}ms)");
         }
     }
 }
