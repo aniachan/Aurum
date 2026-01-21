@@ -967,14 +967,73 @@ public class ChartWindow : Window, IDisposable
             // Stacked Bar Chart Implementation
             // Strategy: Draw Total (HQ color) first, then NQ (NQ color) on top (covering the bottom part).
             // Visual result: Bottom = NQ (Blue), Top = HQ (Gold).
+
+            // Calculate Outlier Threshold using IQR
+            var prices = listings.Select(x => (double)x.PricePerUnit).ToList();
+            double outlierThreshold = double.MaxValue;
+
+            if (prices.Count >= 4)
+            {
+                int q1Idx = prices.Count / 4;
+                int q3Idx = (prices.Count * 3) / 4;
+                double q1 = prices[q1Idx];
+                double q3 = prices[q3Idx];
+                double iqr = q3 - q1;
+                // If IQR is 0 (all prices same), use a multiplier fallback
+                if (iqr <= 0) iqr = q3 * 0.5;
+                
+                outlierThreshold = q3 + (1.5 * iqr);
+            }
+
+            // Fallback / Sanity check
+            if (outlierThreshold <= minPrice || outlierThreshold == double.MaxValue)
+            {
+                 outlierThreshold = minPrice * 3.0;
+            }
+
+            // Split counts into Normal and Outlier
+            var countsTotalNormal = new double[bucketCount + 1];
+            var countsNQNormal = new double[bucketCount + 1];
+            var countsTotalOutlier = new double[bucketCount + 1];
+            var countsNQOutlier = new double[bucketCount + 1];
             
-            // Draw Total (background for stack) - represents HQ part on top
+            // Re-distribute counts
+            foreach (var listing in listings)
+            {
+                int bucketIndex = (int)((listing.PricePerUnit - minPrice) / bucketSize);
+                if (bucketIndex < 0) bucketIndex = 0;
+                if (bucketIndex > bucketCount) bucketIndex = bucketCount;
+                
+                bool isOutlier = listing.PricePerUnit > outlierThreshold;
+                
+                if (isOutlier)
+                {
+                    countsTotalOutlier[bucketIndex] += listing.Quantity;
+                    if (!listing.IsHQ) countsNQOutlier[bucketIndex] += listing.Quantity;
+                }
+                else
+                {
+                    countsTotalNormal[bucketIndex] += listing.Quantity;
+                    if (!listing.IsHQ) countsNQNormal[bucketIndex] += listing.Quantity;
+                }
+            }
+            
+            // Draw Normal (Total then NQ)
             ImPlot.SetNextFillStyle(new Vector4(1f, 0.84f, 0f, 0.8f)); // Soft Gold for HQ
-            ImPlot.PlotBars("HQ Volume", ref plotX[0], ref countsTotal[0], bucketCount + 1, bucketSize);
+            ImPlot.PlotBars("HQ Volume", ref plotX[0], ref countsTotalNormal[0], bucketCount + 1, bucketSize);
             
-            // Draw NQ (foreground) - represents NQ part on bottom
             ImPlot.SetNextFillStyle(new Vector4(0.2f, 0.7f, 1f, 0.8f)); // Soft Blue for NQ
-            ImPlot.PlotBars("NQ Volume", ref plotX[0], ref countsNQ[0], bucketCount + 1, bucketSize);
+            ImPlot.PlotBars("NQ Volume", ref plotX[0], ref countsNQNormal[0], bucketCount + 1, bucketSize);
+
+            // Draw Outliers (Total then NQ)
+            if (countsTotalOutlier.Sum() > 0)
+            {
+                ImPlot.SetNextFillStyle(new Vector4(1f, 0.3f, 0.3f, 0.8f)); // Red for Outlier HQ
+                ImPlot.PlotBars("Outlier HQ", ref plotX[0], ref countsTotalOutlier[0], bucketCount + 1, bucketSize);
+
+                ImPlot.SetNextFillStyle(new Vector4(0.8f, 0.1f, 0.1f, 0.8f)); // Dark Red for Outlier NQ
+                ImPlot.PlotBars("Outlier NQ", ref plotX[0], ref countsNQOutlier[0], bucketCount + 1, bucketSize);
+            }
 
             // Highlight Current Min Price (Market Price) with cleaner line
             double currentMin = (double)currentData.MinPrice;
@@ -983,13 +1042,12 @@ public class ChartWindow : Window, IDisposable
             double[] minLineY = { 0, countsTotal.Max() * 1.1 }; // Go a bit above max
             ImPlot.PlotLine("Market Price", ref minLineX[0], ref minLineY[0], 2);
 
-            // Highlight Outliers
-            double outlierThreshold = currentMin * 3.0;
+            // Highlight Outliers Threshold
             if (maxPrice > outlierThreshold)
             {
                  ImPlot.SetNextLineStyle(new Vector4(1f, 0.4f, 0.4f, 0.7f), 2.0f);
                  double[] outlierX = { outlierThreshold, outlierThreshold };
-                 ImPlot.PlotLine("High Price Warning", ref outlierX[0], ref minLineY[0], 2);
+                 ImPlot.PlotLine("Outlier Threshold", ref outlierX[0], ref minLineY[0], 2);
             }
             
             ImPlot.EndPlot();
