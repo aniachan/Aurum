@@ -20,6 +20,8 @@ public class ChartWindow : Window, IDisposable
     private MarketData? currentData;
     private string itemName = "Unknown Item";
     private int selectedTimeRange = 30; // Default 30 days, -1 for All
+    private bool shouldFitHistory = true;
+    private bool shouldFitDistribution = true;
 
     private class ChartSeries
     {
@@ -96,6 +98,13 @@ public class ChartWindow : Window, IDisposable
     {
         if (comparisonSeries.Any(s => s.Data.ItemId == data.ItemId)) return;
         
+        // If this is the first data being added, set it as current
+        if (currentData == null)
+        {
+            SetMarketData(data, name);
+            return;
+        }
+        
         int colorIndex = comparisonSeries.Count % SeriesColors.Length;
         comparisonSeries.Add(new ChartSeries
         {
@@ -129,6 +138,15 @@ public class ChartWindow : Window, IDisposable
         if (ImGui.RadioButton("90 Days", selectedTimeRange == 90)) selectedTimeRange = 90;
         ImGui.SameLine();
         if (ImGui.RadioButton("All Time", selectedTimeRange == -1)) selectedTimeRange = -1;
+
+        ImGui.SameLine();
+        ImGui.Spacing();
+        ImGui.SameLine();
+        if (ImGui.Button("Fit Zoom"))
+        {
+            shouldFitHistory = true;
+            shouldFitDistribution = true;
+        }
 
         ImGui.Separator();
 
@@ -219,10 +237,16 @@ public class ChartWindow : Window, IDisposable
     {
         if (currentData?.RecentHistory == null) return;
 
+        if (shouldFitHistory)
+        {
+            ImPlot.SetNextAxesToFit();
+            shouldFitHistory = false;
+        }
+
         if (ImPlot.BeginPlot("Price History & Supply/Demand", new Vector2(-1, 400), ImPlotFlags.None))
         {
             // Setup axes
-            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.AutoFit, ImPlotAxisFlags.AutoFit);
+            ImPlot.SetupAxes("Date", "Price (Gil)", ImPlotAxisFlags.None, ImPlotAxisFlags.AutoFit);
             ImPlot.SetupAxisScale(ImAxis.X1, ImPlotScale.Time);
             
             // Setup Y2 axis for Volume / Listings
@@ -428,6 +452,12 @@ public class ChartWindow : Window, IDisposable
             if (bucketIndex < 0) bucketIndex = 0;
             if (bucketIndex > bucketCount) bucketIndex = bucketCount;
             counts[bucketIndex] += listing.Quantity; // Use Quantity for volume at price, or 1 for number of listings? Issue says "Histogram of listing prices" usually implies volume or count. Let's use Quantity (Depth).
+        }
+
+        if (shouldFitDistribution)
+        {
+            ImPlot.SetNextAxesToFit();
+            shouldFitDistribution = false;
         }
 
         if (ImPlot.BeginPlot("Price Distribution (Market Depth)", new Vector2(-1, 400), ImPlotFlags.None))
