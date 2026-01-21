@@ -10,13 +10,13 @@ public class CacheService
 {
     private readonly Dictionary<string, CacheEntry> cache = new();
     private readonly object lockObject = new();
-    private readonly Configuration config;
+    private readonly ICacheConfig config;
     
     // Statistics
     private long _hits;
     private long _misses;
     
-    public CacheService(Configuration config)
+    public CacheService(ICacheConfig config)
     {
         this.config = config;
     }
@@ -32,6 +32,7 @@ public class CacheService
             {
                 if (!entry.IsExpired)
                 {
+                    entry.LastAccessed = DateTime.UtcNow;
                     System.Threading.Interlocked.Increment(ref _hits);
                     value = entry.Value as T;
                     return value != null;
@@ -64,11 +65,47 @@ public class CacheService
     {
         lock (lockObject)
         {
+            // If cache is full and we're adding a new key, evict LRU
+            if (cache.Count >= config.MaxCacheEntries && !cache.ContainsKey(key))
+            {
+                EvictLru();
+            }
+
             cache[key] = new CacheEntry
             {
                 Value = value,
-                ExpiresAt = DateTime.UtcNow.Add(ttl)
+                ExpiresAt = DateTime.UtcNow.Add(ttl),
+                LastAccessed = DateTime.UtcNow
             };
+        }
+    }
+    
+    private void EvictLru()
+    {
+        if (cache.Count == 0) return;
+
+        // First remove any expired entries
+        if (RemoveExpired() > 0 && cache.Count < config.MaxCacheEntries)
+        {
+            return;
+        }
+
+        // Find the oldest accessed entry
+        string? lruKey = null;
+        DateTime oldestAccess = DateTime.MaxValue;
+
+        foreach (var kvp in cache)
+        {
+            if (kvp.Value.LastAccessed < oldestAccess)
+            {
+                oldestAccess = kvp.Value.LastAccessed;
+                lruKey = kvp.Key;
+            }
+        }
+
+        if (lruKey != null)
+        {
+            cache.Remove(lruKey);
         }
     }
     
@@ -171,6 +208,7 @@ public class CacheService
     {
         public object Value { get; set; } = null!;
         public DateTime ExpiresAt { get; set; }
+        public DateTime LastAccessed { get; set; } = DateTime.UtcNow;
         public bool IsExpired => DateTime.UtcNow > ExpiresAt;
     }
 }

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace Aurum;
 
 [Serializable]
-public class Configuration : IPluginConfiguration
+public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
 {
     public int Version { get; set; } = 0;
 
@@ -21,6 +21,7 @@ public class Configuration : IPluginConfiguration
     // API Settings
     public string PreferredWorld { get; set; } = "Auto";  // or specific world name
     public int MarketDataCacheDurationSeconds { get; set; } = 300;  // 5 minutes
+    public int MaxCacheEntries { get; set; } = 1000;
     public int MaxConcurrentApiRequests { get; set; } = 5;
     public int ApiRateLimitPerMinute { get; set; } = 900; // 15 requests/second * 60 = 900
     

@@ -18,6 +18,8 @@ class Program
     {
         Console.WriteLine("=== Aurum Universalis API Integration Tests ===\n");
         
+        CacheServiceTests.Run();
+
         await TestSingleItemMarketData();
         await TestBulkMarketData();
         await TestInvalidItem();
