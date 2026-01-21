@@ -19,6 +19,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+    [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
     private const string CommandName = "/aurum";
@@ -70,7 +71,7 @@ public sealed class Plugin : IDalamudPlugin
         
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
-        RateLimiter = new RateLimiter(Log, Configuration, DatabaseService);
+        RateLimiter = new RateLimiter(Log, Configuration, ChatGui, DatabaseService);
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration);

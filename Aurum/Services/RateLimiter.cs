@@ -6,12 +6,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text;
+
 namespace Aurum.Services;
 
 public class RateLimiter : IDisposable
 {
     private readonly IPluginLog log;
     private readonly Configuration configuration;
+    private readonly IChatGui chat;
     private readonly DatabaseService? database; // Add dependency for persistent tracking
     
     // Token Bucket State
@@ -35,6 +39,7 @@ public class RateLimiter : IDisposable
     private DateTime _lastDailyReset = DateTime.UtcNow.Date;
 
     private DateTime _pausedUntil = DateTime.MinValue;
+    private DateTime _lastAlertTime = DateTime.MinValue;
 
     public long TotalErrors { get; private set; }
     public long TotalRetries { get; private set; }
@@ -66,10 +71,11 @@ public class RateLimiter : IDisposable
         }
     }
 
-    public RateLimiter(IPluginLog log, Configuration config, DatabaseService? database = null)
+    public RateLimiter(IPluginLog log, Configuration config, IChatGui chat, DatabaseService? database = null)
     {
         this.log = log;
         this.configuration = config;
+        this.chat = chat;
         this.database = database;
         
         // Calculate rate from config or default
@@ -100,6 +106,26 @@ public class RateLimiter : IDisposable
             {
                 _pausedUntil = until;
                 log.Warning($"Rate limiter paused until {_pausedUntil} (UTC)");
+            }
+        }
+    }
+
+    private void CheckRateLimitAlert(int currentRequests, int limit)
+    {
+        // Alert at 90% usage
+        if (currentRequests >= limit * 0.9)
+        {
+            var now = DateTime.UtcNow;
+            if ((now - _lastAlertTime).TotalMinutes >= 5) // Don't spam alerts more than once every 5 mins
+            {
+                _lastAlertTime = now;
+                var message = new SeStringBuilder()
+                    .AddUiForeground("[Aurum] ", 45)
+                    .AddText($"Approaching API rate limit ({currentRequests}/{limit}). Slowing down requests.")
+                    .Build();
+                
+                chat.Print(message);
+                log.Warning($"Approaching API rate limit: {currentRequests}/{limit}");
             }
         }
     }
@@ -225,6 +251,13 @@ public class RateLimiter : IDisposable
         {
             PruneQueue(_minuteHistory, TimeSpan.FromMinutes(1));
             PruneQueue(_hourHistory, TimeSpan.FromHours(1));
+            
+            // Check for alert condition
+            var limit = configuration.ApiRateLimitPerMinute;
+            if (limit > 0)
+            {
+                 CheckRateLimitAlert(_minuteHistory.Count, limit);
+            }
         }
     }
 

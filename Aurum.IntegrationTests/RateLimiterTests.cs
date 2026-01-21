@@ -13,11 +13,13 @@ namespace Aurum.IntegrationTests
     public class RateLimiterTests
     {
         private Mock<IPluginLog> _mockLog;
+        private Mock<IChatGui> _mockChat;
         private Configuration _config;
 
         public RateLimiterTests()
         {
             _mockLog = new Mock<IPluginLog>();
+            _mockChat = new Mock<IChatGui>();
             _config = new Configuration();
         }
 
@@ -26,7 +28,7 @@ namespace Aurum.IntegrationTests
         {
             // Arrange
             _config.ApiRateLimitPerMinute = 6000; // 100 req/sec
-            var limiter = new RateLimiter(_mockLog.Object, _config, null);
+            var limiter = new RateLimiter(_mockLog.Object, _config, _mockChat.Object, null);
 
             // Act
             var sw = Stopwatch.StartNew();
@@ -46,7 +48,7 @@ namespace Aurum.IntegrationTests
         {
             // Arrange
             _config.ApiRateLimitPerMinute = 60; // 1 req/sec
-            var limiter = new RateLimiter(_mockLog.Object, _config, null);
+            var limiter = new RateLimiter(_mockLog.Object, _config, _mockChat.Object, null);
 
             // Consume initial burst (default max is burst capacity, approx 25 or 2*rate)
             // Rate = 1 req/s. MaxTokens = Max(25, 2) = 25.
@@ -71,7 +73,7 @@ namespace Aurum.IntegrationTests
         {
              // Arrange
             _config.ApiRateLimitPerMinute = 6000; // Fast global limit
-            var limiter = new RateLimiter(_mockLog.Object, _config, null);
+            var limiter = new RateLimiter(_mockLog.Object, _config, _mockChat.Object, null);
             
             // The EndpointLimiter in RateLimiter.cs is hardcoded to (1000, 50) currently in GetOrAdd
             // new EndpointLimiter(1000, 50) -> 1000 req/min ~ 16.6 req/sec. Burst 50.
@@ -100,7 +102,7 @@ namespace Aurum.IntegrationTests
             // Low refill rate but reasonable burst
             _config.ApiRateLimitPerMinute = 60; // 1 req/sec
             // Burst will be 25
-            var limiter = new RateLimiter(_mockLog.Object, _config, null);
+            var limiter = new RateLimiter(_mockLog.Object, _config, _mockChat.Object, null);
 
             // Calculate threshold: 20% of 25 = 5 tokens.
             // If tokens < 5, Background requests should block.
