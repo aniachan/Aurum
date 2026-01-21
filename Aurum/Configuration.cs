@@ -36,6 +36,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool UseHQPricesWhenAvailable { get; set; } = true;
     public bool CalculateOpportunityCost { get; set; } = true;
     public int DefaultCraftingTimeSeconds { get; set; } = 20;
+    public int EstimatedGatheringTimeSeconds { get; set; } = 15;
     
     // Display Settings
     public bool ShowOnlyProfitableItems { get; set; } = true;

@@ -449,9 +449,19 @@ public class ProfitService
             ? recipe.EstimatedCraftTimeSeconds 
             : config.DefaultCraftingTimeSeconds;
         
-        var craftTimeHours = craftTimeSeconds / 3600f;
-        calculation.GilPerHour = craftTimeHours > 0 
-            ? (int)(calculation.RawProfit / craftTimeHours)
+        // Add gathering time if using self-gathered items
+        int gatheringTimeSeconds = 0;
+        if (config.DefaultCostMode == CostMode.SelfGathered || config.DefaultCostMode == CostMode.Cheapest)
+        {
+            gatheringTimeSeconds = CalculateGatheringTime(ingredientTree);
+        }
+        calculation.GatheringTimeSeconds = gatheringTimeSeconds;
+        
+        var totalTimeSeconds = craftTimeSeconds + gatheringTimeSeconds;
+        var totalTimeHours = totalTimeSeconds / 3600f;
+        
+        calculation.GilPerHour = totalTimeHours > 0 
+            ? (int)(calculation.RawProfit / totalTimeHours)
             : 0;
         
         // Calculate profit score (0-100 based on profit alone)
@@ -475,6 +485,28 @@ public class ProfitService
         return calculation;
     }
     
+    /// <summary>
+    /// Calculate estimated gathering time for self-gathered materials
+    /// </summary>
+    private int CalculateGatheringTime(IngredientTree tree)
+    {
+        int totalGatheringTime = 0;
+        
+        // Helper to check if item is gathered (CostSource.SelfGathered)
+        // We iterate the flat list to find all SelfGathered items
+        foreach (var item in tree.FlatIngredientList)
+        {
+            if (item.Source == CostSource.SelfGathered)
+            {
+                // Simple estimation: constant time per item gathered
+                // In reality, this would depend on node locations, GP, etc.
+                totalGatheringTime += item.Quantity * config.EstimatedGatheringTimeSeconds;
+            }
+        }
+        
+        return totalGatheringTime;
+    }
+
     /// <summary>
     /// Calculate profit score (0-100) based on profit metrics
     /// </summary>

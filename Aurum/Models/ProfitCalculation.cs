@@ -83,6 +83,7 @@ public class ProfitCalculation
     public int ProfitVsMaterials { get; set; }   // Net sale - OpportunityCost
     public float ProfitMargin { get; set; }      // profit / sale_price * 100
     public int GilPerHour { get; set; }          // profit / craft_time
+    public int GatheringTimeSeconds { get; set; } // Estimated time to gather materials
     
     // Convenience property for new code preferring "NetProfit"
     public int NetProfit { get => RawProfit; set => RawProfit = value; }
