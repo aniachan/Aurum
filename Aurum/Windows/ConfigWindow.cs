@@ -277,6 +277,26 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
         }
 
+        var topItems = configuration.TopItemsToFetch;
+        if (ImGui.SliderInt("Max Items to Fetch per Cycle", ref topItems, 10, 100))
+        {
+            configuration.TopItemsToFetch = topItems;
+            configuration.Save();
+        }
+
+        var maxTracked = configuration.MaxItemsToTrack;
+        if (ImGui.InputInt("Max Items to Track", ref maxTracked))
+        {
+            // Set reasonable limits (e.g., min 100, max 10000)
+            maxTracked = Math.Clamp(maxTracked, 100, 10000);
+            configuration.MaxItemsToTrack = maxTracked;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Maximum number of items to keep in the priority tracking system.\nOlder/lower priority items may be removed when this limit is reached.");
+        }
+
         ImGui.Separator();
         ImGui.Text("Database Settings");
         

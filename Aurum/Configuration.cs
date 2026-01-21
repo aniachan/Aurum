@@ -66,6 +66,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
 
     // Fetch Settings
     public int TopItemsToFetch { get; set; } = 50; // Default limit for API fetches
+    public int MaxItemsToTrack { get; set; } = 2000; // Limit for items stored/tracked (NEW)
     
     // Database Settings
     public int DatabaseVacuumFrequencyDays { get; set; } = 7; // Default weekly
