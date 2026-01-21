@@ -59,6 +59,10 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     // Fetch Settings
     public int TopItemsToFetch { get; set; } = 50; // Default limit for API fetches
     
+    // Database Settings
+    public int DatabaseVacuumFrequencyDays { get; set; } = 7; // Default weekly
+    public DateTime LastDatabaseVacuum { get; set; } = DateTime.MinValue;
+    
     // The below exists just to make saving less cumbersome
     public void Save()
     {

@@ -941,6 +941,31 @@ public class DatabaseService : IDisposable
         log.Information("Running database VACUUM...");
         ExecuteSafe("VACUUM;");
     }
+
+    public void CheckAndRunVacuum(int frequencyDays, DateTime lastVacuum, Action<DateTime> onVacuumComplete)
+    {
+        if (frequencyDays <= 0) return; // Disabled
+
+        var daysSince = (DateTime.UtcNow - lastVacuum).TotalDays;
+        if (daysSince >= frequencyDays)
+        {
+            log.Information($"Database maintenance due (last run: {daysSince:F1} days ago). Running VACUUM...");
+            
+            // Run in background to not block startup
+            Task.Run(() => 
+            {
+                try
+                {
+                    Vacuum();
+                    onVacuumComplete(DateTime.UtcNow);
+                }
+                catch (Exception ex)
+                {
+                    log.Error(ex, "Failed to run scheduled database maintenance");
+                }
+            });
+        }
+    }
     
     public long GetDatabaseSize()
     {

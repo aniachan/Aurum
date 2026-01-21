@@ -71,6 +71,18 @@ public sealed class Plugin : IDalamudPlugin
         
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
+        
+        // Schedule database maintenance
+        DatabaseService.CheckAndRunVacuum(
+            Configuration.DatabaseVacuumFrequencyDays,
+            Configuration.LastDatabaseVacuum,
+            (completedAt) => 
+            {
+                Configuration.LastDatabaseVacuum = completedAt;
+                Configuration.Save();
+            }
+        );
+
         RateLimiter = new RateLimiter(Log, Configuration, ChatGui, DatabaseService);
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log);

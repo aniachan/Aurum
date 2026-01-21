@@ -234,10 +234,29 @@ public class ConfigWindow : Window, IDisposable
         if (ImGui.Button("Optimize Database (VACUUM)"))
         {
             Aurum.Plugin.Instance?.DatabaseService?.Vacuum();
+            // Update last vacuum time
+            configuration.LastDatabaseVacuum = DateTime.UtcNow;
+            configuration.Save();
         }
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip("Reclaims unused space and defragments the database file.\nMay take a few seconds.");
+        }
+        
+        var vacuumFreq = configuration.DatabaseVacuumFrequencyDays;
+        if (ImGui.InputInt("Auto-Optimize Frequency (Days)", ref vacuumFreq))
+        {
+            configuration.DatabaseVacuumFrequencyDays = Math.Max(0, vacuumFreq); // Ensure non-negative
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("How often to automatically run database optimization.\nSet to 0 to disable.");
+        }
+
+        if (configuration.LastDatabaseVacuum != DateTime.MinValue)
+        {
+            ImGui.TextDisabled($"Last optimized: {configuration.LastDatabaseVacuum.ToLocalTime()}");
         }
 
         ImGui.Separator();
