@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using System.Diagnostics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
@@ -37,6 +38,7 @@ public class DashboardWindow : Window, IDisposable
     
     private readonly string[] craftingClasses = { "All", "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
     private string lastErrorMessage = string.Empty;
+    private string lastErrorSuggestion = string.Empty;
     private DateTime lastErrorTime = DateTime.MinValue;
 
     public DashboardWindow(Plugin plugin) 
@@ -58,10 +60,21 @@ public class DashboardWindow : Window, IDisposable
         DrawHeader();
         ImGui.Separator();
         
-        if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalSeconds < 10)
+        if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
         {
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.3f, 0.3f, 1f));
             ImGui.TextWrapped($"⚠️ {lastErrorMessage}");
+            
+            // Show suggestion if available
+            var suggestion = ErrorMessageUtils.GetSuggestion(new Exception(lastErrorMessage)); // Hacky, but works since we store the friendly message mostly
+            // Better approach: Store the exception or get suggestion when error occurs
+            // But we only have lastErrorMessage string here.
+            // Let's modify Draw() to use a stored suggestion string
+            if (!string.IsNullOrEmpty(lastErrorSuggestion))
+            {
+                ImGui.TextDisabled($"💡 {lastErrorSuggestion}");
+            }
+            
             ImGui.PopStyleColor();
             ImGui.Separator();
         }
@@ -133,10 +146,35 @@ public class DashboardWindow : Window, IDisposable
 
         ImGui.SameLine();
 
-        if (ImGui.Button("📥 Export CSV"))
-        {
-             _ = ExportToCsvAsync();
-        }
+            if (ImGui.Button("📥 Export CSV"))
+            {
+                 _ = ExportToCsvAsync();
+            }
+            
+            // Error Reporting Button (shows when an error has occurred recently)
+            if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
+            {
+                ImGui.SameLine();
+                ImGui.PushFont(UiBuilder.IconFont);
+                if (ImGui.Button($"{FontAwesomeIcon.Bug.ToIconString()}##ReportError"))
+                {
+                     // Open GitHub issues page with pre-filled title
+                     try 
+                     {
+                         var title = $"[Bug] Error: {lastErrorMessage}";
+                         var url = $"https://github.com/Dicklesworthstone/Aurum/issues/new?title={Uri.EscapeDataString(title)}&body=Describe%20what%20you%20were%20doing%20when%20this%20occurred...";
+                         
+                         Process.Start(new ProcessStartInfo
+                         {
+                             FileName = url,
+                             UseShellExecute = true
+                         });
+                     }
+                     catch { /* Ignore navigation errors */ }
+                }
+                ImGui.PopFont();
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Report this error on GitHub");
+            }
         
         // Stats row
         if (profitResults.Any())
@@ -482,6 +520,7 @@ public class DashboardWindow : Window, IDisposable
         catch (Exception ex)
         {
             lastErrorMessage = ErrorMessageUtils.GetUserFriendlyMessage(ex);
+            lastErrorSuggestion = ErrorMessageUtils.GetSuggestion(ex);
             lastErrorTime = DateTime.UtcNow;
             Plugin.Log.Error(ex, "Error refreshing market data");
         }

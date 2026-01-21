@@ -42,6 +42,12 @@ public static class ErrorMessageUtils
         if (message.Contains("timeout"))
             return "Try refreshing fewer items or wait a bit.";
             
+        if (message.Contains("500") || message.Contains("502") || message.Contains("503") || message.Contains("504"))
+            return "Server maintenance or temporary issue. Try again in 10-15 minutes.";
+
+        if (message.Contains("SQLite Error") || message.Contains("database is locked"))
+            return "Restarting the game might fix this if it keeps happening.";
+
         return "If this persists, please report it on GitHub.";
     }
 }
