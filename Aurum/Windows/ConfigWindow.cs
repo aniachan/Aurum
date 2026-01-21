@@ -33,6 +33,7 @@ public class ConfigWindow : Window, IDisposable
     public override void PreDraw()
     {
         ThemeManager.PushWindowStyles(configuration.ColorTheme);
+        ImGui.GetIO().FontGlobalScale = configuration.UIScale;
         
         // Flags must be added or removed before Draw() is being called, or they won't apply
         if (configuration.IsConfigWindowMovable)
@@ -48,6 +49,7 @@ public class ConfigWindow : Window, IDisposable
     public override void PostDraw()
     {
         ThemeManager.PopWindowStyles();
+        ImGui.GetIO().FontGlobalScale = 1.0f;
     }
 
     public override void Draw()

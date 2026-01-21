@@ -63,11 +63,13 @@ public class DashboardWindow : Window, IDisposable
     public override void PreDraw()
     {
         ThemeManager.PushWindowStyles(plugin.Configuration.ColorTheme);
+        ImGui.GetIO().FontGlobalScale = plugin.Configuration.UIScale;
     }
     
     public override void PostDraw()
     {
         ThemeManager.PopWindowStyles();
+        ImGui.GetIO().FontGlobalScale = 1.0f;
     }
 
     public void Dispose() { }
