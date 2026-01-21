@@ -916,29 +916,40 @@ public class ChartWindow : Window, IDisposable
         var maxPrice = listings.Last().PricePerUnit;
         
         // Determine buckets
-        // If spread is small, use exact prices. If large, bucketize.
-        // Let's create roughly 20-30 buckets max.
         int bucketCount = 20;
         double range = maxPrice - minPrice;
-        if (range == 0) range = 100; // Single price point
+        if (range <= 0) range = 100; // Single price point
         double bucketSize = Math.Max(1, range / bucketCount);
 
-        var buckets = new double[bucketCount + 1];
-        var counts = new double[bucketCount + 1];
+        // Arrays for histogram data
+        // We use bucketCount + 1 to catch edge cases
+        var plotX = new double[bucketCount + 1];
+        var countsNQ = new double[bucketCount + 1];
+        var countsHQ = new double[bucketCount + 1];
+        var countsTotal = new double[bucketCount + 1];
         
-        // Initialize bucket X values (start of each bucket)
+        // Initialize bucket centers
         for (int i = 0; i <= bucketCount; i++)
         {
-            buckets[i] = minPrice + (i * bucketSize);
+            // Bar should be centered in the bucket
+            // Bucket i spans [min + i*size, min + (i+1)*size]
+            plotX[i] = minPrice + (i * bucketSize) + (bucketSize * 0.5);
         }
 
         // Fill counts
         foreach (var listing in listings)
         {
             int bucketIndex = (int)((listing.PricePerUnit - minPrice) / bucketSize);
+            // Clamp to valid range
             if (bucketIndex < 0) bucketIndex = 0;
             if (bucketIndex > bucketCount) bucketIndex = bucketCount;
-            counts[bucketIndex] += listing.Quantity; // Use Quantity for volume at price, or 1 for number of listings? Issue says "Histogram of listing prices" usually implies volume or count. Let's use Quantity (Depth).
+            
+            if (listing.IsHQ)
+                countsHQ[bucketIndex] += listing.Quantity;
+            else
+                countsNQ[bucketIndex] += listing.Quantity;
+                
+            countsTotal[bucketIndex] += listing.Quantity;
         }
 
         if (shouldFitDistribution)
@@ -951,29 +962,35 @@ public class ChartWindow : Window, IDisposable
         {
             ImPlot.SetupAxes("Price (Gil)", "Volume (Qty)", ImPlotAxisFlags.None, ImPlotAxisFlags.None);
             ImPlot.SetupAxisFormat(ImAxis.X1, "%'.0f");
-            ImPlot.SetupLegend(ImPlotLocation.NorthEast, ImPlotLegendFlags.None);
+            ImPlot.SetupLegend(ImPlotLocation.NorthEast);
             
-            // Histogram with gradient-like appearance
-            ImPlot.SetNextFillStyle(new Vector4(0.35f, 0.7f, 0.95f, 0.65f));
-            ImPlot.PlotBars("Volume at Price", ref buckets[0], ref counts[0], bucketCount + 1, bucketSize);
+            // Stacked Bar Chart Implementation
+            // Strategy: Draw Total (HQ color) first, then NQ (NQ color) on top (covering the bottom part).
+            // Visual result: Bottom = NQ (Blue), Top = HQ (Gold).
+            
+            // Draw Total (background for stack) - represents HQ part on top
+            ImPlot.SetNextFillStyle(new Vector4(1f, 0.84f, 0f, 0.8f)); // Soft Gold for HQ
+            ImPlot.PlotBars("HQ Volume", ref plotX[0], ref countsTotal[0], bucketCount + 1, bucketSize);
+            
+            // Draw NQ (foreground) - represents NQ part on bottom
+            ImPlot.SetNextFillStyle(new Vector4(0.2f, 0.7f, 1f, 0.8f)); // Soft Blue for NQ
+            ImPlot.PlotBars("NQ Volume", ref plotX[0], ref countsNQ[0], bucketCount + 1, bucketSize);
 
             // Highlight Current Min Price (Market Price) with cleaner line
             double currentMin = (double)currentData.MinPrice;
             ImPlot.SetNextLineStyle(new Vector4(0.25f, 0.85f, 0.45f, 0.9f), 2.5f);
             double[] minLineX = { currentMin, currentMin };
-            double[] minLineY = { 0, counts.Max() * 1.1 }; // Go a bit above max
+            double[] minLineY = { 0, countsTotal.Max() * 1.1 }; // Go a bit above max
             ImPlot.PlotLine("Market Price", ref minLineX[0], ref minLineY[0], 2);
 
-            // Highlight Outliers with softer color
+            // Highlight Outliers
             double outlierThreshold = currentMin * 3.0;
             if (maxPrice > outlierThreshold)
             {
-                 ImPlot.SetNextLineStyle(new Vector4(1f, 0.84f, 0.4f, 0.7f), 2.0f);
+                 ImPlot.SetNextLineStyle(new Vector4(1f, 0.4f, 0.4f, 0.7f), 2.0f);
                  double[] outlierX = { outlierThreshold, outlierThreshold };
                  ImPlot.PlotLine("High Price Warning", ref outlierX[0], ref minLineY[0], 2);
             }
-            
-            // Add NQ vs HQ distribution if useful later
             
             ImPlot.EndPlot();
         }
@@ -983,7 +1000,8 @@ public class ChartWindow : Window, IDisposable
         ImGui.Text($"Min Price: {minPrice:N0}");
         ImGui.SameLine(200);
         ImGui.Text($"Max Price: {maxPrice:N0}");
-        ImGui.Text($"Total Listed Quantity: {listings.Sum(x => x.Quantity):N0}");
+        ImGui.SameLine(400);
+        ImGui.Text($"Total Listed: {listings.Sum(x => x.Quantity):N0} (NQ: {countsNQ.Sum():N0}, HQ: {countsHQ.Sum():N0})");
     }
 
     public void Dispose()
