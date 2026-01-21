@@ -5,7 +5,8 @@ using System.Numerics;
 using Dalamud.Interface.Windowing;
 using Aurum.Models;
 using Dalamud.Bindings.ImGui;
-// using ImPlotNET; // ImPlot integration paused until dependency is resolved
+// Implot is now imported through dalamud. Fancy charts can now be added.
+using Dalamud.Bindings.ImPlot;
 
 namespace Aurum.Windows;
 
