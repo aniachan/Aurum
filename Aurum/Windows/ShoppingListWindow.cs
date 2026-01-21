@@ -58,6 +58,28 @@ public class ShoppingListWindow : Window, IDisposable
         {
             ImGui.SetClipboardText(currentList.ToClipboardString());
         }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Export to CSV"))
+        {
+             try 
+             {
+                 var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                 var fileName = $"Aurum_ShoppingList_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                 var filePath = System.IO.Path.Combine(documentsPath, fileName);
+                 System.IO.File.WriteAllText(filePath, currentList.ToCsvString());
+                 
+                 // Show a tooltip or log? For now maybe just a momentary visual feedback could be nice but difficult with immediate mode
+                 // Let's rely on standard logging if available via Plugin, but we don't have easy access to Log here directly unless we injected it.
+                 // The 'plugin' field is available.
+                 Plugin.Log.Information($"Shopping list exported to {filePath}");
+             }
+             catch (Exception ex)
+             {
+                 Plugin.Log.Error(ex, "Failed to export shopping list to CSV");
+             }
+        }
         
         ImGui.Separator();
 

@@ -34,6 +34,26 @@ public class ShoppingList
         
         return sb.ToString();
     }
+
+    public string ToCsvString()
+    {
+        var sb = new System.Text.StringBuilder();
+        // Header
+        sb.AppendLine("Item Name,Quantity,Source Type,Vendor Location,Est. Cost (Gil)");
+        
+        foreach (var item in Items.OrderBy(i => i.SourceType).ThenBy(i => i.ItemName))
+        {
+            // Escape quotes if necessary, though simple item names usually don't have them
+            var safeName = item.ItemName.Contains(",") ? $"\"{item.ItemName}\"" : item.ItemName;
+            var safeLocation = item.VendorLocation.Contains(",") ? $"\"{item.VendorLocation}\"" : item.VendorLocation;
+            
+            sb.AppendLine($"{safeName},{item.AmountNeeded},{item.SourceType},{safeLocation},{item.TotalCost}");
+        }
+        
+        sb.AppendLine($",,,TOTAL,{TotalEstimatedCost}");
+        
+        return sb.ToString();
+    }
 }
 
 public class CraftingTarget
