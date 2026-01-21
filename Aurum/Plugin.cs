@@ -54,6 +54,7 @@ public sealed class Plugin : IDalamudPlugin
     private DashboardWindow DashboardWindow { get; init; }
     public DetailWindow DetailWindow { get; init; }
     public ChartWindow ChartWindow { get; init; }
+    public ShoppingListWindow ShoppingListWindow { get; init; }
 
     public Plugin()
     {
@@ -105,11 +106,13 @@ public sealed class Plugin : IDalamudPlugin
         DashboardWindow = new DashboardWindow(this);
         DetailWindow = new DetailWindow(this);
         ChartWindow = new ChartWindow(this);
+        ShoppingListWindow = new ShoppingListWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(DashboardWindow);
         WindowSystem.AddWindow(DetailWindow);
         WindowSystem.AddWindow(ChartWindow);
+        WindowSystem.AddWindow(ShoppingListWindow);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -161,6 +164,7 @@ public sealed class Plugin : IDalamudPlugin
         DashboardWindow.Dispose();
         DetailWindow.Dispose();
         ChartWindow.Dispose();
+        ShoppingListWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         
