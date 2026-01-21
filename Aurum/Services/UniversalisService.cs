@@ -303,10 +303,11 @@ public class UniversalisService : IDisposable
 
         // 2. Fetch uncached items in chunks of 100
         // Universalis API limit is 100 items per request
-        const int BatchSize = 100;
-        var chunks = uncachedItems.Chunk(BatchSize).ToList();
+        // Use configured batch size, clamped to 100 max for API safety
+        int batchSize = Math.Min(configuration.ApiBatchSize, 100);
+        var chunks = uncachedItems.Chunk(batchSize).ToList();
         
-        log.Info($"Fetching {uncachedItems.Count} items in {chunks.Count} batches");
+        log.Info($"Fetching {uncachedItems.Count} items in {chunks.Count} batches (size: {batchSize})");
         
         // Use SemaphoreSlim to limit concurrency if needed, but RateLimiter is global anyway.
         // We can process chunks in parallel, but they will all hit the same RateLimiter lock.
@@ -491,8 +492,11 @@ public class UniversalisService : IDisposable
         
         while (!disposeCts.Token.IsCancellationRequested)
         {
+            // Use configured batch size for dequeuing, clamped to 100 max
+            int batchSize = Math.Min(configuration.ApiBatchSize, 100);
+            
             // Use DequeueBatch to get optimized requests
-            var request = requestQueue.DequeueBatch(maxItems: 100);
+            var request = requestQueue.DequeueBatch(maxItems: batchSize);
             if (request == null)
             {
                 // No requests? sleep for a bit
@@ -504,7 +508,7 @@ public class UniversalisService : IDisposable
             // If we pulled a request, there might be more incoming very soon (e.g. UI rendering a list).
             // Wait a short window (e.g. 50-100ms) to see if more requests arrive, 
             // so we can batch them into this one if possible.
-            if (request.ItemIds.Count < 100)
+            if (request.ItemIds.Count < batchSize)
             {
                 // Wait for potential coalescing
                 try 
@@ -514,7 +518,7 @@ public class UniversalisService : IDisposable
                 catch (OperationCanceledException) { break; }
 
                 // Check for more items for the SAME world
-                var secondRequest = requestQueue.DequeueBatchForWorld(request.WorldName, maxItems: 100 - request.ItemIds.Count);
+                var secondRequest = requestQueue.DequeueBatchForWorld(request.WorldName, maxItems: batchSize - request.ItemIds.Count);
                 if (secondRequest != null)
                 {
                     // Merge!

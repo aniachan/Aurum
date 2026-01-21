@@ -184,6 +184,17 @@ public class ConfigWindow : Window, IDisposable
             Aurum.Plugin.Instance?.RateLimiter?.UpdateConfiguration();
         }
 
+        var batchSize = configuration.ApiBatchSize;
+        if (ImGui.SliderInt("Batch Size (Items per Request)", ref batchSize, 10, 100))
+        {
+            configuration.ApiBatchSize = batchSize;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Number of items to fetch in a single API call.\nUniversalis supports up to 100, but lower values may improve responsiveness.");
+        }
+
         var timeout = configuration.ApiRequestTimeoutSeconds;
         if (ImGui.SliderInt("API Request Timeout (Seconds)", ref timeout, 5, 60))
         {
