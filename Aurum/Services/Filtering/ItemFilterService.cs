@@ -67,6 +67,7 @@ public class ItemFilterService
         {
             if (!criteria.IncludeCombatGear && item.Recipe.MainCategory == ItemMainCategory.Combat) return false;
             if (!criteria.IncludeCraftingGatheringGear && item.Recipe.MainCategory == ItemMainCategory.Crafting) return false;
+            if (!criteria.IncludeFurniture && item.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
         }
 
         return true;

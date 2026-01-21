@@ -10,5 +10,6 @@ public enum ItemMainCategory
     Gathering,
     Consumable,
     Material,
+    Furniture,
     Other
 }
