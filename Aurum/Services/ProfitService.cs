@@ -305,7 +305,7 @@ public class ProfitService
         }
         
         // Calculate total cost
-        tree.TotalCost = (uint)tree.FlatIngredientList.Sum(i => i.TotalCost);
+        tree.TotalCost = (uint)tree.RootIngredients.Sum(i => i.TotalCost);
         
         return tree;
     }
