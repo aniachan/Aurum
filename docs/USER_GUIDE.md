@@ -116,6 +116,9 @@ Customize which items Aurum recommends.
     *   **Max Acceptable Risk**: Automatically filter out items above a certain risk level (e.g., hide "High" risk items).
     *   **Show High Risk Items**: Toggle to show/hide risky investments regardless of score.
 
+### 📚 Advanced Filtering
+For a deep dive into the powerful Advanced Filter Window, including presets and granular item property filters, see the [Advanced Filters Guide](ADVANCED_FILTERS.md).
+
 ### 🧠 Recommendation Engine (Priority Weights)
 
 Aurum calculates a "Score" for every item. You can tweak how this score is calculated by adjusting the weights. These are advanced settings.
