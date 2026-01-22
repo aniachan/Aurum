@@ -47,6 +47,7 @@ public static class ShoppingListTests
         {
             RecipeId = 1,
             ResultItemId = finalProductId,
+            ItemName = "Final Product",
             Ingredients = new List<RecipeIngredient>
             {
                 new RecipeIngredient 
@@ -67,6 +68,7 @@ public static class ShoppingListTests
         {
             RecipeId = 2,
             ResultItemId = intermediateId,
+            ItemName = "Intermediate Product",
             Ingredients = new List<RecipeIngredient>
             {
                 new RecipeIngredient 
@@ -100,7 +102,7 @@ public static class ShoppingListTests
         // Perform Test
         var targets = new List<CraftingTarget>
         {
-            new CraftingTarget { RecipeId = 1, AmountToCraft = 1 }
+            new CraftingTarget { RecipeId = 1, ItemId = finalProductId, AmountToCraft = 1 }
         };
 
         var shoppingList = shoppingService.GenerateShoppingList(targets);
@@ -127,11 +129,11 @@ public static class ShoppingListTests
         
         // Step 1: Craft Intermediate (Bottom-Up order)
         var step1 = shoppingList.CraftingSteps[0];
-        if (step1.ItemId != intermediateId) throw new Exception("Step 1 should be Intermediate item");
+        if (step1.ItemId != intermediateId) throw new Exception($"Step 1 should be Intermediate item, got {step1.ItemId}");
         
         // Step 2: Craft Final Product
         var step2 = shoppingList.CraftingSteps[1];
-        if (step2.ItemId != finalProductId) throw new Exception("Step 2 should be Final Product");
+        if (step2.ItemId != finalProductId) throw new Exception($"Step 2 should be Final Product, got {step2.ItemId}");
 
         Console.WriteLine("- TestRecursiveBreakdown passed");
     }

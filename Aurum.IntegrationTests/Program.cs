@@ -56,7 +56,7 @@ class Program
                  defaultsOk = false;
             }
 
-            if (Enum.GetNames(typeof(Aurum.SortMode)).Length != 6)
+            if (Enum.GetNames(typeof(Aurum.SortMode)).Length != 7)
             {
                  Console.WriteLine("✗ SortMode enum length mismatch");
                  defaultsOk = false;
