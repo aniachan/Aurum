@@ -79,7 +79,7 @@ Recommendation: ❌ AVOID - Try something else!
 ### Manual Development Install
 1. Clone this repository
 2. Build the solution: `dotnet build Aurum.sln --configuration Release`
-3. Add `SamplePlugin/bin/x64/Release/Aurum.dll` to Dalamud Dev Plugin Locations
+3. Add `Aurum/bin/x64/Release/Aurum.dll` to Dalamud Dev Plugin Locations
 4. Enable in Plugin Installer under Dev Tools
 
 ---
