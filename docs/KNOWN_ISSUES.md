@@ -18,6 +18,10 @@ This document tracks known issues, limitations, and planned improvements for Aur
 - **Vendor Data**: Currently uses a hardcoded fallback list for vendor items. Needs to properly parse `GilShop` and `GilShopItem` excel sheets to support all vendor items dynamically.
   - *Location*: `Aurum/Services/ShoppingListService.cs` (Initialize method)
 
+### DebugWindow
+- **Selection Logic**: The Debug Window currently lacks implementation for specific item selection logic within its debug views.
+  - *Location*: `Aurum/Windows/DebugWindow.cs` (Draw method)
+
 ## UI & UX
 - **Async Loading**: Some UI components may freeze momentarily when fetching fresh data if not fully decoupled from the main thread.
 - **Cross-World**: Cross-world market analysis is available but may be slower than single-world due to aggregation overhead.
