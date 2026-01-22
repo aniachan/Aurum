@@ -179,9 +179,41 @@ public class FilterWindow : Window, IDisposable
             // Item Categories
             if (ImGui.TreeNode("Item Types"))
             {
-                // This would be populated with checkboxes for item categories
-                // For now, placeholder
-                ImGui.TextDisabled("Category selection coming soon...");
+                bool combat = criteria.IncludeCombatGear;
+                if (ImGui.Checkbox("Combat Gear (Weapons & Armor)", ref combat))
+                {
+                    criteria.IncludeCombatGear = combat;
+                    changed = true;
+                }
+
+                bool craftGather = criteria.IncludeCraftingGatheringGear;
+                if (ImGui.Checkbox("Crafting & Gathering Gear", ref craftGather))
+                {
+                    criteria.IncludeCraftingGatheringGear = craftGather;
+                    changed = true;
+                }
+
+                bool consumables = criteria.IncludeConsumables;
+                if (ImGui.Checkbox("Consumables (Food, Potions)", ref consumables))
+                {
+                    criteria.IncludeConsumables = consumables;
+                    changed = true;
+                }
+
+                bool materials = criteria.IncludeMaterials;
+                if (ImGui.Checkbox("Crafting Materials", ref materials))
+                {
+                    criteria.IncludeMaterials = materials;
+                    changed = true;
+                }
+
+                bool furniture = criteria.IncludeFurniture;
+                if (ImGui.Checkbox("Furniture & Housing", ref furniture))
+                {
+                    criteria.IncludeFurniture = furniture;
+                    changed = true;
+                }
+                
                 ImGui.TreePop();
             }
         }
