@@ -423,6 +423,57 @@ public class MarketAnalysisService
                 });
             }
         }
+
+        // Price manipulation detection
+        DetectPriceManipulation(marketData);
+    }
+
+    /// <summary>
+    /// Detects potential price manipulation attempts
+    /// </summary>
+    private void DetectPriceManipulation(MarketData marketData)
+    {
+        if (marketData.RecentHistory == null || marketData.RecentHistory.Count < 5) return;
+
+        // Check for massive outliers in recent sales (e.g. buying out low stock and relisting super high, or RMT transfer)
+        var sortedSales = marketData.RecentHistory.OrderByDescending(h => h.Timestamp).Take(20).ToList();
+        var prices = sortedSales.Select(s => (double)s.PricePerUnit).ToList();
+        
+        // Calculate median of recent sales
+        prices.Sort();
+        double median = prices[prices.Count / 2];
+        if (prices.Count % 2 == 0)
+            median = (prices[prices.Count / 2 - 1] + prices[prices.Count / 2]) / 2.0;
+
+        if (median <= 0) return;
+
+        // 1. Detect Artificial Inflation (Buyout)
+        // If the current minimum price is vastly higher than the median recent sale price
+        if (marketData.MinPrice > median * 3.0)
+        {
+             marketData.Warnings.Add(new MarketWarningInfo
+             {
+                 Type = MarketWarning.PriceManipulation,
+                 Message = "Potential Price Gouging",
+                 Details = $"Current lowest price ({marketData.MinPrice:N0}) is >3x the recent median sales price ({median:N0}).",
+                 Level = WarningLevel.Warning
+             });
+        }
+
+        // 2. Detect RMT / Gil Transfer (Extreme outliers in sales history)
+        // Look for a sale that is 10x the median
+        var outliers = sortedSales.Where(s => s.PricePerUnit > median * 10.0).ToList();
+        if (outliers.Any())
+        {
+            var outlier = outliers.First();
+             marketData.Warnings.Add(new MarketWarningInfo
+             {
+                 Type = MarketWarning.PriceManipulation,
+                 Message = "Suspicious Sales Detected",
+                 Details = $"A sale for {outlier.PricePerUnit:N0} gil detected (10x median). Possible RMT or gil transfer.",
+                 Level = WarningLevel.Warning
+             });
+        }
     }
     
     /// <summary>

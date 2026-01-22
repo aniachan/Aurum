@@ -12,7 +12,8 @@ public enum MarketWarning
     StaleMarket,
     HighCompetition,
     OversupplyExpected,
-    ApiUnreachable
+    ApiUnreachable,
+    PriceManipulation
 }
 
 /// <summary>
