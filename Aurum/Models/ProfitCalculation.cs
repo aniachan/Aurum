@@ -116,4 +116,5 @@ public class ProfitCalculation
     // Cross-World Analysis
     public string? BestWorldName { get; set; }
     public uint BestWorldPrice { get; set; }
+    public int CrossWorldTravelCost { get; set; } // Estimated cost to visit the other world
 }

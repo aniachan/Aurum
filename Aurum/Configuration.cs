@@ -68,6 +68,9 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public RiskLevel MaxAcceptableRisk { get; set; } = RiskLevel.Medium;
     public bool ShowHighRiskItems { get; set; } = true;
 
+    // Cross-World Settings
+    public int CrossWorldTravelCost { get; set; } = 2000; // Estimated cost in gil (teleport fees) to visit another world
+
     // Fetch Settings
     public int TopItemsToFetch { get; set; } = 50; // Default limit for API fetches
     public int MaxItemsToTrack { get; set; } = 2000; // Limit for items stored/tracked (NEW)

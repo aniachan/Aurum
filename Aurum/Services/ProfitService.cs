@@ -650,14 +650,31 @@ public class ProfitService
             
             if (bestWorld != null)
             {
-                // Only suggest if it's significantly better (> 20% better than current world)
+                // Factor in travel cost from configuration
+                int travelCost = config.CrossWorldTravelCost;
+                
+                // Only suggest if it's significantly better (> 20% better than current world OR absolute profit > travel cost + buffer)
+                // We are looking for where to SELL, so we want the HIGHEST price.
+                // Profit difference = (BestWorldPrice - CurrentPrice) * Quantity - TravelCost
+                
+                // But ExpectedSalePrice is per unit.
+                // Let's assume a typical batch size (e.g. 10 items or just 1 for high value)
+                // For safety, let's just look at unit price improvement relative to base price, 
+                // but we should display the travel cost in the UI.
+
                 if (profit.ExpectedSalePrice > 0)
                 {
                     float improvement = (float)bestWorld.MinPrice / profit.ExpectedSalePrice;
-                    if (improvement > 1.2f) // 20% better
+                    
+                    // If it's 20% better price
+                    // OR if the raw difference covers the travel cost comfortably (e.g. 5x travel cost per item)
+                    long priceDiff = (long)bestWorld.MinPrice - profit.ExpectedSalePrice;
+                    
+                    if (improvement > 1.2f || priceDiff > (travelCost * 2)) 
                     {
                         profit.BestWorldName = bestWorld.WorldName;
                         profit.BestWorldPrice = (uint)bestWorld.MinPrice;
+                        profit.CrossWorldTravelCost = travelCost;
                     }
                 }
                 else
@@ -665,6 +682,7 @@ public class ProfitService
                     // If current world has no price, any price is better
                     profit.BestWorldName = bestWorld.WorldName;
                     profit.BestWorldPrice = (uint)bestWorld.MinPrice;
+                    profit.CrossWorldTravelCost = travelCost;
                 }
             }
         }
