@@ -36,10 +36,17 @@ Aurum assigns a Risk Score (0-100) to every item to help you avoid bad investmen
 *   **High (50-74)**: Risky. Prices fluctuate wildly or demand is dropping.
 *   **Very High (75-100)**: Dangerous. Likely to result in a loss due to market crashes or zero demand.
 
-**Common Risk Warnings:**
-*   **Market Crash Risk**: Prices are trending down rapidly.
-*   **Oversupply**: Too many items listed compared to daily sales.
-*   **Stagnant Market**: Item hasn't sold in a long time.
+### ⚠️ Reading Market Warnings
+
+Aurum analyzes market conditions and displays specific warnings when it detects potential issues. These appear as icons in the grid or detailed messages in the panel.
+
+*   **Market Crash Risk** (Danger): Prices are trending down rapidly. Entering this market now may result in selling below cost.
+*   **Price War Active** (Danger): Sellers are aggressively undercutting each other. Expect low margins and high frustration.
+*   **Low Demand** (Warning): The item sells very slowly. You might be holding stock for weeks.
+*   **Stale Market** (Warning): The item hasn't sold in a significant amount of time. Data may be outdated or the item is dead.
+*   **High Competition** (Warning): There are many distinct sellers. It will be hard to keep your listing the cheapest.
+*   **Oversupply Expected** (Warning): The number of listings is very high compared to the daily sales volume. Prices are likely to drop.
+*   **API Unreachable** (Info): Cannot fetch fresh data from Universalis. Prices shown may be old.
 
 ### 🔍 Finding Profitable Crafts
 
