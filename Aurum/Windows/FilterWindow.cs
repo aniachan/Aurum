@@ -177,6 +177,59 @@ public class FilterWindow : Window, IDisposable
             }
             
             // Item Categories
+            if (ImGui.TreeNode("Item Sources"))
+            {
+                bool crafted = criteria.IncludeCrafted;
+                if (ImGui.Checkbox("Crafted Items", ref crafted))
+                {
+                    criteria.IncludeCrafted = crafted;
+                    changed = true;
+                }
+
+                bool gathered = criteria.IncludeGathered;
+                if (ImGui.Checkbox("Gathered Items", ref gathered))
+                {
+                    criteria.IncludeGathered = gathered;
+                    changed = true;
+                }
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Items obtained via Mining, Botany, or Fishing.");
+
+                bool vendor = criteria.IncludeVendor;
+                if (ImGui.Checkbox("Vendor Items", ref vendor))
+                {
+                    criteria.IncludeVendor = vendor;
+                    changed = true;
+                }
+
+                ImGui.Spacing();
+
+                bool tradeable = criteria.IncludeMarketTradeable;
+                if (ImGui.Checkbox("Market Prohibited / Untradeable", ref tradeable))
+                {
+                     // Logic inversion in UI vs Model often tricky, but here we want to Include Tradeable usually.
+                     // Wait, the checkbox says "Market Prohibited" but the model says "IncludeMarketTradeable".
+                     // Let's stick to positive affirmation for checkboxes usually.
+                }
+                
+                // Let's redo the UI for Tradeability to be clearer
+                bool includeTradeable = criteria.IncludeMarketTradeable;
+                if (ImGui.Checkbox("Market Tradeable", ref includeTradeable))
+                {
+                    criteria.IncludeMarketTradeable = includeTradeable;
+                    changed = true;
+                }
+                
+                bool includeUntradeable = criteria.IncludeUntradeable;
+                if (ImGui.Checkbox("Untradeable / Ex", ref includeUntradeable))
+                {
+                    criteria.IncludeUntradeable = includeUntradeable;
+                    changed = true;
+                }
+                
+                ImGui.TreePop();
+            }
+
+            // Item Categories
             if (ImGui.TreeNode("Item Types"))
             {
                 bool combat = criteria.IncludeCombatGear;

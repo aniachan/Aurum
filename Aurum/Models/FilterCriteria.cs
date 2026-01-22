@@ -32,6 +32,13 @@ public class FilterCriteria
     public bool ExcludeMarketCrashRisks { get; set; } = false;
     public bool OnlyRisingTrends { get; set; } = false;
 
+    // Item Sources
+    public bool IncludeCrafted { get; set; } = true;
+    public bool IncludeGathered { get; set; } = true;
+    public bool IncludeVendor { get; set; } = true;
+    public bool IncludeMarketTradeable { get; set; } = true;
+    public bool IncludeUntradeable { get; set; } = false; // Usually not useful for profit analysis, but maybe for gathering?
+
     // Categories
     public bool IncludeCombatGear { get; set; } = true;
     public bool IncludeCraftingGatheringGear { get; set; } = true;

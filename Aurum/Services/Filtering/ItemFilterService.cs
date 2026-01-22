@@ -132,6 +132,27 @@ public class ItemFilterService
             }
         }
         
+        // 5.5 Item Source Filtering
+        // Note: Currently ProfitCalculation is centered around Recipes (Crafted items),
+        // so IncludeCrafted is implicitly true for all items currently processed.
+        // However, if we expand to gathered items or drops, we need these checks.
+        
+        // If it has a recipe, it's crafted
+        bool isCrafted = item.Recipe != null && item.Recipe.RecipeId > 0;
+        
+        if (isCrafted && !criteria.IncludeCrafted) return false;
+        
+        // If we support non-crafted items in the future (e.g. gathering log), we'd check:
+        // if (!isCrafted && isGathered && !criteria.IncludeGathered) return false;
+        
+        // Market Tradeability
+        // This usually comes from Item sheet 'IsUntradable'
+        // For now, assume if it has MarketData, it is tradeable.
+        bool isTradeable = item.MarketData != null; 
+        
+        if (isTradeable && !criteria.IncludeMarketTradeable) return false;
+        if (!isTradeable && !criteria.IncludeUntradeable) return false;
+
         // 6. Category Filtering
         if (item.Recipe != null)
         {

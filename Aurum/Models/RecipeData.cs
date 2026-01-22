@@ -57,6 +57,11 @@ public class RecipeData
     // Derived Categories
     public ItemMainCategory MainCategory { get; set; }
 
-    // Estimated crafting time (for gil/hour calculations)
+    // Source Types (flags to help filtering)
+    public bool IsCrafted => RecipeId > 0;
+    // Note: IsGathered, IsVendor, etc. might need to be set during data loading or derived from other fields
+    // For now, we rely on the fact that if it has a recipe, it is crafted.
+    // If it has no recipe but is a material, it might be gathered or dropped.
+
     public int EstimatedCraftTimeSeconds { get; set; } = 20;  // Default estimate
 }
