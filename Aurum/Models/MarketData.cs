@@ -16,6 +16,7 @@ public class SaleRecord
     public DateTime Timestamp { get; set; }
     public string BuyerName { get; set; } = string.Empty;
     public bool OnMannequin { get; set; }
+    public string WorldName { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -44,6 +45,7 @@ public class MarketListing
     public uint Materia { get; set; }
     public bool OnMannequin { get; set; }
     public string SellerName { get; set; } = string.Empty;
+    public string WorldName { get; set; } = string.Empty;
 }
 
 /// <summary>

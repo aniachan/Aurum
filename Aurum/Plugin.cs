@@ -254,6 +254,20 @@ public sealed class Plugin : IDalamudPlugin
                 Log.Error("  ✗ No level 90 recipes found");
             }
             
+            // Test 3: Cross-world market data
+            Log.Information("Test 3: Fetching cross-world data for Darksteel Ore (ID: 5114)");
+            var dcData = await UniversalisService.GetMarketDataCrossWorldAsync("Gilgamesh", 5114);
+            if (dcData != null)
+            {
+                Log.Information($"  ✓ DC Listings: {dcData.Listings.Count}");
+                Log.Information($"  ✓ Worlds found: {string.Join(", ", dcData.Listings.Select(l => l.WorldName).Distinct())}");
+                Log.Information($"  ✓ Min Price (DC): {dcData.MinPrice}");
+            }
+            else
+            {
+                Log.Error("  ✗ Failed to fetch cross-world data");
+            }
+            
             Log.Information("========================================");
             Log.Information("INTEGRATION TEST COMPLETE");
             Log.Information("========================================");

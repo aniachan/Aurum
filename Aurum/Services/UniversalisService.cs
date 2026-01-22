@@ -109,6 +109,109 @@ public class UniversalisService : IDisposable
     }
 
     /// <summary>
+    /// Gets all worlds in the same data center as the specified world.
+    /// </summary>
+    public List<Lumina.Excel.Sheets.World> GetWorldsInDataCenter(string worldName)
+    {
+        var worldSheet = dataManager.GetExcelSheet<Lumina.Excel.Sheets.World>();
+        if (worldSheet == null) return new List<Lumina.Excel.Sheets.World>();
+
+        var targetWorld = worldSheet.FirstOrDefault(w => 
+            w.Name.ToString().Equals(worldName, StringComparison.OrdinalIgnoreCase));
+            
+        if (targetWorld.RowId == 0) return new List<Lumina.Excel.Sheets.World>();
+
+        // Find all worlds with the same DataCenter rowId
+        var dcId = targetWorld.DataCenter.RowId;
+        
+        return worldSheet
+            .Where(w => w.DataCenter.RowId == dcId && w.IsPublic)
+            .ToList();
+    }
+    
+    /// <summary>
+    /// Fetch market data for a single item from ALL worlds in the Data Center
+    /// </summary>
+    public async Task<MarketData?> GetMarketDataCrossWorldAsync(string worldName, uint itemId)
+    {
+        // 1. Resolve DC worlds
+        var worlds = GetWorldsInDataCenter(worldName);
+        if (worlds.Count == 0)
+        {
+             log.Warning($"Could not resolve Data Center for world '{worldName}'");
+             return await GetMarketDataAsync(worldName, itemId); // Fallback to single world
+        }
+        
+        string dcName = worlds.First().DataCenter.Value.Name.ToString();
+        log.Info($"Fetching cross-world data for {itemId} in DC {dcName} ({worlds.Count} worlds)");
+
+        // 2. Fetch from Universalis using DC name
+        // Universalis supports DC name instead of World Name to get aggregated data
+        // API: /api/v2/{dataCenter}/{itemId}
+        
+        var url = $"{BaseUrl}/{dcName}/{itemId}?listings=20&entries=50";
+        
+        // Use standard fetching logic but parse slightly differently
+        // The DC response format is same as single item but listings have worldID
+        
+        try
+        {
+             await rateLimiter.WaitForTokenAsync("api", disposeCts.Token);
+             
+             using var response = await httpClient.GetAsync(url, disposeCts.Token);
+             
+             // Log
+             _ = Task.Run(() => database.LogApiRequest($"item/{itemId}/dc/{dcName}", DateTime.UtcNow, 0, (int)response.StatusCode, response.IsSuccessStatusCode));
+             
+             if (!response.IsSuccessStatusCode)
+             {
+                 log.Warning($"DC request failed: {response.StatusCode}");
+                 return null;
+             }
+             
+             var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
+             var apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
+             {
+                 PropertyNameCaseInsensitive = true
+             });
+             
+             if (apiResponse == null) return null;
+             
+             // 3. Convert to MarketData
+             // Note: The aggregated object fields (MinPrice, AveragePrice, etc) are ACROSS THE DC
+             // We want to preserve this "DC View" as a MarketData object
+             
+             var marketData = ConvertToMarketData(apiResponse, dcName, itemId);
+             
+             // Decorate listings with World Names for display
+             if (marketData.Listings != null)
+             {
+                 foreach(var listing in marketData.Listings)
+                 {
+                     // Universalis returns WorldID in listing for DC requests? 
+                     // Actually we need to check if our model supports it.
+                     // We added WorldID to UniversalisListing model.
+                     
+                     // We need to map WorldID back to WorldName
+                     // We can't easily do this inside ConvertToMarketData without passing the map
+                     
+                     // Let's rely on the raw response listing having WorldID
+                     // Wait, our ConvertToMarketData maps from UniversalisListing to MarketListing
+                     // We need to look at the raw apiResponse listings to get WorldID
+                 }
+             }
+             
+             return marketData;
+        }
+        catch(Exception ex)
+        {
+            log.Error(ex, "Failed to fetch cross-world data");
+            return null;
+        }
+    }
+
+
+    /// <summary>
     /// Fetch market data for a single item (synchronous-like wrapper for compatibility)
     /// </summary>
     public virtual MarketData? GetMarketData(uint itemId)
@@ -402,7 +505,8 @@ public class UniversalisService : IDisposable
                 RetainerCity = GetCityName(l.RetainerCity),
                 ListingTime = DateTimeOffset.FromUnixTimeSeconds(l.LastReviewTime).UtcDateTime,
                 OnMannequin = l.OnMannequin,
-                SellerName = l.SellerID ?? string.Empty
+                SellerName = l.SellerID ?? string.Empty,
+                WorldName = l.WorldName ?? (l.WorldID.HasValue ? GetWorldName(l.WorldID.Value) : worldName)
             }).ToList();
         }
         
@@ -417,7 +521,8 @@ public class UniversalisService : IDisposable
                 Quantity = h.Quantity,
                 Timestamp = DateTimeOffset.FromUnixTimeSeconds(h.Timestamp).UtcDateTime,
                 BuyerName = h.BuyerName ?? string.Empty,
-                OnMannequin = h.OnMannequin
+                OnMannequin = h.OnMannequin,
+                WorldName = h.WorldName ?? (h.WorldID.HasValue ? GetWorldName(h.WorldID.Value) : worldName)
             }).ToList();
             
             if (marketData.RecentHistory.Any())
@@ -427,6 +532,20 @@ public class UniversalisService : IDisposable
         }
         
         return marketData;
+    }
+    
+    private string GetWorldName(int worldId)
+    {
+        var worldSheet = dataManager.GetExcelSheet<Lumina.Excel.Sheets.World>();
+        if (worldSheet != null)
+        {
+            var world = worldSheet.GetRow((uint)worldId);
+            if (world.RowId != 0)
+            {
+                return world.Name.ToString();
+            }
+        }
+        return worldId.ToString();
     }
     
     /// <summary>
@@ -865,6 +984,9 @@ public class UniversalisItemResponse
     public double MinPriceHQ { get; set; }
     public double MaxPriceNQ { get; set; }
     public double MaxPriceHQ { get; set; }
+    
+    // Additional fields for multi-world/DC requests
+    public Dictionary<string, long>? WorldUploadTimes { get; set; }
 }
 
 public class UniversalisListing
@@ -878,6 +1000,10 @@ public class UniversalisListing
     public long LastReviewTime { get; set; }
     public string? SellerID { get; set; }
     public bool OnMannequin { get; set; }
+    
+    // Multi-world fields
+    public int? WorldID { get; set; }
+    public string? WorldName { get; set; }
 }
 
 public class UniversalisHistoryEntry
@@ -888,6 +1014,10 @@ public class UniversalisHistoryEntry
     public long Timestamp { get; set; }
     public string? BuyerName { get; set; }
     public bool OnMannequin { get; set; }
+    
+    // Multi-world fields
+    public int? WorldID { get; set; }
+    public string? WorldName { get; set; }
 }
 
 /// <summary>
