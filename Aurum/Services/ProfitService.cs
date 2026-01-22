@@ -662,63 +662,77 @@ public class ProfitService
             if (!otherWorldListings.Any())
                 return;
 
-            // Find the best price (highest) on another world
-            // We are looking for where to SELL, so we want the HIGHEST price.
-            // But we should be realistic - look at recent sales or average, not just one high listing.
-            // Let's use the average of the cheapest 5 listings on that world to gauge "market price"
-            
+            // Group by world for aggregation
             var worldGroups = otherWorldListings
                 .GroupBy(l => l.WorldName)
                 .Select(g => new 
                 { 
                     WorldName = g.Key,
-                    // Estimate market price on that world using simple average of top 3 cheapest listings (to undercut)
-                    // If we want to sell, we are competing with these.
-                    // Wait, if we want to SELL, we want a world where prices are HIGH.
-                    // So we look for the world with the HIGHEST 'MinPrice' or 'AveragePrice'.
                     MinPrice = g.Min(l => l.PricePerUnit),
                     AveragePrice = g.Average(l => l.PricePerUnit)
                 })
-                .OrderByDescending(x => x.MinPrice) // Sort by highest minimum price (best place to sell)
                 .ToList();
 
-            var bestWorld = worldGroups.FirstOrDefault();
-            
-            if (bestWorld != null)
-            {
-                // Factor in travel cost from configuration
-                int travelCost = config.CrossWorldTravelCost;
-                
-                // Only suggest if it's significantly better (> 20% better than current world OR absolute profit > travel cost + buffer)
-                // We are looking for where to SELL, so we want the HIGHEST price.
-                // Profit difference = (BestWorldPrice - CurrentPrice) * Quantity - TravelCost
-                
-                // But ExpectedSalePrice is per unit.
-                // Let's assume a typical batch size (e.g. 10 items or just 1 for high value)
-                // For safety, let's just look at unit price improvement relative to base price, 
-                // but we should display the travel cost in the UI.
+            // Factor in travel cost from configuration
+            int travelCost = config.CrossWorldTravelCost;
+            profit.CrossWorldTravelCost = travelCost;
 
+            // 1. Identify best place to SELL (Highest prices)
+            // We want the world with the highest minimum price (floor)
+            var bestSellWorld = worldGroups
+                .OrderByDescending(x => x.MinPrice)
+                .FirstOrDefault();
+
+            if (bestSellWorld != null)
+            {
                 if (profit.ExpectedSalePrice > 0)
                 {
-                    float improvement = (float)bestWorld.MinPrice / profit.ExpectedSalePrice;
+                    float improvement = (float)bestSellWorld.MinPrice / profit.ExpectedSalePrice;
+                    long priceDiff = (long)bestSellWorld.MinPrice - profit.ExpectedSalePrice;
                     
-                    // If it's 20% better price
-                    // OR if the raw difference covers the travel cost comfortably (e.g. 5x travel cost per item)
-                    long priceDiff = (long)bestWorld.MinPrice - profit.ExpectedSalePrice;
-                    
+                    // Only suggest if it's significantly better or covers travel cost
                     if (improvement > 1.2f || priceDiff > (travelCost * 2)) 
                     {
-                        profit.BestWorldName = bestWorld.WorldName;
-                        profit.BestWorldPrice = (uint)bestWorld.MinPrice;
-                        profit.CrossWorldTravelCost = travelCost;
+                        profit.BestWorldName = bestSellWorld.WorldName;
+                        profit.BestWorldPrice = (uint)bestSellWorld.MinPrice;
                     }
                 }
                 else
                 {
-                    // If current world has no price, any price is better
-                    profit.BestWorldName = bestWorld.WorldName;
-                    profit.BestWorldPrice = (uint)bestWorld.MinPrice;
-                    profit.CrossWorldTravelCost = travelCost;
+                    profit.BestWorldName = bestSellWorld.WorldName;
+                    profit.BestWorldPrice = (uint)bestSellWorld.MinPrice;
+                }
+            }
+
+            // 2. Identify best place to BUY (Cheapest prices)
+            // We want the world with the lowest minimum price
+            var cheapestBuyWorld = worldGroups
+                .OrderBy(x => x.MinPrice)
+                .FirstOrDefault();
+                
+            if (cheapestBuyWorld != null)
+            {
+                profit.CheapestWorldName = cheapestBuyWorld.WorldName;
+                profit.CheapestWorldPrice = (uint)cheapestBuyWorld.MinPrice;
+
+                // Calculate potential arbitrage profit (Buy Low, Sell High LOCALLY)
+                // Profit = (LocalSellPrice - RemoteBuyPrice) - Tax - TravelCost
+                // LocalSellPrice = profit.ExpectedSalePrice (undercutting local market)
+                
+                if (profit.ExpectedSalePrice > 0)
+                {
+                    var buyCost = cheapestBuyWorld.MinPrice;
+                    var sellRevenue = profit.ExpectedSalePrice;
+                    var tax = (int)(sellRevenue * 0.05); // 5% tax on sale
+                    var netRevenue = sellRevenue - tax;
+                    
+                    var arbitrageProfit = (int)netRevenue - (int)buyCost - travelCost;
+                    
+                    // Only record if it's profitable
+                    if (arbitrageProfit > 0)
+                    {
+                        profit.ArbitrageProfit = arbitrageProfit;
+                    }
                 }
             }
         }

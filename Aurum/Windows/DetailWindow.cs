@@ -363,7 +363,7 @@ public class DetailWindow : Window, IDisposable
                             if (ImGui.IsItemHovered())
                             {
                                 var diff = bestWorld.MinPrice - localPrice;
-                                ImGui.SetTooltip($"Earn {diff:N0} more gil per item by selling on {bestWorld.WorldName}");
+                                ImGui.SetTooltip($"Prices are higher on {bestWorld.WorldName} (+{diff:N0} gil).\n\nWARNING: You cannot sell items on other worlds as a visitor.\nYou must transfer your Home World to {bestWorld.WorldName} to sell there.\n(Note: Home World transfers usually incur a 90-day cooldown)");
                             }
                         }
                     }
@@ -408,6 +408,18 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextColumn(); 
             var color = currentItem.RawProfit > 0 ? new Vector4(0, 1, 0, 1) : new Vector4(1, 0, 0, 1);
             ImGui.TextColored(color, $"{currentItem.RawProfit:N0} gil");
+
+            if (currentItem.ArbitrageProfit > 0)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn(); ImGui.Text("Arbitrage Profit:");
+                ImGui.TableNextColumn(); 
+                ImGui.TextColored(new Vector4(0, 1, 1, 1), $"{currentItem.ArbitrageProfit:N0} gil");
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip($"Potential profit by buying on {currentItem.CheapestWorldName}\nand selling on current world (after tax & travel).");
+                }
+            }
 
             ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Gil / Hour:");

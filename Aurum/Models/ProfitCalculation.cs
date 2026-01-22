@@ -116,5 +116,10 @@ public class ProfitCalculation
     // Cross-World Analysis
     public string? BestWorldName { get; set; }
     public uint BestWorldPrice { get; set; }
+    
+    public string? CheapestWorldName { get; set; }
+    public uint CheapestWorldPrice { get; set; }
+    
     public int CrossWorldTravelCost { get; set; } // Estimated cost to visit the other world
+    public int ArbitrageProfit { get; set; } // Potential profit from buying on CheapestWorld and selling on CurrentWorld
 }
