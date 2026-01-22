@@ -18,7 +18,7 @@ public static class ThemeManager
         ImGui.PopStyleColor(3);
     }
 
-    private static ThemeColors GetThemeColors(Theme theme)
+    public static ThemeColors GetThemeColors(Theme theme)
     {
         return theme switch
         {
@@ -45,5 +45,5 @@ public static class ThemeManager
         };
     }
 
-    private record struct ThemeColors(Vector4 TitleBg, Vector4 TitleBgActive, Vector4 TitleBgCollapsed);
+    public record struct ThemeColors(Vector4 TitleBg, Vector4 TitleBgActive, Vector4 TitleBgCollapsed);
 }
