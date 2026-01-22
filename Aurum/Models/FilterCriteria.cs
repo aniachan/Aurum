@@ -7,6 +7,9 @@ namespace Aurum.Models;
 /// </summary>
 public class FilterCriteria
 {
+    // Search
+    public string NameSearch { get; set; } = string.Empty;
+
     // Profit Metrics
     public int MinProfitAmount { get; set; } = 0;
     public float MinProfitMargin { get; set; } = 0;

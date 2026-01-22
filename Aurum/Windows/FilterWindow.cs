@@ -66,6 +66,21 @@ public class FilterWindow : Window, IDisposable
         ImGui.TextDisabled("Configure advanced filtering options below.");
         ImGui.Separator();
         
+        // Search Section
+        if (ImGui.CollapsingHeader("Search", ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            string nameSearch = criteria.NameSearch;
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text("Item Name:");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X);
+            if (ImGui.InputText("##NameSearch", ref nameSearch, 100))
+            {
+                criteria.NameSearch = nameSearch;
+                changed = true;
+            }
+        }
+        
         // Basic Filters Section
         if (ImGui.CollapsingHeader("Basic Requirements", ImGuiTreeNodeFlags.DefaultOpen))
         {
