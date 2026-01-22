@@ -106,7 +106,7 @@ public class DatabaseService : IDisposable
             
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = "INSERT INTO SchemaVersion (version, applied_at) VALUES (@version, @appliedAt)";
+            cmd.CommandText = "INSERT OR IGNORE INTO SchemaVersion (version, applied_at) VALUES (@version, @appliedAt)";
             cmd.Parameters.AddWithValue("@version", version);
             cmd.Parameters.AddWithValue("@appliedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             cmd.ExecuteNonQuery();
