@@ -132,6 +132,10 @@ public class MarketData
     public List<int> BestHoursToSell { get; set; } = new(); // 0-23
     public string PeakDemandAnalysis { get; set; } = string.Empty;
 
+    // Seasonal Analysis
+    public bool IsSeasonal { get; set; }
+    public string SeasonalTrend { get; set; } = string.Empty;
+
     // Alternative item suggestions
     public List<AlternativeItemSuggestion> AlternativeSuggestions { get; set; } = new();
 

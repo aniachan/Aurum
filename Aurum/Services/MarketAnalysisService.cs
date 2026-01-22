@@ -66,6 +66,9 @@ public class MarketAnalysisService
         // Identify best time to sell (peak demand)
         CalculatePeakDemand(marketData);
 
+        // Seasonal trend analysis
+        CalculateSeasonalTrend(marketData);
+
         // Generate alternative suggestions (if relevant)
         // This requires access to RecipeService, which we don't have here directly.
         // The ProfitService or a higher-level orchestrator should handle cross-item analysis.
@@ -537,6 +540,46 @@ public class MarketAnalysisService
             if (maxPriceDay.AveragePrice > bestDay.AveragePrice * 1.1)
             {
                  marketData.PeakDemandAnalysis += $" Highest prices on {maxPriceDay.Day}.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Analyze seasonal trends if historical data spans enough time
+    /// </summary>
+    private void CalculateSeasonalTrend(MarketData marketData)
+    {
+        if (marketData.RecentHistory == null || !marketData.RecentHistory.Any())
+            return;
+
+        var history = marketData.RecentHistory.OrderBy(h => h.Timestamp).ToList();
+        var oldest = history.First().Timestamp;
+        var newest = history.Last().Timestamp;
+        
+        // Need at least 6 months of data for meaningful seasonal analysis, 
+        // but let's do a "mini-seasonal" or "event-based" check if we see spikes
+        // For now, simple logic: check if sales volume is concentrated in specific months
+        
+        var totalDays = (newest - oldest).TotalDays;
+        if (totalDays < 30) return; // Not enough data for seasonality
+
+        var salesByMonth = history
+            .GroupBy(h => h.Timestamp.Month)
+            .Select(g => new { Month = g.Key, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .ToList();
+
+        // If one month has > 50% of sales (and we have data covering multiple months), it's seasonal
+        if (salesByMonth.Count >= 2)
+        {
+            var topMonth = salesByMonth.First();
+            var totalSales = history.Count;
+            
+            if (topMonth.Count > totalSales * 0.5)
+            {
+                marketData.IsSeasonal = true;
+                var monthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(topMonth.Month);
+                marketData.SeasonalTrend = $"Seasonal spike detected in {monthName} ({topMonth.Count} sales).";
             }
         }
     }
