@@ -58,6 +58,16 @@ public class ProfitService
             // Calculate profit
             var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
             
+            if (config.EnableProfitCalculationLogging && profit != null)
+            {
+                log.Information($"Profit calculation for {recipe.ItemName} ({recipe.ResultItemId}): RawProfit={profit.RawProfit:N0}, ROI={profit.ROI:F1}%, Margin={profit.ProfitMargin:F1}%, Score={profit.RecommendationScore}");
+                
+                if (profit.Warnings.Any())
+                {
+                    log.Information($"Warnings for {recipe.ItemName}: {string.Join(", ", profit.Warnings.Select(w => w.Message))}");
+                }
+            }
+
             // Check cross-world prices (Aurum-ykb.1.3)
             await CheckCrossWorldPricesAsync(recipe, profit, worldName);
 

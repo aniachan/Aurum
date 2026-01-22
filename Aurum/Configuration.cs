@@ -69,6 +69,11 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public RiskLevel MaxAcceptableRisk { get; set; } = RiskLevel.Medium;
     public bool ShowHighRiskItems { get; set; } = true;
 
+    // Logging Settings
+    public bool EnableDebugLogging { get; set; } = false;
+    public bool EnableProfitCalculationLogging { get; set; } = false;
+    public bool EnableMarketAnalysisLogging { get; set; } = false;
+
     // Cross-World Settings
     public int CrossWorldTravelCost { get; set; } = 2000; // Estimated cost in gil (teleport fees) to visit another world
 

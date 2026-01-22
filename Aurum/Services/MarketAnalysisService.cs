@@ -79,6 +79,11 @@ public class MarketAnalysisService
 
         // Generate final recommendation
         GenerateRecommendation(marketData);
+
+        if (config.EnableMarketAnalysisLogging)
+        {
+            log.Information($"Market analysis for {marketData.ItemId}: Velocity={marketData.SaleVelocity:F2}, S/D={marketData.SupplyDemandRatio:F2}, Risk={marketData.RiskLevel} ({marketData.RiskScore})");
+        }
     }
     
     /// <summary>
