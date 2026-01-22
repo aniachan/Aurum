@@ -11,7 +11,7 @@ namespace Aurum.Utils;
 public static class ShareUtils
 {
     private const string SHARE_URL_BASE = "https://aurum-app.com/share/";
-    private const int VERSION = 1;
+    private const int VERSION = 2;
 
     public class SharedProfitData
     {
@@ -44,6 +44,15 @@ public static class ShareUtils
 
         [JsonPropertyName("risk")]
         public string RiskLevel { get; set; } = string.Empty;
+
+        [JsonPropertyName("score")]
+        public int RecommendationScore { get; set; }
+
+        [JsonPropertyName("profitScore")]
+        public int ProfitScore { get; set; }
+
+        [JsonPropertyName("demandScore")]
+        public int DemandScore { get; set; }
     }
 
     public static string GenerateShareLink(ProfitCalculation calc)
@@ -60,7 +69,10 @@ public static class ShareUtils
             SalePrice = calc.ExpectedSalePrice,
             Profit = calc.RawProfit,
             Margin = calc.ProfitMargin,
-            RiskLevel = calc.RiskLevel.ToString()
+            RiskLevel = calc.RiskLevel.ToString(),
+            RecommendationScore = calc.RecommendationScore,
+            ProfitScore = calc.ProfitScore,
+            DemandScore = calc.DemandScore
         };
 
         var json = JsonSerializer.Serialize(data);

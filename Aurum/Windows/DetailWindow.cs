@@ -176,7 +176,7 @@ public class DetailWindow : Window, IDisposable
         }
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Copy shareable link to clipboard");
+            ImGui.SetTooltip("Copy shareable link with profit & scores to clipboard");
         }
         ImGui.SameLine();
         
