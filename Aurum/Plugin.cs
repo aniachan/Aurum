@@ -56,6 +56,7 @@ public sealed class Plugin : IDalamudPlugin
     public DetailWindow DetailWindow { get; init; }
     public ChartWindow ChartWindow { get; init; }
     public ShoppingListWindow ShoppingListWindow { get; init; }
+    public DebugWindow DebugWindow { get; init; }
 
     public Plugin()
     {
@@ -109,12 +110,14 @@ public sealed class Plugin : IDalamudPlugin
         DetailWindow = new DetailWindow(this);
         ChartWindow = new ChartWindow(this);
         ShoppingListWindow = new ShoppingListWindow(this);
+        DebugWindow = new DebugWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(DashboardWindow);
         WindowSystem.AddWindow(DetailWindow);
         WindowSystem.AddWindow(ChartWindow);
         WindowSystem.AddWindow(ShoppingListWindow);
+        WindowSystem.AddWindow(DebugWindow);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -167,6 +170,7 @@ public sealed class Plugin : IDalamudPlugin
         DetailWindow.Dispose();
         ChartWindow.Dispose();
         ShoppingListWindow.Dispose();
+        DebugWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         
@@ -214,6 +218,10 @@ public sealed class Plugin : IDalamudPlugin
             var logPath = FileLog?.GetLogFilePath() ?? "Unknown";
             Log.Information($"Log file location: {logPath}");
             Log.Information("You can read this file to see all plugin output.");
+        }
+        else if (argsTrimmed == "debug")
+        {
+            DebugWindow.IsOpen = true;
         }
         else
         {
