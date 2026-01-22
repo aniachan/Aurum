@@ -12,6 +12,10 @@ public class DebugWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
     private Models.ApiRequestLogEntry[]? recentRequests;
+    private string customQuery = "";
+    private DatabaseService.QueryResult? queryResult;
+    private string[]? tableList;
+    private string selectedTable = "";
 
     public DebugWindow(Plugin plugin) : base("Aurum Debug Tools")
     {
@@ -45,6 +49,12 @@ public class DebugWindow : Window, IDisposable
             if (ImGui.BeginTabItem("Cache & DB"))
             {
                 DrawDatabaseTab();
+                ImGui.EndTabItem();
+            }
+            
+            if (ImGui.BeginTabItem("DB Browser"))
+            {
+                DrawDbBrowserTab();
                 ImGui.EndTabItem();
             }
             
@@ -212,6 +222,93 @@ public class DebugWindow : Window, IDisposable
         }
         ImGui.SameLine();
         ImGui.Text("Optimizes database file size");
+    }
+
+    private void DrawDbBrowserTab()
+    {
+        ImGui.Text("Database Browser");
+        
+        if (tableList == null)
+        {
+            tableList = plugin.DatabaseService.GetAllTables().ToArray();
+            if (tableList.Length > 0)
+                selectedTable = tableList[0];
+        }
+
+        ImGui.Columns(2);
+        ImGui.SetColumnWidth(0, 200);
+
+        // Sidebar: Tables
+        ImGui.Text("Tables");
+        ImGui.Separator();
+        
+        if (ImGui.BeginListBox("##Tables", new Vector2(-1, -1)))
+        {
+            foreach (var table in tableList)
+            {
+                if (ImGui.Selectable(table, selectedTable == table))
+                {
+                    selectedTable = table;
+                    customQuery = $"SELECT * FROM {selectedTable} LIMIT 100";
+                    queryResult = plugin.DatabaseService.ExecuteCustomQuery(customQuery);
+                }
+            }
+            ImGui.EndListBox();
+        }
+
+        ImGui.NextColumn();
+
+        // Main Area: Query & Results
+        ImGui.Text("SQL Query");
+        ImGui.InputTextMultiline("##Query", ref customQuery, 1000, new Vector2(-1, 80));
+        
+        if (ImGui.Button("Execute Query"))
+        {
+            queryResult = plugin.DatabaseService.ExecuteCustomQuery(customQuery);
+        }
+
+        ImGui.Separator();
+
+        if (queryResult != null)
+        {
+            if (queryResult.Error != null)
+            {
+                ImGui.TextColored(new Vector4(1, 0, 0, 1), $"Error: {queryResult.Error}");
+            }
+            else if (queryResult.Message != null)
+            {
+                ImGui.TextColored(new Vector4(0, 1, 0, 1), queryResult.Message);
+            }
+            else
+            {
+                ImGui.Text($"Rows: {queryResult.Rows.Count}");
+                if (ImGui.BeginTable("Results", queryResult.Columns.Count, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
+                {
+                    foreach (var col in queryResult.Columns)
+                    {
+                        ImGui.TableSetupColumn(col);
+                    }
+                    ImGui.TableHeadersRow();
+
+                    foreach (var row in queryResult.Rows)
+                    {
+                        ImGui.TableNextRow();
+                        foreach (var cell in row)
+                        {
+                            ImGui.TableNextColumn();
+                            ImGui.Text(cell);
+                        }
+                    }
+                    ImGui.EndTable();
+                }
+            }
+        }
+        else
+        {
+             ImGui.Text("Select a table or run a query to view data.");
+        }
+
+        ImGui.Columns(1);
     }
 
     private void DrawPerformanceTab()

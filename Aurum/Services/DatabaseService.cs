@@ -1050,6 +1050,96 @@ public class DatabaseService : IDisposable
         }
     }
 
+    public List<string> GetAllTables()
+    {
+        lock (dbLock)
+        {
+            var tables = new List<string>();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;";
+                
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    tables.Add(reader.GetString(0));
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to get all tables");
+            }
+            return tables;
+        }
+    }
+
+    public QueryResult ExecuteCustomQuery(string sql)
+    {
+        lock (dbLock)
+        {
+            var result = new QueryResult();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                
+                // Determine if it's a SELECT query
+                bool isSelect = sql.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) || 
+                                sql.TrimStart().StartsWith("PRAGMA", StringComparison.OrdinalIgnoreCase);
+
+                if (isSelect)
+                {
+                    using var reader = command.ExecuteReader();
+                    
+                    // Get column names
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        result.Columns.Add(reader.GetName(i));
+                    }
+
+                    // Get rows
+                    while (reader.Read())
+                    {
+                        var row = new List<string>();
+                        for (int i = 0; i < reader.FieldCount; i++)
+                        {
+                            if (reader.IsDBNull(i))
+                                row.Add("NULL");
+                            else
+                                row.Add(reader.GetValue(i).ToString() ?? "");
+                        }
+                        result.Rows.Add(row);
+                    }
+                }
+                else
+                {
+                    result.RecordsAffected = command.ExecuteNonQuery();
+                    result.Message = $"Query executed successfully. Records affected: {result.RecordsAffected}";
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Error = ex.Message;
+                log.Error(ex, "Failed to execute custom query");
+            }
+            return result;
+        }
+    }
+
+    public class QueryResult
+    {
+        public List<string> Columns { get; set; } = new();
+        public List<List<string>> Rows { get; set; } = new();
+        public string? Error { get; set; }
+        public string? Message { get; set; }
+        public int RecordsAffected { get; set; }
+    }
+
     public void Dispose()
     {
         // SQLite connection pooling handles actual connection closing
