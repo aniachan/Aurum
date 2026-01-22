@@ -722,12 +722,12 @@ public class ProfitService
     /// <summary>
     /// Load cached profit calculations from database
     /// </summary>
-    public List<ProfitCalculation> LoadCachedProfits(int maxAgeHours = 24)
+    public List<ProfitCalculation> LoadCachedProfits(int maxAgeHours = 24, int limit = 1000, int offset = 0)
     {
         try
         {
-            log.Information($"Loading cached profits (max age: {maxAgeHours}h)...");
-            var cachedData = Plugin.Instance?.DatabaseService?.GetAllCachedProfits(maxAgeHours);
+            log.Information($"Loading cached profits (max age: {maxAgeHours}h, limit: {limit}, offset: {offset})...");
+            var cachedData = Plugin.Instance?.DatabaseService?.GetAllCachedProfits(maxAgeHours, limit, offset);
             
             if (cachedData == null || !cachedData.Any())
             {

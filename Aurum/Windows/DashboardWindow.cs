@@ -961,7 +961,8 @@ public class DashboardWindow : Window, IDisposable
             // Load from database cache (last 24 hours)
             await Task.Run(() =>
             {
-                profitResults = plugin.ProfitService.LoadCachedProfits(24);
+                // Load more data for dashboard
+                profitResults = plugin.ProfitService.LoadCachedProfits(24, 5000, 0);
             });
             
             if (profitResults.Any())

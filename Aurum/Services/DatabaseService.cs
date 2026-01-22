@@ -861,7 +861,7 @@ public class DatabaseService : IDisposable
         }
     }
     
-    public List<(uint RecipeId, ProfitCalculation Profit, long LastAnalyzed)> GetAllCachedProfits(int maxAgeHours = 24)
+    public List<(uint RecipeId, ProfitCalculation Profit, long LastAnalyzed)> GetAllCachedProfits(int maxAgeHours = 24, int limit = 1000, int offset = 0)
     {
         lock (dbLock)
         {
@@ -879,9 +879,11 @@ public class DatabaseService : IDisposable
                     FROM RecipeCache
                     WHERE last_analyzed > @cutoff
                     ORDER BY recommendation_score DESC
-                    LIMIT 1000
+                    LIMIT @limit OFFSET @offset
                 ";
                 command.Parameters.AddWithValue("@cutoff", cutoffTime);
+                command.Parameters.AddWithValue("@limit", limit);
+                command.Parameters.AddWithValue("@offset", offset);
 
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
