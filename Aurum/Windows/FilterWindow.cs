@@ -483,7 +483,7 @@ public class FilterWindow : Window, IDisposable
             return;
         }
         
-        ImGui.BeginChild("PresetsList", new Vector2(0, -40), true);
+            ImGui.BeginChild("PresetsList", new Vector2(0, -40), true);
         
         foreach (var preset in presets)
         {
@@ -491,7 +491,6 @@ public class FilterWindow : Window, IDisposable
             if (ImGui.Selectable($"{preset.Name}##{preset.Id}", isSelected))
             {
                 selectedPresetId = preset.Id;
-                filterService.LoadPreset(preset.Id);
             }
             
             if (ImGui.IsItemHovered())

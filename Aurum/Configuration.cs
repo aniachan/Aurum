@@ -93,6 +93,9 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool AllowAnonymousAnalytics { get; set; } = false;
     public bool AllowCommunityDataSync { get; set; } = false;
 
+    // Filter Presets
+    public Dictionary<string, (string Name, FilterCriteria Criteria)> FilterPresets { get; set; } = new();
+
     // The below exists just to make saving less cumbersome
     public void Save()
     {

@@ -25,82 +25,37 @@ public class ItemFilterService
         CurrentCriteria = new FilterCriteria();
     }
     
-    // Preset Management - In-memory for now, could be persisted to Configuration later
-    private Dictionary<string, (string Name, FilterCriteria Criteria)> _presets = new();
-
+    // Preset Management
     public void SavePreset(string name, FilterCriteria criteria)
     {
         string id = Guid.NewGuid().ToString("N");
-        // Deep copy needed if FilterCriteria were complex reference type, but properties are mostly value types or simple.
-        // For safety, let's just serialize/deserialize or manual copy if needed.
-        // For now, assuming direct copy is fine or shallow copy.
-        // Actually, let's do a manual memberwise clone approach via JSON or similar if needed.
-        // For this prototype, we'll just store the reference, which is risky if UI mutates it.
-        // Better:
-        var copy = new FilterCriteria 
-        {
-            NameSearch = criteria.NameSearch,
-            MinJobLevel = criteria.MinJobLevel,
-            MaxJobLevel = criteria.MaxJobLevel,
-            MinItemLevel = criteria.MinItemLevel,
-            MaxItemLevel = criteria.MaxItemLevel,
-            MinProfitAmount = criteria.MinProfitAmount,
-            MinROI = criteria.MinROI,
-            MinSaleVelocity = criteria.MinSaleVelocity,
-            IncludedEquipSlots = new HashSet<EquipSlot>(criteria.IncludedEquipSlots),
-            IncludedJobIds = new HashSet<string>(criteria.IncludedJobIds),
-            
-            // Additional properties
-            IsDyeableOnly = criteria.IsDyeableOnly,
-            IsCollectableOnly = criteria.IsCollectableOnly,
-            MinMateriaSlots = criteria.MinMateriaSlots,
-            MinRarity = criteria.MinRarity,
-            MaxRarity = criteria.MaxRarity,
-            ExcludeUnique = criteria.ExcludeUnique,
-            ExcludeUntradable = criteria.ExcludeUntradable
-        };
-        _presets[id] = (name, copy);
+        var copy = criteria.Clone();
+        _configuration.FilterPresets[id] = (name, copy);
+        _configuration.Save();
     }
 
     public List<(string Id, string Name, FilterCriteria Criteria)> GetPresets()
     {
-        return _presets.Select(kv => (kv.Key, kv.Value.Name, kv.Value.Criteria)).ToList();
+        return _configuration.FilterPresets.Select(kv => (kv.Key, kv.Value.Name, kv.Value.Criteria)).ToList();
     }
 
     public void LoadPreset(string id)
     {
-        if (_presets.TryGetValue(id, out var preset))
+        if (_configuration.FilterPresets.TryGetValue(id, out var preset))
         {
             // Clone back to CurrentCriteria
-            CurrentCriteria = new FilterCriteria
-            {
-                NameSearch = preset.Criteria.NameSearch,
-                MinJobLevel = preset.Criteria.MinJobLevel,
-                MaxJobLevel = preset.Criteria.MaxJobLevel,
-                MinItemLevel = preset.Criteria.MinItemLevel,
-                MaxItemLevel = preset.Criteria.MaxItemLevel,
-                MinProfitAmount = preset.Criteria.MinProfitAmount,
-                MinROI = preset.Criteria.MinROI,
-                MinSaleVelocity = preset.Criteria.MinSaleVelocity,
-                IncludedEquipSlots = new HashSet<EquipSlot>(preset.Criteria.IncludedEquipSlots),
-                IncludedJobIds = new HashSet<string>(preset.Criteria.IncludedJobIds),
-                
-                // Additional properties
-                IsDyeableOnly = preset.Criteria.IsDyeableOnly,
-                IsCollectableOnly = preset.Criteria.IsCollectableOnly,
-                MinMateriaSlots = preset.Criteria.MinMateriaSlots,
-                MinRarity = preset.Criteria.MinRarity,
-                MaxRarity = preset.Criteria.MaxRarity,
-                ExcludeUnique = preset.Criteria.ExcludeUnique,
-                ExcludeUntradable = preset.Criteria.ExcludeUntradable
-            };
+            CurrentCriteria = preset.Criteria.Clone();
         }
     }
 
     public void DeletePreset(string id)
     {
-        _presets.Remove(id);
+        if (_configuration.FilterPresets.Remove(id))
+        {
+            _configuration.Save();
+        }
     }
+
 
     /// <summary>
     /// Filter a list of profit calculations based on criteria
