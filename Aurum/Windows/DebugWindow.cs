@@ -58,6 +58,12 @@ public class DebugWindow : Window, IDisposable
                 ImGui.EndTabItem();
             }
             
+            if (ImGui.BeginTabItem("Request Queue"))
+            {
+                DrawRequestQueueTab();
+                ImGui.EndTabItem();
+            }
+            
             if (ImGui.BeginTabItem("DB Browser"))
             {
                 DrawDbBrowserTab();
@@ -306,6 +312,89 @@ public class DebugWindow : Window, IDisposable
         }
         ImGui.SameLine();
         ImGui.Text("Optimizes database file size");
+    }
+
+    private void DrawRequestQueueTab()
+    {
+        ImGui.Text("Request Queue Visualizer");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(Items waiting to be sent to Universalis)");
+        
+        ImGui.Separator();
+        
+        // Stats Header
+        var queue = plugin.RequestQueue;
+        var snapshot = queue.GetSnapshot();
+        
+        ImGui.Columns(3, "QueueStats", false);
+        ImGui.Text($"Total Pending: {snapshot.Count}");
+        ImGui.NextColumn();
+        ImGui.Text($"Distinct Worlds: {snapshot.Select(r => r.WorldName).Distinct().Count()}");
+        ImGui.NextColumn();
+        ImGui.Text($"Total Items: {snapshot.Sum(r => r.ItemIds.Count)}");
+        ImGui.Columns(1);
+        
+        ImGui.Separator();
+        
+        // Controls
+        if (ImGui.Button("Clear Queue"))
+        {
+            queue.Clear();
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Refresh View"))
+        {
+            // Just redraws
+        }
+        
+        ImGui.Dummy(new Vector2(0, 10));
+
+        // Queue Table
+        if (ImGui.BeginTable("QueueTable", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable, new Vector2(0, 400)))
+        {
+            ImGui.TableSetupColumn("Priority", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableSetupColumn("Items", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Age", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Count", ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableHeadersRow();
+
+            foreach (var req in snapshot)
+            {
+                ImGui.TableNextRow();
+                
+                ImGui.TableNextColumn();
+                Vector4 color = req.Priority switch
+                {
+                    RequestPriority.Critical => new Vector4(1, 0, 0, 1),
+                    RequestPriority.High => new Vector4(1, 0.5f, 0, 1),
+                    RequestPriority.Normal => new Vector4(1, 1, 1, 1),
+                    RequestPriority.Background => new Vector4(0.5f, 0.5f, 0.5f, 1),
+                    _ => new Vector4(1, 1, 1, 1)
+                };
+                ImGui.TextColored(color, req.Priority.ToString());
+                
+                ImGui.TableNextColumn();
+                ImGui.Text(req.WorldName);
+                
+                ImGui.TableNextColumn();
+                var itemList = string.Join(", ", req.ItemIds.Take(10));
+                if (req.ItemIds.Count > 10) itemList += $"... (+{req.ItemIds.Count - 10} more)";
+                ImGui.Text(itemList);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip(string.Join(", ", req.ItemIds));
+                }
+                
+                ImGui.TableNextColumn();
+                var age = DateTimeOffset.UtcNow - req.Timestamp;
+                ImGui.Text($"{age.TotalSeconds:F1}s");
+                
+                ImGui.TableNextColumn();
+                ImGui.Text($"{req.ItemIds.Count}");
+            }
+            ImGui.EndTable();
+        }
     }
 
     private void DrawDbBrowserTab()

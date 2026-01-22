@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
     public MarketAnalysisService MarketAnalysisService { get; init; }
     public ItemPriorityService ItemPriorityService { get; init; }
     public RateLimiter RateLimiter { get; init; }
+    public RequestQueue RequestQueue { get; init; }
     public ProfitService ProfitService { get; init; }
     public ShoppingListService ShoppingListService { get; init; }
     public RefreshService RefreshService { get; init; }
@@ -87,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
             }
         );
 
+        RequestQueue = new RequestQueue();
         RateLimiter = new RateLimiter(Log, Configuration, ChatGui, DatabaseService);
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log, Configuration);

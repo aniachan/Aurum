@@ -377,4 +377,12 @@ public class RequestQueue
             _pendingRequests.Clear();
         }
     }
+    
+    public IReadOnlyList<QueuedRequest> GetSnapshot()
+    {
+        lock (_queueLock)
+        {
+            return _queue.ToList();
+        }
+    }
 }
