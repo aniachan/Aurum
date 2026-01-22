@@ -97,9 +97,9 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public Dictionary<string, (string Name, FilterCriteria Criteria)> FilterPresets { get; set; } = new();
 
     // The below exists just to make saving less cumbersome
-    public void Save()
+    public virtual void Save()
     {
-        Plugin.PluginInterface.SavePluginConfig(this);
+        Plugin.PluginInterface?.SavePluginConfig(this);
     }
 }
 
