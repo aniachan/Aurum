@@ -262,6 +262,16 @@ public class DashboardWindow : Window, IDisposable
             {
                 _ = ExportToCsvAsync();
             }
+
+            ImGui.SameLine();
+            if (ImGui.Button("📋 Copy Report"))
+            {
+                CopyReportToClipboard();
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Copy a formatted text summary to clipboard for sharing");
+            }
             
             // Defer UI rendering until visible - Check visibility before complex drawing
             // Note: ImGui.IsWindowCollapsed() checks if the window is collapsed (rolled up)
@@ -1203,6 +1213,49 @@ public class DashboardWindow : Window, IDisposable
         catch (Exception ex)
         {
             Plugin.Log.Error(ex, "Failed to export CSV");
+        }
+    }
+
+    private void CopyReportToClipboard()
+    {
+        if (!profitResults.Any())
+        {
+             return;
+        }
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("✨ Aurum Market Report ✨");
+            sb.AppendLine($"Generated: {DateTime.Now:g}");
+            sb.AppendLine($"Found: {filteredResults.Count} opportunities");
+            sb.AppendLine("----------------------------------------");
+
+            // Top 5 items
+            var topItems = filteredResults.Take(5);
+            foreach (var p in topItems)
+            {
+                var profitK = p.RawProfit >= 1000 ? $"{p.RawProfit / 1000.0:F1}k" : p.RawProfit.ToString();
+                sb.AppendLine($"🔹 {p.Recipe.ItemName} ({p.Recipe.CraftingClassName})");
+                sb.AppendLine($"   Profit: {profitK} gil | Margin: {p.ProfitMargin:F0}%");
+                sb.AppendLine($"   Velocity: {p.MarketData?.SaleVelocity:F1}/day");
+                sb.AppendLine("");
+            }
+            
+            if (filteredResults.Count > 5)
+            {
+                sb.AppendLine($"...and {filteredResults.Count - 5} more items.");
+            }
+            
+            sb.AppendLine("----------------------------------------");
+            sb.AppendLine("Download Aurum: https://github.com/Dicklesworthstone/Aurum");
+            
+            ImGui.SetClipboardText(sb.ToString());
+            Plugin.Log.Information("Copied market report to clipboard");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, "Failed to copy report to clipboard");
         }
     }
 }
