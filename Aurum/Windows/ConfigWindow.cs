@@ -307,6 +307,21 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
         }
 
+        // Cross-World Settings
+        ImGui.Separator();
+        ImGui.Text("Cross-World Settings");
+        
+        var travelCost = configuration.CrossWorldTravelCost;
+        if (ImGui.InputInt("Est. Travel Cost (Gil)", ref travelCost))
+        {
+            configuration.CrossWorldTravelCost = Math.Max(0, travelCost);
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Estimated gil cost to travel to another world (teleport fees).\nUsed to calculate net profit for cross-world arbitrage.");
+        }
+
         var topItems = configuration.TopItemsToFetch;
         if (ImGui.SliderInt("Max Items to Fetch per Cycle", ref topItems, 10, 100))
         {

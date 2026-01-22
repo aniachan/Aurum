@@ -187,7 +187,7 @@ public class DetailWindow : Window, IDisposable
         }
         else if (crossWorldData == null)
         {
-            if (ImGui.Button("Check Cheapest World"))
+            if (ImGui.Button("Check Cross-World Prices"))
             {
                 FetchCrossWorldData();
             }
@@ -297,17 +297,20 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextColumn(); ImGui.Text("Current Listings:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.MarketData.CurrentListings}");
 
-            // Cross-World Cheapest Price Row
-            if (crossWorldData != null)
+            // Cross-World Analysis
+            if (crossWorldData != null && currentItem.MarketData != null)
             {
-                var cheapestListing = crossWorldData.Listings.OrderBy(l => l.PricePerUnit).FirstOrDefault();
+                // 1. Cheapest World (Buying)
+                var cheapestListing = crossWorldData.Listings
+                    .OrderBy(l => l.PricePerUnit)
+                    .FirstOrDefault();
+
                 if (cheapestListing != null)
                 {
                     ImGui.TableNextRow();
-                    ImGui.TableNextColumn(); ImGui.Text("Cheapest World:");
+                    ImGui.TableNextColumn(); ImGui.Text("Cheapest (Buy):");
                     ImGui.TableNextColumn();
                     
-                    // Highlight if cheaper than local
                     var localMin = currentItem.MarketData.CurrentMinPrice;
                     var isCheaper = cheapestListing.PricePerUnit < localMin;
                     var color = isCheaper ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 1, 1);
@@ -320,6 +323,48 @@ public class DetailWindow : Window, IDisposable
                         {
                             var diff = localMin - cheapestListing.PricePerUnit;
                             ImGui.SetTooltip($"Save {diff:N0} gil per item by buying on {cheapestListing.WorldName}");
+                        }
+                    }
+                }
+
+                // 2. Best World (Selling)
+                // Filter out current world listings to find opportunities elsewhere
+                var otherListings = crossWorldData.Listings
+                    .Where(l => !l.WorldName.Equals(currentItem.MarketData.WorldName, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (otherListings.Any())
+                {
+                    // Find world with highest floor price (best to sell)
+                    var bestWorld = otherListings
+                        .GroupBy(l => l.WorldName)
+                        .Select(g => new 
+                        { 
+                            WorldName = g.Key,
+                            MinPrice = g.Min(l => l.PricePerUnit)
+                        })
+                        .OrderByDescending(x => x.MinPrice)
+                        .FirstOrDefault();
+
+                    if (bestWorld != null)
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn(); ImGui.Text("Best (Sell):");
+                        ImGui.TableNextColumn();
+                        
+                        var localPrice = currentItem.ExpectedSalePrice;
+                        var isBetter = bestWorld.MinPrice > localPrice;
+                        var color = isBetter ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 1, 1);
+                        
+                        ImGui.TextColored(color, $"{bestWorld.MinPrice:N0} @ {bestWorld.WorldName}");
+                        
+                        if (isBetter)
+                        {
+                            if (ImGui.IsItemHovered())
+                            {
+                                var diff = bestWorld.MinPrice - localPrice;
+                                ImGui.SetTooltip($"Earn {diff:N0} more gil per item by selling on {bestWorld.WorldName}");
+                            }
                         }
                     }
                 }
