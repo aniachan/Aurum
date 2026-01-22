@@ -155,6 +155,16 @@ public class DetailWindow : Window, IDisposable
         }
         ImGui.SameLine();
         
+        if (ImGui.Button("Copy"))
+        {
+            CopyToClipboard();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Copy analysis to clipboard");
+        }
+        ImGui.SameLine();
+        
         // Cross-world button
         if (loadingCrossWorld)
         {
@@ -213,6 +223,22 @@ public class DetailWindow : Window, IDisposable
                 loadingCrossWorld = false;
             }
         });
+    }
+
+    private void CopyToClipboard()
+    {
+        if (currentItem == null) return;
+        
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"--- {currentItem.Recipe.ItemName} Analysis ---");
+        sb.AppendLine($"Expected Sale: {currentItem.ExpectedSalePrice:N0} gil");
+        sb.AppendLine($"Crafting Cost: {currentItem.TotalCraftCost:N0} gil");
+        sb.AppendLine($"Net Profit:    {currentItem.RawProfit:N0} gil");
+        sb.AppendLine($"Margin:        {currentItem.ProfitMargin:F0}%");
+        sb.AppendLine($"Risk Level:    {currentItem.RiskLevel}");
+        sb.AppendLine($"Recommendation: {currentItem.Recommendation}");
+        
+        ImGui.SetClipboardText(sb.ToString());
     }
 
     private void OpenUrl(string url)
