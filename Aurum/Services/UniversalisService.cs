@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 using Aurum.Models;
+using Aurum.Infrastructure;
 
 namespace Aurum.Services;
 
@@ -365,28 +366,27 @@ public class UniversalisService : IDisposable
     /// </summary>
     private MarketData ConvertToMarketData(UniversalisItemResponse response, string worldName, uint itemId)
     {
-        var marketData = new MarketData
-        {
-            ItemId = itemId,
-            WorldName = worldName,
-            LastUploadTime = DateTimeOffset.FromUnixTimeMilliseconds(response.LastUploadTime).UtcDateTime,
-            CurrentListings = response.Listings?.Count ?? 0,
-            // Round doubles to uints (prices in gil are whole numbers)
-            MinPrice = (uint)Math.Round(response.MinPrice),
-            MaxPrice = (uint)Math.Round(response.MaxPrice),
-            CurrentAveragePriceNQ = (uint)Math.Round(response.CurrentAveragePriceNQ),
-            CurrentAveragePriceHQ = (uint)Math.Round(response.CurrentAveragePriceHQ),
-            AveragePriceNQ = (uint)Math.Round(response.AveragePriceNQ),
-            AveragePriceHQ = (uint)Math.Round(response.AveragePriceHQ),
-            MinPriceNQ = (uint)Math.Round(response.MinPriceNQ),
-            MinPriceHQ = (uint)Math.Round(response.MinPriceHQ),
-            MaxPriceNQ = (uint)Math.Round(response.MaxPriceNQ),
-            MaxPriceHQ = (uint)Math.Round(response.MaxPriceHQ),
-            CachedAt = DateTime.UtcNow,
+        var marketData = MarketDataPool.Get();
+        
+        marketData.ItemId = itemId;
+        marketData.WorldName = worldName;
+        marketData.LastUploadTime = DateTimeOffset.FromUnixTimeMilliseconds(response.LastUploadTime).UtcDateTime;
+        marketData.CurrentListings = response.Listings?.Count ?? 0;
+        // Round doubles to uints (prices in gil are whole numbers)
+        marketData.MinPrice = (uint)Math.Round(response.MinPrice);
+        marketData.MaxPrice = (uint)Math.Round(response.MaxPrice);
+        marketData.CurrentAveragePriceNQ = (uint)Math.Round(response.CurrentAveragePriceNQ);
+        marketData.CurrentAveragePriceHQ = (uint)Math.Round(response.CurrentAveragePriceHQ);
+        marketData.AveragePriceNQ = (uint)Math.Round(response.AveragePriceNQ);
+        marketData.AveragePriceHQ = (uint)Math.Round(response.AveragePriceHQ);
+        marketData.MinPriceNQ = (uint)Math.Round(response.MinPriceNQ);
+        marketData.MinPriceHQ = (uint)Math.Round(response.MinPriceHQ);
+        marketData.MaxPriceNQ = (uint)Math.Round(response.MaxPriceNQ);
+        marketData.MaxPriceHQ = (uint)Math.Round(response.MaxPriceHQ);
+        marketData.CachedAt = DateTime.UtcNow;
 
-            // Initialize supply/demand metrics that can be derived from raw response
-            ListingsCount = response.Listings?.Count ?? 0
-        };
+        // Initialize supply/demand metrics that can be derived from raw response
+        marketData.ListingsCount = response.Listings?.Count ?? 0;
         
         // Convert listings
         if (response.Listings != null)

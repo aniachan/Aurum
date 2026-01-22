@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Aurum.Infrastructure;
+using Aurum.Models;
 
 namespace Aurum.Services;
 
@@ -40,7 +42,14 @@ public class CacheService
                 else
                 {
                     // Remove expired entry
+                    var expiredValue = cache[key].Value;
                     cache.Remove(key);
+                    
+                    // If it was a MarketData object, return it to the pool
+                    if (expiredValue is MarketData marketData)
+                    {
+                        MarketDataPool.Return(marketData);
+                    }
                 }
             }
             
@@ -69,6 +78,15 @@ public class CacheService
             if (cache.Count >= config.MaxCacheEntries && !cache.ContainsKey(key))
             {
                 EvictLru();
+            }
+
+            // If overwriting existing key, check if we need to return old value to pool
+            if (cache.TryGetValue(key, out var existingEntry))
+            {
+                if (existingEntry.Value is MarketData oldMarketData && !ReferenceEquals(oldMarketData, value))
+                {
+                    MarketDataPool.Return(oldMarketData);
+                }
             }
 
             cache[key] = new CacheEntry
@@ -105,7 +123,13 @@ public class CacheService
 
         if (lruKey != null)
         {
+            var valueToRemove = cache[lruKey].Value;
             cache.Remove(lruKey);
+            
+            if (valueToRemove is MarketData marketData)
+            {
+                MarketDataPool.Return(marketData);
+            }
         }
     }
     
@@ -116,7 +140,14 @@ public class CacheService
     {
         lock (lockObject)
         {
-            cache.Remove(key);
+            if (cache.TryGetValue(key, out var entry))
+            {
+                cache.Remove(key);
+                if (entry.Value is MarketData marketData)
+                {
+                    MarketDataPool.Return(marketData);
+                }
+            }
         }
     }
     
@@ -138,7 +169,14 @@ public class CacheService
             
             foreach (var key in keysToRemove)
             {
-                cache.Remove(key);
+                if (cache.TryGetValue(key, out var entry))
+                {
+                    cache.Remove(key);
+                    if (entry.Value is MarketData marketData)
+                    {
+                        MarketDataPool.Return(marketData);
+                    }
+                }
             }
         }
     }
@@ -150,6 +188,13 @@ public class CacheService
     {
         lock (lockObject)
         {
+            foreach (var entry in cache.Values)
+            {
+                if (entry.Value is MarketData marketData)
+                {
+                    MarketDataPool.Return(marketData);
+                }
+            }
             cache.Clear();
         }
     }
@@ -172,7 +217,14 @@ public class CacheService
             
             foreach (var key in expiredKeys)
             {
-                cache.Remove(key);
+                if (cache.TryGetValue(key, out var entry))
+                {
+                    cache.Remove(key);
+                    if (entry.Value is MarketData marketData)
+                    {
+                        MarketDataPool.Return(marketData);
+                    }
+                }
             }
             
             return expiredKeys.Count;
