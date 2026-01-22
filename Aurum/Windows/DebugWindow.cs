@@ -17,6 +17,11 @@ public class DebugWindow : Window, IDisposable
     private string[]? tableList;
     private string selectedTable = "";
 
+    // Performance Graph State
+    private readonly float[] throughputHistory = new float[60];
+    private int historyOffset = 0;
+    private DateTime lastGraphUpdate = DateTime.MinValue;
+
     public DebugWindow(Plugin plugin) : base("Aurum Debug Tools")
     {
         this.plugin = plugin;
@@ -488,6 +493,55 @@ public class DebugWindow : Window, IDisposable
     {
         ImGui.Text("Performance Profiler");
         
+        // Update Graph
+        var now = DateTime.UtcNow;
+        if ((now - lastGraphUpdate).TotalSeconds >= 1)
+        {
+            lastGraphUpdate = now;
+            var requests = plugin.RateLimiter.RequestsLastMinute;
+            throughputHistory[historyOffset] = requests / 60.0f; // Approx req/sec
+            historyOffset = (historyOffset + 1) % throughputHistory.Length;
+        }
+
+        // 1. Throughput Graph
+        ImGui.Text("API Throughput (req/sec - last 60s)");
+        ImGui.PlotLines("##Throughput", throughputHistory, throughputHistory.Length, 
+            $"{throughputHistory[(historyOffset - 1 + throughputHistory.Length) % throughputHistory.Length]:F1} r/s", 
+            0, 5, new Vector2(-1, 80)); // scale 0-5 req/sec
+
+        ImGui.Separator();
+
+        // 2. Key Metrics Grid
+        if (ImGui.BeginTable("PerfMetrics", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Metric", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableSetupColumn("Evaluation", ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableHeadersRow();
+
+            // API Latency (from DB stats if available, or just use last request)
+            var apiStats = plugin.PerformanceMonitor.GetStats("Universalis_FetchSingle");
+            DrawMetricRow("Avg API Latency", apiStats?.AverageMs ?? 0, "ms", 500, 2000);
+            
+            // Database Query Time
+            var dbStats = plugin.PerformanceMonitor.GetStats("Database_Upsert"); // Example metric
+            DrawMetricRow("DB Write Time", dbStats?.AverageMs ?? 0, "ms", 10, 50);
+
+            // Memory Usage
+            var memory = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
+            DrawMetricRow("Managed Memory", memory, "MB", 100, 500);
+
+            // DB Size
+            var dbSize = plugin.DatabaseService.GetDatabaseSize() / 1024.0 / 1024.0;
+            DrawMetricRow("Database Size", dbSize, "MB", 50, 200);
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Dummy(new Vector2(0, 10));
+
+        // 3. Detailed Stats Table (Existing)
+        ImGui.Text("Detailed Execution Stats");
         if (ImGui.Button("Refresh Stats"))
         {
             // Just triggers redraw with fresh data
@@ -519,5 +573,23 @@ public class DebugWindow : Window, IDisposable
             }
             ImGui.EndTable();
         }
+    }
+
+    private void DrawMetricRow(string label, double value, string unit, double warnThreshold, double critThreshold)
+    {
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        ImGui.Text(label);
+        
+        ImGui.TableNextColumn();
+        ImGui.Text($"{value:F2} {unit}");
+        
+        ImGui.TableNextColumn();
+        if (value > critThreshold)
+            ImGui.TextColored(new Vector4(1, 0, 0, 1), "CRITICAL");
+        else if (value > warnThreshold)
+            ImGui.TextColored(new Vector4(1, 0.5f, 0, 1), "WARNING");
+        else
+            ImGui.TextColored(new Vector4(0, 1, 0, 1), "GOOD");
     }
 }
