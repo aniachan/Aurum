@@ -10,4 +10,5 @@ public class ApiRequestLogEntry
     public long ResponseTimeMs { get; set; }
     public int StatusCode { get; set; }
     public bool Success { get; set; }
+    public long PayloadSize { get; set; }
 }

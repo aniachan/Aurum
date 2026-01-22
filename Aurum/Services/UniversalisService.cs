@@ -172,7 +172,7 @@ public class UniversalisService : IDisposable
              using var response = await httpClient.GetAsync(url, disposeCts.Token);
              
              // Log
-             _ = Task.Run(() => database.LogApiRequest($"item/{itemId}/dc/{dcName}", DateTime.UtcNow, 0, (int)response.StatusCode, response.IsSuccessStatusCode));
+             _ = Task.Run(() => database.LogApiRequest($"item/{itemId}/dc/{dcName}", DateTime.UtcNow, 0, (int)response.StatusCode, response.IsSuccessStatusCode, response.Content.Headers.ContentLength ?? 0));
              
              if (!response.IsSuccessStatusCode)
              {
@@ -911,7 +911,7 @@ public class UniversalisService : IDisposable
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             
             // Fire and forget logging
-            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, elapsedMs, statusCode, success));
+            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, elapsedMs, statusCode, success, response.Content.Headers.ContentLength ?? 0));
             
             response.EnsureSuccessStatusCode();
             
@@ -1015,7 +1015,7 @@ public class UniversalisService : IDisposable
             var elapsedMs = stopwatch.ElapsedMilliseconds;
             
             // Fire and forget logging
-            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, elapsedMs, statusCode, success));
+            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, elapsedMs, statusCode, success, response.Content.Headers.ContentLength ?? 0));
             
             response.EnsureSuccessStatusCode();
             

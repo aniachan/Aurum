@@ -88,12 +88,13 @@ public class DebugWindow : Window, IDisposable
         ImGui.SameLine();
         ImGui.Text($"Degraded Mode: {plugin.RateLimiter.IsDegraded}");
 
-        if (recentRequests != null && ImGui.BeginTable("ApiLog", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        if (recentRequests != null && ImGui.BeginTable("ApiLog", 6, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
         {
             ImGui.TableSetupColumn("Time", ImGuiTableColumnFlags.WidthFixed, 150);
             ImGui.TableSetupColumn("Endpoint", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableSetupColumn("Duration", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Size", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableSetupColumn("Result", ImGuiTableColumnFlags.WidthFixed, 60);
             ImGui.TableHeadersRow();
 
@@ -111,6 +112,9 @@ public class DebugWindow : Window, IDisposable
                 
                 ImGui.TableNextColumn();
                 ImGui.Text($"{req.ResponseTimeMs}ms");
+
+                ImGui.TableNextColumn();
+                ImGui.Text($"{req.PayloadSize}B");
                 
                 ImGui.TableNextColumn();
                 if (req.Success)

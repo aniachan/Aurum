@@ -74,6 +74,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 3) ApplyMigration(connection, 3, Migration_3_AddPriorityScores);
             if (currentVersion < 4) ApplyMigration(connection, 4, Migration_4_AddSupplyDemandMetrics);
             if (currentVersion < 5) ApplyMigration(connection, 5, Migration_5_AddGilPerHourColumn);
+            if (currentVersion < 6) ApplyMigration(connection, 6, Migration_6_AddApiPayloadSize);
             
             log.Information("Database initialization complete");
         }
@@ -256,6 +257,17 @@ public class DatabaseService : IDisposable
         {
             var addGilPerHour = "ALTER TABLE RecipeCache ADD COLUMN gil_per_hour INTEGER DEFAULT 0;";
             ExecuteNonQuery(connection, addGilPerHour, transaction);
+        }
+        catch { /* Column might already exist, ignore */ }
+    }
+
+    private void Migration_6_AddApiPayloadSize(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add payload_size to ApiRequestLog for tracking data usage
+        try
+        {
+            var addPayloadSize = "ALTER TABLE ApiRequestLog ADD COLUMN payload_size INTEGER DEFAULT 0;";
+            ExecuteNonQuery(connection, addPayloadSize, transaction);
         }
         catch { /* Column might already exist, ignore */ }
     }
@@ -919,7 +931,7 @@ public class DatabaseService : IDisposable
     /// Log API request for debugging and rate limiting analysis.
     /// Virtual for testing/mocking.
     /// </summary>
-    public virtual void LogApiRequest(string endpoint, DateTime timestamp, long responseTimeMs, int statusCode, bool success)
+    public virtual void LogApiRequest(string endpoint, DateTime timestamp, long responseTimeMs, int statusCode, bool success, long payloadSize = 0)
     {
         // Don't block the main thread for logging
         lock (dbLock)
@@ -931,8 +943,8 @@ public class DatabaseService : IDisposable
                 using var command = connection.CreateCommand();
 
                 command.CommandText = @"
-                    INSERT INTO ApiRequestLog (endpoint, timestamp, response_time_ms, status_code, success)
-                    VALUES (@endpoint, @timestamp, @responseTime, @statusCode, @success);
+                    INSERT INTO ApiRequestLog (endpoint, timestamp, response_time_ms, status_code, success, payload_size)
+                    VALUES (@endpoint, @timestamp, @responseTime, @statusCode, @success, @payloadSize);
                 ";
                 
                 command.Parameters.AddWithValue("@endpoint", endpoint);
@@ -940,6 +952,7 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@responseTime", responseTimeMs);
                 command.Parameters.AddWithValue("@statusCode", statusCode);
                 command.Parameters.AddWithValue("@success", success);
+                command.Parameters.AddWithValue("@payloadSize", payloadSize);
                 
                 command.ExecuteNonQuery();
             }
@@ -962,7 +975,7 @@ public class DatabaseService : IDisposable
                 using var command = connection.CreateCommand();
 
                 command.CommandText = @"
-                    SELECT id, endpoint, timestamp, response_time_ms, status_code, success
+                    SELECT id, endpoint, timestamp, response_time_ms, status_code, success, payload_size
                     FROM ApiRequestLog
                     ORDER BY timestamp DESC
                     LIMIT @limit
@@ -979,7 +992,8 @@ public class DatabaseService : IDisposable
                         Timestamp = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(2)).UtcDateTime,
                         ResponseTimeMs = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
                         StatusCode = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
-                        Success = reader.GetBoolean(5)
+                        Success = reader.GetBoolean(5),
+                        PayloadSize = reader.IsDBNull(6) ? 0 : reader.GetInt64(6)
                     });
                 }
             }
