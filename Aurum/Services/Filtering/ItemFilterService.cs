@@ -11,10 +11,73 @@ namespace Aurum.Services.Filtering;
 public class ItemFilterService
 {
     private readonly Configuration _configuration;
+    
+    // Default criteria state
+    public FilterCriteria CurrentCriteria { get; private set; } = new FilterCriteria();
 
     public ItemFilterService(Configuration configuration)
     {
         _configuration = configuration;
+    }
+
+    public void Reset()
+    {
+        CurrentCriteria = new FilterCriteria();
+    }
+    
+    // Preset Management - In-memory for now, could be persisted to Configuration later
+    private Dictionary<string, (string Name, FilterCriteria Criteria)> _presets = new();
+
+    public void SavePreset(string name, FilterCriteria criteria)
+    {
+        string id = Guid.NewGuid().ToString("N");
+        // Deep copy needed if FilterCriteria were complex reference type, but properties are mostly value types or simple.
+        // For safety, let's just serialize/deserialize or manual copy if needed.
+        // For now, assuming direct copy is fine or shallow copy.
+        // Actually, let's do a manual memberwise clone approach via JSON or similar if needed.
+        // For this prototype, we'll just store the reference, which is risky if UI mutates it.
+        // Better:
+        var copy = new FilterCriteria 
+        {
+            MinJobLevel = criteria.MinJobLevel,
+            MaxJobLevel = criteria.MaxJobLevel,
+            MinItemLevel = criteria.MinItemLevel,
+            MaxItemLevel = criteria.MaxItemLevel,
+            MinProfitAmount = criteria.MinProfitAmount,
+            MinROI = criteria.MinROI,
+            MinSaleVelocity = criteria.MinSaleVelocity,
+            // ... copy other fields
+        };
+        _presets[id] = (name, copy);
+    }
+
+    public List<(string Id, string Name, FilterCriteria Criteria)> GetPresets()
+    {
+        return _presets.Select(kv => (kv.Key, kv.Value.Name, kv.Value.Criteria)).ToList();
+    }
+
+    public void LoadPreset(string id)
+    {
+        if (_presets.TryGetValue(id, out var preset))
+        {
+            // Clone back to CurrentCriteria
+            CurrentCriteria = new FilterCriteria
+            {
+                MinJobLevel = preset.Criteria.MinJobLevel,
+                MaxJobLevel = preset.Criteria.MaxJobLevel,
+                MinItemLevel = preset.Criteria.MinItemLevel,
+                MaxItemLevel = preset.Criteria.MaxItemLevel,
+                MinProfitAmount = preset.Criteria.MinProfitAmount,
+                MinROI = preset.Criteria.MinROI,
+                MinSaleVelocity = preset.Criteria.MinSaleVelocity,
+                // ... copy others
+            };
+        }
+    }
+
+    public void DeletePreset(string id)
+    {
+        _presets.Remove(id);
     }
 
     /// <summary>

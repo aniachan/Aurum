@@ -47,6 +47,14 @@ public class FilterCriteria
     public int MaxRecipeLevel { get; set; } = int.MaxValue;
     public int MinItemLevel { get; set; } = 1;
     public int MaxItemLevel { get; set; } = int.MaxValue;
+
+    // Helper properties for UI binding
+    public int MinLevel { get => MinJobLevel; set => MinJobLevel = value; }
+    public int MaxLevel { get => MaxJobLevel; set => MaxJobLevel = value; }
+    public int MinProfit { get => MinProfitAmount; set => MinProfitAmount = value; }
+    public float MinRoi { get => MinROI; set => MinROI = value; }
+    public float MinVelocity { get => MinSaleVelocity; set => MinSaleVelocity = value; }
+    public bool ProfitableOnly { get => MinProfitAmount > 0; set { if (value && MinProfitAmount <= 0) MinProfitAmount = 1; else if (!value && MinProfitAmount > 0) MinProfitAmount = 0; } }
 }
 
 public enum SortStrategy
