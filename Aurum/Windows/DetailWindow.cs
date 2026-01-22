@@ -164,6 +164,20 @@ public class DetailWindow : Window, IDisposable
             ImGui.SetTooltip("Copy analysis to clipboard");
         }
         ImGui.SameLine();
+
+        if (ImGui.Button("Share Link"))
+        {
+            if (currentItem != null)
+            {
+                var link = ShareUtils.GenerateShareLink(currentItem);
+                ImGui.SetClipboardText(link);
+            }
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Copy shareable link to clipboard");
+        }
+        ImGui.SameLine();
         
         // Cross-world button
         if (loadingCrossWorld)
