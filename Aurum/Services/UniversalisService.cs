@@ -27,6 +27,9 @@ public class UniversalisService : IDisposable
     private readonly CancellationTokenSource disposeCts = new();
     private Task? processingTask;
     private readonly SemaphoreSlim concurrencySemaphore;
+    
+    // Optional reference to performance monitor
+    private Utils.PerformanceMonitor? _performanceMonitor;
 
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0;
@@ -41,6 +44,14 @@ public class UniversalisService : IDisposable
         this.configuration = configuration;
         this.dataManager = dataManager;
         this.requestQueue = new RequestQueue();
+        
+        // Try to access global plugin instance for perf monitor if available
+        // This is a bit of a hack but avoids changing the constructor signature for now
+        // A cleaner way would be to inject it
+        if (Plugin.Instance?.PerformanceMonitor != null)
+        {
+            _performanceMonitor = Plugin.Instance.PerformanceMonitor;
+        }
         
         // Initialize concurrency semaphore with configured limit
         // Default to 5 if not set or invalid
@@ -879,7 +890,19 @@ public class UniversalisService : IDisposable
         
         try 
         {
-            var response = await httpClient.GetAsync(url, disposeCts.Token);
+            HttpResponseMessage response = null!;
+            
+            if (_performanceMonitor != null)
+            {
+                 response = await _performanceMonitor.Measure("Universalis_FetchSingle", async () => 
+                     await httpClient.GetAsync(url, disposeCts.Token)
+                 );
+            }
+            else
+            {
+                 response = await httpClient.GetAsync(url, disposeCts.Token);
+            }
+            
             statusCode = (int)response.StatusCode;
             success = response.IsSuccessStatusCode;
             
@@ -892,11 +915,36 @@ public class UniversalisService : IDisposable
             
             response.EnsureSuccessStatusCode();
             
-            var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
-            var apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
+            string json = string.Empty;
+            if (_performanceMonitor != null)
             {
-                PropertyNameCaseInsensitive = true
-            });
+                json = await _performanceMonitor.Measure("Universalis_ReadContent", async () => 
+                    await response.Content.ReadAsStringAsync(disposeCts.Token)
+                );
+            }
+            else
+            {
+                json = await response.Content.ReadAsStringAsync(disposeCts.Token);
+            }
+            
+            UniversalisItemResponse? apiResponse = null;
+            
+            if (_performanceMonitor != null)
+            {
+                 apiResponse = _performanceMonitor.Measure("Universalis_Deserialize", () => 
+                     JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
+                     {
+                         PropertyNameCaseInsensitive = true
+                     })
+                 );
+            }
+            else
+            {
+                 apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
+                 {
+                     PropertyNameCaseInsensitive = true
+                 });
+            }
             
             if (apiResponse == null)
             {
@@ -911,7 +959,15 @@ public class UniversalisService : IDisposable
             
             if (currentWorldId != 0)
             {
-                database.UpsertMarketData(marketData, currentWorldId);
+                // Fire and forget upsert? Or measure it
+                if (_performanceMonitor != null)
+                {
+                    _performanceMonitor.Measure("Database_Upsert", () => database.UpsertMarketData(marketData, currentWorldId));
+                }
+                else
+                {
+                    database.UpsertMarketData(marketData, currentWorldId);
+                }
             }
             
             return marketData;

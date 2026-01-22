@@ -45,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     public ProfitService ProfitService { get; init; }
     public ShoppingListService ShoppingListService { get; init; }
     public RefreshService RefreshService { get; init; }
+    public Utils.PerformanceMonitor PerformanceMonitor { get; init; }
     
     // Static accessor for UI components if needed (use sparingly)
     public static Plugin? Instance { get; private set; }
@@ -70,6 +71,7 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize services
         Log.Information("Initializing Aurum services...");
         
+        PerformanceMonitor = new Utils.PerformanceMonitor();
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
         
@@ -180,6 +182,22 @@ public sealed class Plugin : IDalamudPlugin
         if (argsTrimmed == "config")
         {
             ToggleConfigUi();
+        }
+        else if (argsTrimmed == "profile")
+        {
+            var stats = PerformanceMonitor.GetAllStats();
+            Log.Information("Performance Profile:");
+            if (stats.Any())
+            {
+                foreach (var stat in stats)
+                {
+                    Log.Information($"  {stat}");
+                }
+            }
+            else
+            {
+                Log.Information("  No performance data collected yet.");
+            }
         }
         else if (argsTrimmed == "health")
         {
