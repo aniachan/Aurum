@@ -69,45 +69,61 @@ public class FilterWindow : Window, IDisposable
         // Basic Filters Section
         if (ImGui.CollapsingHeader("Basic Requirements", ImGuiTreeNodeFlags.DefaultOpen))
         {
-            // Level Range
+            // Level Range (Equip Level)
             int minLvl = criteria.MinLevel;
-            int maxLvl = criteria.MaxLevel;
-            ImGui.Text("Level Range:");
+            int maxLvl = criteria.MaxLevel >= 100 ? 100 : criteria.MaxLevel; // Cap display at current level cap
+            
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text("Equip Level:");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Required character level to equip the item.");
+            
             ImGui.SameLine();
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("##MinLevel", ref minLvl))
+            if (ImGui.DragInt("##MinLevel", ref minLvl, 0.5f, 1, 100))
             {
-                criteria.MinLevel = Math.Clamp(minLvl, 1, 100);
+                // Ensure Min doesn't exceed Max (if Max is reasonable)
+                int safeMax = maxLvl == 0 ? 100 : maxLvl;
+                criteria.MinLevel = Math.Clamp(minLvl, 1, safeMax);
                 changed = true;
             }
+            
             ImGui.SameLine();
             ImGui.Text("-");
             ImGui.SameLine();
+            
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("##MaxLevel", ref maxLvl))
+            if (ImGui.DragInt("##MaxLevel", ref maxLvl, 0.5f, 1, 100))
             {
-                criteria.MaxLevel = Math.Clamp(maxLvl, 1, 100);
+                // Ensure Max doesn't go below Min
+                criteria.MaxLevel = Math.Clamp(maxLvl, minLvl, 100);
                 changed = true;
             }
 
-            // Item Level Range
+            // Item Level Range (iLvl)
             int minILvl = criteria.MinItemLevel;
-            int maxILvl = criteria.MaxItemLevel;
+            int maxILvl = criteria.MaxItemLevel >= 999 ? 999 : criteria.MaxItemLevel; // Cap display
+            
+            ImGui.AlignTextToFramePadding();
             ImGui.Text("Item Level: ");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("The item's distinct power level (iLvl).");
+            
             ImGui.SameLine();
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("##MinItemLevel", ref minILvl))
+            if (ImGui.DragInt("##MinItemLevel", ref minILvl, 1f, 1, 999))
             {
-                criteria.MinItemLevel = Math.Max(1, minILvl);
+                int safeMax = maxILvl == 0 ? 999 : maxILvl;
+                criteria.MinItemLevel = Math.Clamp(minILvl, 1, safeMax);
                 changed = true;
             }
+            
             ImGui.SameLine();
             ImGui.Text("-");
             ImGui.SameLine();
+            
             ImGui.SetNextItemWidth(100);
-            if (ImGui.InputInt("##MaxItemLevel", ref maxILvl))
+            if (ImGui.DragInt("##MaxItemLevel", ref maxILvl, 1f, 1, 999))
             {
-                criteria.MaxItemLevel = Math.Max(1, maxILvl);
+                criteria.MaxItemLevel = Math.Clamp(maxILvl, minILvl, 999);
                 changed = true;
             }
         }
