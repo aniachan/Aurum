@@ -45,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     public RequestQueue RequestQueue { get; init; }
     public ProfitService ProfitService { get; init; }
     public ShoppingListService ShoppingListService { get; init; }
+    public Services.TestGen.TestDataGeneratorService TestDataGenerator { get; init; }
     public RefreshService RefreshService { get; init; }
     public Utils.PerformanceMonitor PerformanceMonitor { get; init; }
     
@@ -101,6 +102,9 @@ public sealed class Plugin : IDalamudPlugin
         // Initialize recipe service asynchronously
         RecipeService.Initialize();
         ShoppingListService.Initialize();
+
+        // Initialize TestGen
+        TestDataGenerator = new Services.TestGen.TestDataGeneratorService(Log, DatabaseService, CacheService, RateLimiter);
         
         // Run health check
         var healthCheck = new HealthCheck(this, Log);

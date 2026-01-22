@@ -81,6 +81,12 @@ public class DebugWindow : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem("Test Gen"))
+            {
+                DrawTestGenTab();
+                ImGui.EndTabItem();
+            }
+
             ImGui.EndTabBar();
         }
     }
@@ -591,5 +597,55 @@ public class DebugWindow : Window, IDisposable
             ImGui.TextColored(new Vector4(1, 0.5f, 0, 1), "WARNING");
         else
             ImGui.TextColored(new Vector4(0, 1, 0, 1), "GOOD");
+    }
+
+    private void DrawTestGenTab()
+    {
+        ImGui.Text("Test Data Generator");
+        ImGui.TextDisabled("Use these tools to populate the database with mock data for testing UI and performance.");
+        
+        ImGui.Separator();
+        
+        ImGui.Text("Market Data Generation");
+        
+        if (ImGui.Button("Generate 100 Mock Items"))
+        {
+            // Generate IDs 1000-1100
+            var ids = Enumerable.Range(1000, 100).Select(i => (uint)i);
+            // Default to Gilgamesh (63) for testing if not set, or use current
+            var worldId = 63; 
+            
+            System.Threading.Tasks.Task.Run(async () => 
+            {
+                await plugin.TestDataGenerator.GenerateMockMarketDataAsync(worldId, ids);
+            });
+        }
+        ImGui.SameLine();
+        ImGui.Text("(IDs 1000-1100)");
+
+        if (ImGui.Button("Generate 1000 Mock Items"))
+        {
+             var ids = Enumerable.Range(2000, 1000).Select(i => (uint)i);
+             var worldId = 63;
+             System.Threading.Tasks.Task.Run(async () => 
+             {
+                 await plugin.TestDataGenerator.GenerateMockMarketDataAsync(worldId, ids);
+             });
+        }
+        ImGui.SameLine();
+        ImGui.Text("(IDs 2000-3000)");
+        
+        ImGui.Separator();
+        ImGui.Text("Simulation");
+        
+        if (ImGui.Button("Simulate 5 API Errors"))
+        {
+            plugin.TestDataGenerator.SimulateApiErrors(5);
+        }
+        
+        if (ImGui.Button("Clear All Market Data"))
+        {
+            plugin.TestDataGenerator.ClearAllMarketData();
+        }
     }
 }
