@@ -76,12 +76,65 @@ Aurum provides a clear "Buy", "Sell", or "Avoid" recommendation based on its ana
 
 ## ⚙️ Configuration
 
-Access settings via `/aurum config` or the cog icon on the dashboard.
+Access the settings window by typing `/aurum config` or clicking the cog icon on the main dashboard. The configuration window is divided into several sections to help you customize Aurum to your needs.
 
-*   **Data Source**: Choose between Universalis (default) or other providers if available.
-*   **Refresh Rate**: How often market data is updated.
-*   **Risk Tolerance**: Hide items above a certain risk level automatically.
-*   **UI Scale**: Adjust the size of the interface.
+### 🖥️ General & UI Settings
+
+*   **UI Scale**: Adjust the size of the interface (0.5x to 2.0x) for better readability.
+*   **Movable Config Window**: Toggle whether the configuration window can be dragged.
+*   **Enable Animated Charts**: Turn off to improve performance on lower-end machines.
+*   **Rows Per Page**: Control how many items appear in the main data grid (default: 50).
+*   **Color Theme**: Choose between Default, Dark, Light, or High Contrast themes.
+*   **Column Visibility**: customization checklist to show or hide specific columns in the main grid (e.g., hide "Gil/Hr" if you don't use it).
+
+### 🌐 API & Network
+
+Aurum uses the Universalis API to fetch market data.
+
+*   **Preferred World**:
+    *   **Auto**: Uses the world your character is currently on.
+    *   **Specific World**: Forces Aurum to always check prices for a specific world (e.g., "Gilgamesh").
+*   **Remember Last World**: If enabled, the dashboard remembers the last world you refreshed, even if you teleport away.
+*   **Market Data Cache**: How long Aurum keeps price data before considering it "stale" (default: 5 minutes). Increasing this reduces API calls but may show outdated prices.
+*   **Max Concurrent Requests**: Number of parallel connections to Universalis. Lower this if you experience lag or timeouts.
+*   **Work Offline**: Disables all network activity. Aurum will only show data already stored in its local cache.
+
+### 🔍 Filtering & Sorting
+
+Customize which items Aurum recommends.
+
+*   **Minimum Profit**: Items earning less than this amount (in Gil) will be hidden.
+*   **Show Only Profitable**: Hides any item where the crafting cost exceeds the market price.
+*   **Category Filters**: Toggle entire categories of items:
+    *   Combat Gear
+    *   Crafting & Gathering Gear
+    *   Furniture & Housing
+    *   Consumables (Food/Potions)
+    *   Crafting Materials
+*   **Default Sort Mode**: Choose how results are sorted by default (e.g., Highest Profit, Recommendation Score, Fastest Selling).
+*   **Risk Tolerance**:
+    *   **Max Acceptable Risk**: Automatically filter out items above a certain risk level (e.g., hide "High" risk items).
+    *   **Show High Risk Items**: Toggle to show/hide risky investments regardless of score.
+
+### 🧠 Recommendation Engine (Priority Weights)
+
+Aurum calculates a "Score" for every item. You can tweak how this score is calculated by adjusting the weights. These are advanced settings.
+
+*   **Recipe Level**: Prioritize higher-level recipes.
+*   **Market Velocity**: Prioritize items that sell frequently.
+*   **Profit Potential**: Prioritize items with high raw profit margins.
+*   **Category**: Prioritize items in "expert" categories.
+*   **User Preference**: Prioritize items you have searched for recently.
+
+*Note: You can reset these to default values with the "Reset Weights" button.*
+
+### 💾 Database Management
+
+Aurum stores market data locally to improve speed.
+
+*   **Database Size**: Displays the current size of your local database.
+*   **Optimize Database**: Runs a "VACUUM" command to reclaim space and defragment the database. Useful if the plugin feels sluggish.
+*   **Auto-Optimize**: Sets how often (in days) Aurum should automatically optimize the database.
 
 ## ❓ Troubleshooting
 
