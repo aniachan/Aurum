@@ -40,7 +40,10 @@ public class FilterCriteria
     public bool IncludeGathered { get; set; } = true;
     public bool IncludeVendor { get; set; } = true;
     public bool IncludeMarketTradeable { get; set; } = true;
-    public bool IncludeUntradeable { get; set; } = false; // Usually not useful for profit analysis, but maybe for gathering?
+    
+    // Status
+    public bool IncludeHQ { get; set; } = true;
+    public bool IncludeNQ { get; set; } = true;
 
     // Item Types
     public bool IncludeCombatGear { get; set; } = true;
@@ -91,6 +94,21 @@ public class FilterCriteria
     // Helper for UI Binding
     public bool IsDyeable { get => IsDyeableOnly; set => IsDyeableOnly = value; }
     public bool IsCollectable { get => IsCollectableOnly; set => IsCollectableOnly = value; }
+
+    /// <summary>
+    /// Deep copy of the criteria
+    /// </summary>
+    public FilterCriteria Clone()
+    {
+        var clone = (FilterCriteria)this.MemberwiseClone();
+        
+        // Deep copy collections
+        clone.AllowedRiskLevels = new HashSet<RiskLevel>(this.AllowedRiskLevels);
+        clone.IncludedEquipSlots = new HashSet<EquipSlot>(this.IncludedEquipSlots);
+        clone.IncludedJobIds = new HashSet<string>(this.IncludedJobIds);
+        
+        return clone;
+    }
 }
 
 public enum SortStrategy

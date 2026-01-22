@@ -18,7 +18,8 @@ public class ItemFilterServiceSearchTests
         _criteria = new FilterCriteria();
         
         // Ensure we don't get filtered out by other things
-        _criteria.IncludeUntradeable = true; 
+        // _criteria.IncludeUntradeable = true; // Removed property
+        _criteria.ExcludeUntradable = false; // Set to false to include untradeables
         _criteria.IncludeCrafted = true;
         // Search filter works on Recipe.ItemName, so we need Recipe populated.
         // And IsDataComplete must be true.

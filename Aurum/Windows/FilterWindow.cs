@@ -308,10 +308,10 @@ public class FilterWindow : Window, IDisposable
                     changed = true;
                 }
                 
-                bool includeUntradeable = criteria.IncludeUntradeable;
-                if (ImGui.Checkbox("Untradeable / Ex", ref includeUntradeable))
+                bool excludeUntradable = criteria.ExcludeUntradable;
+                if (ImGui.Checkbox("Exclude Untradeable / Ex", ref excludeUntradable))
                 {
-                    criteria.IncludeUntradeable = includeUntradeable;
+                    criteria.ExcludeUntradable = excludeUntradable;
                     changed = true;
                 }
                 
