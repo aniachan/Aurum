@@ -36,8 +36,6 @@ namespace Aurum.IntegrationTests.Utils
             Assert.Contains("#v2_", link);
             
             // Decode to verify contents
-            // The format is "...#v2_{payload}"
-            // We need to be careful because the payload itself might contain underscores
             var parts = link.Split(new[] { '_' }, 2);
             var payload = parts[1];
             
