@@ -86,3 +86,6 @@ Before submitting a PR, please verify the following:
 - Use `file-scoped namespaces`.
 - Prefer `var` when type is obvious.
 - Keep UI logic separate from Service logic where possible.
+
+## 📚 Community Guidelines
+For detailed contributing guidelines, including bug reporting and PR process, see [docs/community/CONTRIBUTING_GUIDELINES.md](docs/community/CONTRIBUTING_GUIDELINES.md).
