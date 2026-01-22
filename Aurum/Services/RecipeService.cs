@@ -323,6 +323,15 @@ public class RecipeService
             ItemCategory = recipe.ItemResult.Value.ItemUICategory.RowId,
             MainCategory = DetermineMainCategory(recipe.ItemResult.Value),
             EquipSlot = DetermineEquipSlot(recipe.ItemResult.Value),
+            
+            // New Properties
+            Rarity = (int)recipe.ItemResult.Value.Rarity,
+            IsDyeable = false, // TODO: Find correct property for IsDyeable
+            MateriaSlotCount = recipe.ItemResult.Value.MateriaSlotCount,
+            IsCollectable = recipe.ItemResult.Value.IsCollectable,
+            IsUnique = recipe.ItemResult.Value.IsUnique,
+            IsUntradable = recipe.ItemResult.Value.IsUntradable,
+            
             EstimatedCraftTimeSeconds = EstimateCraftTime(recipe)
         };
         

@@ -42,12 +42,22 @@ public class FilterCriteria
     public bool IncludeMarketTradeable { get; set; } = true;
     public bool IncludeUntradeable { get; set; } = false; // Usually not useful for profit analysis, but maybe for gathering?
 
-    // Categories
+    // Item Types
     public bool IncludeCombatGear { get; set; } = true;
     public bool IncludeCraftingGatheringGear { get; set; } = true;
     public bool IncludeFurniture { get; set; } = true;
     public bool IncludeConsumables { get; set; } = true;
     public bool IncludeMaterials { get; set; } = true;
+    
+    // Additional Properties
+    public bool IsDyeableOnly { get; set; } = false;
+    public bool IsCollectableOnly { get; set; } = false;
+    public int MinMateriaSlots { get; set; } = 0;
+    public int MinRarity { get; set; } = 1;
+    public int MaxRarity { get; set; } = 7; // 1-4 standard, 7=Relic? 
+    public bool ExcludeUnique { get; set; } = false;
+    public bool ExcludeUntradable { get; set; } = true; // Default to excluding untradable for profit
+    
     public bool OnlyFavorites { get; set; } = false;
 
     // Job/Level
@@ -77,6 +87,10 @@ public class FilterCriteria
     public float MinRoi { get => MinROI; set => MinROI = value; }
     public float MinVelocity { get => MinSaleVelocity; set => MinSaleVelocity = value; }
     public bool ProfitableOnly { get => MinProfitAmount > 0; set { if (value && MinProfitAmount <= 0) MinProfitAmount = 1; else if (!value && MinProfitAmount > 0) MinProfitAmount = 0; } }
+
+    // Helper for UI Binding
+    public bool IsDyeable { get => IsDyeableOnly; set => IsDyeableOnly = value; }
+    public bool IsCollectable { get => IsCollectableOnly; set => IsCollectableOnly = value; }
 }
 
 public enum SortStrategy

@@ -49,7 +49,15 @@ public class ItemFilterService
             MinSaleVelocity = criteria.MinSaleVelocity,
             IncludedEquipSlots = new HashSet<EquipSlot>(criteria.IncludedEquipSlots),
             IncludedJobIds = new HashSet<string>(criteria.IncludedJobIds),
-            // ... copy other fields
+            
+            // Additional properties
+            IsDyeableOnly = criteria.IsDyeableOnly,
+            IsCollectableOnly = criteria.IsCollectableOnly,
+            MinMateriaSlots = criteria.MinMateriaSlots,
+            MinRarity = criteria.MinRarity,
+            MaxRarity = criteria.MaxRarity,
+            ExcludeUnique = criteria.ExcludeUnique,
+            ExcludeUntradable = criteria.ExcludeUntradable
         };
         _presets[id] = (name, copy);
     }
@@ -76,7 +84,15 @@ public class ItemFilterService
                 MinSaleVelocity = preset.Criteria.MinSaleVelocity,
                 IncludedEquipSlots = new HashSet<EquipSlot>(preset.Criteria.IncludedEquipSlots),
                 IncludedJobIds = new HashSet<string>(preset.Criteria.IncludedJobIds),
-                // ... copy others
+                
+                // Additional properties
+                IsDyeableOnly = preset.Criteria.IsDyeableOnly,
+                IsCollectableOnly = preset.Criteria.IsCollectableOnly,
+                MinMateriaSlots = preset.Criteria.MinMateriaSlots,
+                MinRarity = preset.Criteria.MinRarity,
+                MaxRarity = preset.Criteria.MaxRarity,
+                ExcludeUnique = preset.Criteria.ExcludeUnique,
+                ExcludeUntradable = preset.Criteria.ExcludeUntradable
             };
         }
     }
@@ -192,7 +208,7 @@ public class ItemFilterService
             // So we skip filtering here.
         }
 
-        // 6. Category Filtering
+            // 6. Category Filtering
         if (item.Recipe != null)
         {
             if (!criteria.IncludeCombatGear && item.Recipe.MainCategory == ItemMainCategory.Combat) return false;
@@ -201,6 +217,14 @@ public class ItemFilterService
             if (!criteria.IncludeFurniture && item.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
             if (!criteria.IncludeConsumables && item.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
             if (!criteria.IncludeMaterials && item.Recipe.MainCategory == ItemMainCategory.Material) return false;
+            
+            // 6.5 Additional Property Filtering
+            if (criteria.IsDyeableOnly && !item.Recipe.IsDyeable) return false;
+            if (criteria.IsCollectableOnly && !item.Recipe.IsCollectable) return false;
+            if (item.Recipe.MateriaSlotCount < criteria.MinMateriaSlots) return false;
+            if (item.Recipe.Rarity < criteria.MinRarity || item.Recipe.Rarity > criteria.MaxRarity) return false;
+            if (criteria.ExcludeUnique && item.Recipe.IsUnique) return false;
+            if (criteria.ExcludeUntradable && item.Recipe.IsUntradable) return false;
         }
 
         // 7. Favorites

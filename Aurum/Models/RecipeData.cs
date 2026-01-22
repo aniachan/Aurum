@@ -58,6 +58,14 @@ public class RecipeData
     public ItemMainCategory MainCategory { get; set; }
     public EquipSlot EquipSlot { get; set; } = EquipSlot.None;
 
+    // Item Properties
+    public int Rarity { get; set; } // 1=Common, 2=Uncommon, 3=Rare, 4=Relic, etc.
+    public bool IsDyeable { get; set; }
+    public int MateriaSlotCount { get; set; }
+    public bool IsCollectable { get; set; }
+    public bool IsUnique { get; set; }
+    public bool IsUntradable { get; set; }
+
     // Source Types (flags to help filtering)
     public bool IsCrafted => RecipeId > 0;
     // Note: IsGathered, IsVendor, etc. might need to be set during data loading or derived from other fields

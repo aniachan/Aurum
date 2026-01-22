@@ -358,6 +358,72 @@ public class FilterWindow : Window, IDisposable
                 
                 ImGui.TreePop();
             }
+
+            // Additional Properties
+            if (ImGui.TreeNode("Item Properties"))
+            {
+                // Rarity Range
+                int minRarity = criteria.MinRarity;
+                int maxRarity = criteria.MaxRarity;
+                
+                ImGui.Text("Rarity (1-7):");
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.DragInt("##MinRarity", ref minRarity, 0.1f, 1, 7))
+                {
+                    criteria.MinRarity = Math.Clamp(minRarity, 1, 7);
+                    changed = true;
+                }
+                ImGui.SameLine();
+                ImGui.Text("-");
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.DragInt("##MaxRarity", ref maxRarity, 0.1f, 1, 7))
+                {
+                    criteria.MaxRarity = Math.Clamp(maxRarity, criteria.MinRarity, 7);
+                    changed = true;
+                }
+                
+                // Materia Slots
+                int minMateria = criteria.MinMateriaSlots;
+                if (ImGui.SliderInt("Min Materia Slots", ref minMateria, 0, 5))
+                {
+                    criteria.MinMateriaSlots = minMateria;
+                    changed = true;
+                }
+                
+                ImGui.Spacing();
+                
+                // Boolean Flags
+                bool dyeable = criteria.IsDyeableOnly;
+                if (ImGui.Checkbox("Dyeable Only", ref dyeable))
+                {
+                    criteria.IsDyeableOnly = dyeable;
+                    changed = true;
+                }
+                
+                bool collectable = criteria.IsCollectableOnly;
+                if (ImGui.Checkbox("Collectable Only", ref collectable))
+                {
+                    criteria.IsCollectableOnly = collectable;
+                    changed = true;
+                }
+                
+                bool excludeUnique = criteria.ExcludeUnique;
+                if (ImGui.Checkbox("Exclude Unique/Untradeable", ref excludeUnique))
+                {
+                    criteria.ExcludeUnique = excludeUnique;
+                    changed = true;
+                }
+                
+                bool excludeUntradable = criteria.ExcludeUntradable;
+                if (ImGui.Checkbox("Exclude Market Prohibited", ref excludeUntradable))
+                {
+                    criteria.ExcludeUntradable = excludeUntradable;
+                    changed = true;
+                }
+                
+                ImGui.TreePop();
+            }
         }
         
         ImGui.Separator();
