@@ -101,33 +101,57 @@ public class ProfitService
         string worldName, 
         int maxConcurrent = 5)
     {
-        var recipeList = recipes.ToList();
-        var results = new System.Collections.Concurrent.ConcurrentBag<ProfitCalculation>();
-        
-        // Get all item IDs we need market data for
-        var itemIds = recipeList.Select(r => r.ResultItemId).Distinct().ToList();
-        
-        // Fetch market data in batches (this is already parallelized internally by UniversalisService if needed)
-        // But we just need the dictionary to be ready.
-        var marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, itemIds);
-        
-        // Use SemaphoreSlim to limit concurrent CPU-bound processing if needed, 
-        // though profit calc is mostly waiting on DB/async tasks. 
-        // Actually, we can just use Parallel.ForEachAsync or Task.WhenAll with chunks.
-        // Let's use a semaphore to control concurrency as requested.
-        using var semaphore = new SemaphoreSlim(maxConcurrent);
-        var tasks = new List<Task>();
-
-        foreach (var recipe in recipeList)
+        var results = new List<ProfitCalculation>();
+        await foreach (var profit in CalculateProfitsStreamAsync(recipes, worldName))
         {
-            tasks.Add(Task.Run(async () => 
+            results.Add(profit);
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// Stream profit calculations for recipes in chunks
+    /// </summary>
+    public async IAsyncEnumerable<ProfitCalculation> CalculateProfitsStreamAsync(
+        IEnumerable<RecipeData> recipes, 
+        string worldName,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var recipeList = recipes.ToList();
+        if (!recipeList.Any()) yield break;
+
+        // Process in chunks to balance network efficiency with streaming responsiveness
+        int batchSize = config.ApiBatchSize > 0 ? config.ApiBatchSize : 20;
+        var chunks = recipeList.Chunk(batchSize);
+
+        foreach (var chunk in chunks)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            var chunkList = chunk.ToList();
+            var itemIds = chunkList.Select(r => r.ResultItemId).Distinct().ToList();
+            
+            // Fetch market data for this chunk
+            Dictionary<uint, MarketData> marketDataDict;
+            try 
             {
-                await semaphore.WaitAsync();
+                marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, itemIds);
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to fetch market data batch in stream");
+                continue;
+            }
+
+            // Process recipes in this chunk
+            var chunkResults = new System.Collections.Concurrent.ConcurrentBag<ProfitCalculation>();
+            
+            await Parallel.ForEachAsync(chunkList, new ParallelOptions { MaxDegreeOfParallelism = 5, CancellationToken = cancellationToken }, async (recipe, ct) =>
+            {
                 try
                 {
                     if (!marketDataDict.TryGetValue(recipe.ResultItemId, out var marketData))
                     {
-                        // Missing market data
                         return;
                     }
                     
@@ -137,14 +161,11 @@ public class ProfitService
                     
                     if (profit != null)
                     {
-                        results.Add(profit);
-                        
                         // Save to database cache
                         try
                         {
                             Plugin.Instance?.DatabaseService?.UpsertRecipeCache(recipe, profit);
                             
-                            // Set item priority based on recommendation score
                             var priority = Math.Max(1, profit.RecommendationScore);
                             Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
                         }
@@ -152,22 +173,21 @@ public class ProfitService
                         {
                             log.Warning(cacheEx, $"Failed to cache profit for {recipe.ItemName}");
                         }
+
+                        chunkResults.Add(profit);
                     }
                 }
                 catch (Exception ex)
                 {
                     log.Error(ex, $"Error calculating profit for {recipe.ItemName}");
                 }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }));
+            });
+
+            foreach (var result in chunkResults)
+            {
+                yield return result;
+            }
         }
-        
-        await Task.WhenAll(tasks);
-        
-        return results.ToList();
     }
     
     /// <summary>

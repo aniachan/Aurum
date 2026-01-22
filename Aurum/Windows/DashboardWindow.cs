@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Dalamud.Bindings.ImGui;
@@ -1005,6 +1006,8 @@ public class DashboardWindow : Window, IDisposable
         }
     }
     
+    private CancellationTokenSource? refreshCts;
+
     private async Task RefreshDataAsync()
     {
         if (isLoading) return;
@@ -1012,6 +1015,10 @@ public class DashboardWindow : Window, IDisposable
         isLoading = true;
         profitResults.Clear();
         filteredResults.Clear();
+        
+        // Cancel previous refresh if any
+        refreshCts?.Cancel();
+        refreshCts = new CancellationTokenSource();
         
         try
         {
@@ -1060,13 +1067,27 @@ public class DashboardWindow : Window, IDisposable
             
             Plugin.Log.Information($"Analyzing {recipes.Count} recipes for {worldName}...");
             
-            // Calculate profits
-            profitResults = await plugin.ProfitService.CalculateProfitsBatchAsync(recipes, worldName);
+            // Stream results as they come in
+            await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+            {
+                profitResults.Add(profit);
+                
+                // Only re-apply filters periodically to avoid UI stutter on every item
+                // or just do it if list is small enough
+                if (profitResults.Count % 10 == 0) 
+                {
+                    ApplyFilters(); 
+                }
+            }
             
             Plugin.Log.Information($"Loaded {profitResults.Count} profit calculations");
             
             lastRefresh = DateTime.UtcNow;
-            ApplyFilters();
+            ApplyFilters(); // Final filter application
+        }
+        catch (OperationCanceledException)
+        {
+            Plugin.Log.Information("Refresh cancelled");
         }
         catch (Exception ex)
         {
@@ -1078,6 +1099,8 @@ public class DashboardWindow : Window, IDisposable
         finally
         {
             isLoading = false;
+            refreshCts?.Dispose();
+            refreshCts = null;
         }
     }
     
