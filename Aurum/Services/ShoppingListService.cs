@@ -313,6 +313,24 @@ public class ShoppingListService
             {
                 item.SourceType = MaterialSourceType.MarketBoard;
                 item.AveragePricePerUnit = (mbPrice == int.MaxValue) ? 0 : mbPrice;
+                if (marketData != null && marketData.Listings.Any())
+                {
+                    // Find cheapest world from listings
+                    var cheapestListing = marketData.Listings
+                        .Where(l => !l.IsHQ) // Prefer NQ for materials usually
+                        .OrderBy(l => l.PricePerUnit)
+                        .FirstOrDefault();
+                    
+                    if (cheapestListing == null)
+                    {
+                         cheapestListing = marketData.Listings.OrderBy(l => l.PricePerUnit).FirstOrDefault();
+                    }
+
+                    if (cheapestListing != null)
+                    {
+                        item.CheapestWorld = cheapestListing.WorldName;
+                    }
+                }
             }
             
             shoppingList.Items.Add(item);

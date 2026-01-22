@@ -91,6 +91,7 @@ public class ShoppingListItem
     // Sourcing
     public MaterialSourceType SourceType { get; set; }
     public string VendorLocation { get; set; } = string.Empty; // If vendor purchasable
+    public string CheapestWorld { get; set; } = string.Empty;
 }
 
 public enum MaterialSourceType
