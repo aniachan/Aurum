@@ -109,6 +109,7 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextColumn();
             DrawRiskAnalysis();
             DrawRecommendation();
+            DrawMarketTiming();
             ImGui.Spacing();
             DrawRecipeInfo();
             
@@ -700,6 +701,45 @@ public class DetailWindow : Window, IDisposable
         {
             ImGui.SameLine();
             ImGui.TextDisabled($"(undercuts by 1 gil)");
+        }
+    }
+
+    private void DrawMarketTiming()
+    {
+        if (currentItem?.MarketData == null) return;
+        var md = currentItem.MarketData;
+
+        // Skip if we don't have enough data
+        if (!md.BestDaysToSell.Any() && !md.BestHoursToSell.Any()) return;
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextDisabled("MARKET TIMING");
+
+        if (!string.IsNullOrEmpty(md.PeakDemandAnalysis))
+        {
+             ImGui.TextWrapped(md.PeakDemandAnalysis);
+        }
+
+        // Draw visual indicators for best days
+        if (md.BestDaysToSell.Any())
+        {
+            ImGui.Spacing();
+            ImGui.Text("Best Days:");
+            ImGui.SameLine();
+            
+            // Just list them comma separated for now
+            var days = string.Join(", ", md.BestDaysToSell);
+            ImGui.TextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), days);
+        }
+
+        // Draw visual indicators for best hours
+        if (md.BestHoursToSell.Any())
+        {
+            ImGui.Text("Peak Hours (UTC):");
+            ImGui.SameLine();
+            var hours = string.Join(", ", md.BestHoursToSell.Select(h => $"{h:00}:00"));
+            ImGui.TextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), hours);
         }
     }
 
