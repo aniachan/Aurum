@@ -457,7 +457,7 @@ public class RecipeService
             
         // Find job ID from name
         var jobEntry = JobNames.FirstOrDefault(x => x.Value.Equals(className, StringComparison.OrdinalIgnoreCase));
-        if (jobEntry.Value == null) // KeyValuePair default is null value? No, struct.
+        if (jobEntry.Value == null) 
             yield break;
             
         // Check if className is valid
@@ -510,9 +510,9 @@ public class RecipeService
         
         if (string.IsNullOrWhiteSpace(searchTerm))
         {
-            foreach (var r in GetAllRecipes())
-                yield return r;
-            yield break;
+            // Do NOT return all recipes to prevent memory explosion
+            // Instead, limit to recent or return empty
+             yield break;
         }
         
         // Search is tricky with lazy loading because we don't have names loaded
@@ -526,15 +526,23 @@ public class RecipeService
             .Where(kvp => kvp.Value.ToLowerInvariant().Contains(term))
             .Select(kvp => kvp.Key);
             
+        int count = 0;
         foreach (var itemId in matchingItemIds)
         {
             if (itemResultIndex.TryGetValue(itemId, out var recipeIds))
             {
                 foreach (var id in recipeIds)
                 {
+                    // Check if we hit the limit before loading more
+                    if (count >= config.MaxRecipeCacheEntries) 
+                        yield break;
+                        
                     var recipe = LoadRecipe(id);
                     if (recipe != null)
+                    {
+                        count++;
                         yield return recipe;
+                    }
                 }
             }
         }
