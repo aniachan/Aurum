@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Aurum.Infrastructure;
 using Aurum.Models;
 
@@ -253,6 +254,43 @@ public class CacheService
                 Hits = System.Threading.Interlocked.Read(ref _hits),
                 Misses = System.Threading.Interlocked.Read(ref _misses)
             };
+        }
+    }
+    
+    public class CacheEntrySnapshot
+    {
+        public string Key { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+        public DateTime LastAccessed { get; set; }
+        public string TypeName { get; set; } = string.Empty;
+        public uint? ItemId { get; set; }
+        public string? WorldName { get; set; }
+    }
+
+    /// <summary>
+    /// Get a snapshot of all cache entries for debugging
+    /// </summary>
+    public List<CacheEntrySnapshot> GetSnapshot()
+    {
+        lock (lockObject)
+        {
+            return cache.Select(kvp => {
+                var snapshot = new CacheEntrySnapshot
+                {
+                    Key = kvp.Key,
+                    ExpiresAt = kvp.Value.ExpiresAt,
+                    LastAccessed = kvp.Value.LastAccessed,
+                    TypeName = kvp.Value.Value?.GetType().Name ?? "null"
+                };
+                
+                if (kvp.Value.Value is MarketData md)
+                {
+                    snapshot.ItemId = md.ItemId;
+                    snapshot.WorldName = md.WorldName;
+                }
+                
+                return snapshot;
+            }).ToList();
         }
     }
     

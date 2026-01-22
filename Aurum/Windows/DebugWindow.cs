@@ -141,6 +141,70 @@ public class DebugWindow : Window, IDisposable
         ImGui.Text($"Hit Rate: {stats.HitRate:F1}%");
         
         ImGui.Separator();
+
+        if (ImGui.TreeNode("Cache Inspector"))
+        {
+            var snapshot = plugin.CacheService.GetSnapshot();
+            
+            ImGui.Text($"Total Entries: {snapshot.Count}");
+            
+            if (ImGui.Button("Refresh Snapshot"))
+            {
+                // Re-fetch next frame
+            }
+            
+            ImGui.SameLine();
+            if (ImGui.Button("Invalidate Selected"))
+            {
+                // TODO: Implement selection
+            }
+
+            if (ImGui.BeginTable("CacheTable", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable, new Vector2(0, 300)))
+            {
+                ImGui.TableSetupColumn("Key", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 100);
+                ImGui.TableSetupColumn("Expires In", ImGuiTableColumnFlags.WidthFixed, 80);
+                ImGui.TableSetupColumn("Age", ImGuiTableColumnFlags.WidthFixed, 80);
+                ImGui.TableSetupColumn("Action", ImGuiTableColumnFlags.WidthFixed, 60);
+                ImGui.TableHeadersRow();
+
+                foreach (var entry in snapshot)
+                {
+                    ImGui.TableNextRow();
+                    
+                    ImGui.TableNextColumn();
+                    ImGui.Text(entry.Key);
+                    if (ImGui.IsItemHovered() && entry.ItemId.HasValue)
+                    {
+                        ImGui.SetTooltip($"Item ID: {entry.ItemId}\nWorld: {entry.WorldName}");
+                    }
+                    
+                    ImGui.TableNextColumn();
+                    ImGui.Text(entry.TypeName);
+                    
+                    ImGui.TableNextColumn();
+                    var timeLeft = entry.ExpiresAt - DateTime.UtcNow;
+                    if (timeLeft.TotalSeconds < 0)
+                        ImGui.TextColored(new Vector4(1, 0, 0, 1), "Expired");
+                    else
+                        ImGui.Text($"{timeLeft.TotalMinutes:F1}m");
+                        
+                    ImGui.TableNextColumn();
+                    var age = DateTime.UtcNow - entry.LastAccessed;
+                    ImGui.Text($"{age.TotalSeconds:F0}s ago");
+                    
+                    ImGui.TableNextColumn();
+                    if (ImGui.Button($"X##{entry.Key}"))
+                    {
+                        plugin.CacheService.Invalidate(entry.Key);
+                    }
+                }
+                ImGui.EndTable();
+            }
+            ImGui.TreePop();
+        }
+        
+        ImGui.Separator();
         
         if (ImGui.Button("Run VACUUM"))
         {
