@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - *Impact*: Data fetched may now come from multiple worlds. Consumers should check `WorldName` rather than assuming all data belongs to the currently logged-in world.
 
 ### Added
+- **Community Data Sync**: Implemented local aggregation and models for community trend tracking.
+- **Privacy Controls**: Added privacy settings and anonymization service for user data.
+- **Arbitrage Tracking**: Database support for tracking historical arbitrage opportunities.
 - **Cross-World Market Analysis**: Added support for fetching and analyzing data across the entire Data Center.
 - **Offline Mode**: Added `WorkOffline` configuration to disable all network requests (uses cached data only).
 - **Profit Analysis Improvements**:
@@ -25,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Performance**: Implemented `CalculateProfitsStreamAsync` for streaming results in `ProfitService`.
 
 ### Documentation
+- Plugin structure guide.
 - Detailed contributing guidelines.
 - API integration guide for developers.
 - Database schema diagram.
