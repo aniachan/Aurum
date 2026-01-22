@@ -54,6 +54,13 @@ public class HealthCheck
         log.Info($"  ✓ UniversalisService: {(plugin.UniversalisService != null ? "OK" : "NULL")}");
         log.Info($"  ✓ MarketAnalysisService: {(plugin.MarketAnalysisService != null ? "OK" : "NULL")}");
         log.Info($"  ✓ ProfitService: {(plugin.ProfitService != null ? "OK" : "NULL")}");
+        
+        // Log memory profile during health check
+        if (plugin.CacheService != null)
+        {
+            var profiler = new Utils.MemoryProfiler(plugin.CacheService);
+            profiler.LogMemoryUsage(log, "Health Check");
+        }
     }
     
     private void CheckRecipeService()
