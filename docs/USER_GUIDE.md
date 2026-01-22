@@ -26,6 +26,21 @@ Each row in the grid represents a crafting recipe with key metrics:
 *   **Risk**: A color-coded risk assessment (Green = Low, Yellow = Medium, Red = High).
 *   **Score**: Aurum's overall recommendation score (0-100).
 
+### 🛡️ Understanding Risk Scores
+
+Aurum assigns a Risk Score (0-100) to every item to help you avoid bad investments. The score is calculated based on market volatility, competition, and demand stability.
+
+**Risk Levels:**
+*   **Low (0-24)**: Safe bets. Consistent demand and stable prices.
+*   **Medium (25-49)**: Good opportunities but require monitoring.
+*   **High (50-74)**: Risky. Prices fluctuate wildly or demand is dropping.
+*   **Very High (75-100)**: Dangerous. Likely to result in a loss due to market crashes or zero demand.
+
+**Common Risk Warnings:**
+*   **Market Crash Risk**: Prices are trending down rapidly.
+*   **Oversupply**: Too many items listed compared to daily sales.
+*   **Stagnant Market**: Item hasn't sold in a long time.
+
 ### 🔍 Finding Profitable Crafts
 
 1.  **Set your Job**: Select your crafter class (e.g., Alchemist, Culinarian) from the dropdown.
