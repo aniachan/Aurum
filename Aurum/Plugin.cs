@@ -48,6 +48,7 @@ public sealed class Plugin : IDalamudPlugin
     public Services.TestGen.TestDataGeneratorService TestDataGenerator { get; init; }
     public RefreshService RefreshService { get; init; }
     public PrivacyService PrivacyService { get; init; }
+    public Services.Community.CommunitySyncService CommunitySyncService { get; init; }
     public Utils.PerformanceMonitor PerformanceMonitor { get; init; }
     
     // Static accessor for UI components if needed (use sparingly)
@@ -79,6 +80,8 @@ public sealed class Plugin : IDalamudPlugin
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
         PrivacyService = new PrivacyService(Log, Configuration);
+        MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
+        CommunitySyncService = new Services.Community.CommunitySyncService(Log, Configuration, PrivacyService, MarketAnalysisService);
         
         // Schedule database maintenance
         DatabaseService.CheckAndRunVacuum(
@@ -96,7 +99,7 @@ public sealed class Plugin : IDalamudPlugin
         ItemPriorityService = new ItemPriorityService(Log, Configuration);
         RecipeService = new RecipeService(DataManager, Log, Configuration);
         UniversalisService = new UniversalisService(Log, CacheService, DatabaseService, RateLimiter, Configuration, DataManager);
-        MarketAnalysisService = new MarketAnalysisService(Log, Configuration);
+        // MarketAnalysisService initialized earlier for CommunitySyncService
         ProfitService = new ProfitService(Log, Configuration, RecipeService, UniversalisService, MarketAnalysisService);
         ShoppingListService = new ShoppingListService(DataManager, Log, RecipeService, UniversalisService);
         RefreshService = new RefreshService(Log, Configuration, UniversalisService, DatabaseService, ItemPriorityService, RecipeService, ClientState);
