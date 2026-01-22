@@ -41,21 +41,50 @@ public class ShoppingListService
         try 
         {
             // TODO: Load vendor data from GilShop/GilShopItem sheets.
-            // Currently, the schema for connecting Items to Prices via GilShop is complex and requires
-            // further investigation into the sheet structure (GilShop vs GilShopItem).
-            // For the MVP, we are using a fallback list of common vendor items.
+            // Currently, the schema for connecting Items to Prices via GilShop is complex.
+            // Based on investigation, GilShopItem is a Subrow sheet keyed by GilShop.RowId.
             
-            /* 
+            // First, get the main sheets
             var gilShopSheet = dataManager.GetExcelSheet<GilShop>();
-            if (gilShopSheet != null)
+            var gilShopItemSheet = dataManager.GetSubrowExcelSheet<GilShopItem>();
+            
+            if (gilShopSheet != null && gilShopItemSheet != null)
             {
                 foreach (var shop in gilShopSheet)
                 {
-                    // Implementation for parsing GilShop to populate vendorItemPrices
-                    // will go here in a future update.
+                    // Attempt to get the items for this shop using its RowId
+                    // GetRow on a Subrow sheet returns a collection of subrows (the items in the shop)
+                    var shopItems = gilShopItemSheet.GetRow(shop.RowId);
+                    
+                    // SubrowCollection is a struct or non-nullable? Checking count instead.
+                    if (shopItems.Count > 0)
+                    {
+                        foreach (var shopItem in shopItems)
+                        {
+                            // shopItem is a GilShopItem
+                            // It has an Item property which is a RowRef<Item>
+                            
+                            var item = shopItem.Item.Value;
+                            // Value might be nullable or we just check if RowId is valid
+                            if (item.RowId != 0)
+                            {
+                                // Store the price. For GilShops, the price is the Item's PriceMid (usually).
+                                // Or PriceLow? Usually PriceMid is the vendor sell price.
+                                // NOTE: Some items cannot be sold by vendors, but GilShops sell them to YOU.
+                                // The price you buy it for is usually PriceMid.
+                                
+                                // Let's verify this assumption.
+                                if (item.PriceMid > 0)
+                                {
+                                    // We only care about the cheapest price if it appears in multiple shops?
+                                    // Actually, vendor prices are usually global fixed constants.
+                                    vendorItemPrices[item.RowId] = item.PriceMid;
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            */
             
             // Fallback: Load common crafting materials sold by vendors
             LoadCommonVendorItems();
