@@ -87,6 +87,12 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public float WeightCategory { get; set; } = 0.1f;
     public float WeightUserPreference { get; set; } = 0.1f;
 
+    // Privacy & Analytics
+    public string PrivacySalt { get; set; } = string.Empty;
+    public string AnonymousId { get; set; } = string.Empty;
+    public bool AllowAnonymousAnalytics { get; set; } = false;
+    public bool AllowCommunityDataSync { get; set; } = false;
+
     // The below exists just to make saving less cumbersome
     public void Save()
     {

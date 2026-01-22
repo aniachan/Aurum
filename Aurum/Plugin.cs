@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     public ShoppingListService ShoppingListService { get; init; }
     public Services.TestGen.TestDataGeneratorService TestDataGenerator { get; init; }
     public RefreshService RefreshService { get; init; }
+    public PrivacyService PrivacyService { get; init; }
     public Utils.PerformanceMonitor PerformanceMonitor { get; init; }
     
     // Static accessor for UI components if needed (use sparingly)
@@ -77,6 +78,7 @@ public sealed class Plugin : IDalamudPlugin
         PerformanceMonitor = new Utils.PerformanceMonitor();
         CacheService = new CacheService(Configuration);
         DatabaseService = new DatabaseService(Log, pluginDir);
+        PrivacyService = new PrivacyService(Log, Configuration);
         
         // Schedule database maintenance
         DatabaseService.CheckAndRunVacuum(

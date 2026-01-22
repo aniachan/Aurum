@@ -454,5 +454,43 @@ public class ConfigWindow : Window, IDisposable
             configuration.WeightUserPreference = 0.1f;
             configuration.Save();
         }
+
+        ImGui.Separator();
+        ImGui.Text("Privacy & Data");
+
+        var allowAnalytics = configuration.AllowAnonymousAnalytics;
+        if (ImGui.Checkbox("Allow Anonymous Analytics", ref allowAnalytics))
+        {
+            configuration.AllowAnonymousAnalytics = allowAnalytics;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("If enabled, anonymous usage statistics may be collected to help improve the plugin.\nNo personal data (character name, IP, etc) is ever collected.");
+        }
+
+        var allowSync = configuration.AllowCommunityDataSync;
+        if (ImGui.Checkbox("Allow Community Data Sync (Future)", ref allowSync))
+        {
+            configuration.AllowCommunityDataSync = allowSync;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("If enabled, market data you fetch may be shared anonymously with the community database.\n(Feature currently in development)");
+        }
+
+        if (ImGui.TreeNode("Advanced Privacy Info"))
+        {
+            ImGui.TextDisabled($"Your Anonymous ID: {Aurum.Plugin.Instance?.PrivacyService?.GetAnonymousId()}");
+            ImGui.TextWrapped("This ID is randomly generated and unique to your installation. It allows us to distinguish between users without knowing who you are.");
+            
+            if (ImGui.Button("Reset Anonymous ID"))
+            {
+                configuration.AnonymousId = Guid.NewGuid().ToString("N");
+                configuration.Save();
+            }
+            ImGui.TreePop();
+        }
     }
 }
