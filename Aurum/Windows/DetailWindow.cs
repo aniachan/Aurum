@@ -16,6 +16,11 @@ public class DetailWindow : Window, IDisposable
     private readonly Plugin plugin;
     private ProfitCalculation? currentItem;
     
+    // Cross-world state
+    private MarketData? crossWorldData;
+    private bool loadingCrossWorld;
+    private string? crossWorldError;
+
     public DetailWindow(Plugin plugin) : base("Item Details##AurumDetail", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
     {
         this.plugin = plugin;
@@ -43,6 +48,11 @@ public class DetailWindow : Window, IDisposable
     {
         currentItem = item;
         IsOpen = true;
+        
+        // Reset cross-world state when changing items
+        crossWorldData = null;
+        loadingCrossWorld = false;
+        crossWorldError = null;
         
         // Update window title to include item name
         WindowName = $"{item.Recipe.ItemName} Details##AurumDetail";
@@ -143,6 +153,66 @@ public class DetailWindow : Window, IDisposable
             if (currentItem?.MarketData != null)
                 OpenUrl($"https://ffxivteamcraft.com/db/en/item/{currentItem.MarketData.ItemId}");
         }
+        ImGui.SameLine();
+        
+        // Cross-world button
+        if (loadingCrossWorld)
+        {
+            ImGui.TextDisabled("Checking Worlds...");
+        }
+        else if (crossWorldData == null)
+        {
+            if (ImGui.Button("Check Cheapest World"))
+            {
+                FetchCrossWorldData();
+            }
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.5f, 1.0f, 0.5f, 1.0f), "DC Data Loaded");
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Data Center market data has been fetched.\nSee 'Cheapest' row in Market Snapshot below.");
+            }
+        }
+
+        if (!string.IsNullOrEmpty(crossWorldError))
+        {
+             ImGui.SameLine();
+             ImGui.TextColored(new Vector4(1, 0, 0, 1), "!");
+             if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Error: {crossWorldError}");
+        }
+    }
+
+    private void FetchCrossWorldData()
+    {
+        if (currentItem == null) return;
+        
+        loadingCrossWorld = true;
+        crossWorldError = null;
+        
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                // We use the same world name (which resolves to the current DC in the service if needed, 
+                // but UniversalisService.GetMarketDataCrossWorldAsync handles fetching for the whole DC)
+                var result = await plugin.UniversalisService.GetMarketDataCrossWorldAsync(
+                    currentItem.MarketData?.WorldName ?? "", 
+                    currentItem.Recipe.ResultItemId
+                );
+                
+                crossWorldData = result;
+            }
+            catch (Exception ex)
+            {
+                crossWorldError = ex.Message;
+            }
+            finally
+            {
+                loadingCrossWorld = false;
+            }
+        });
     }
 
     private void OpenUrl(string url)
@@ -185,6 +255,34 @@ public class DetailWindow : Window, IDisposable
             ImGui.TableNextRow();
             ImGui.TableNextColumn(); ImGui.Text("Current Listings:");
             ImGui.TableNextColumn(); ImGui.Text($"{currentItem.MarketData.CurrentListings}");
+
+            // Cross-World Cheapest Price Row
+            if (crossWorldData != null)
+            {
+                var cheapestListing = crossWorldData.Listings.OrderBy(l => l.PricePerUnit).FirstOrDefault();
+                if (cheapestListing != null)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableNextColumn(); ImGui.Text("Cheapest World:");
+                    ImGui.TableNextColumn();
+                    
+                    // Highlight if cheaper than local
+                    var localMin = currentItem.MarketData.CurrentMinPrice;
+                    var isCheaper = cheapestListing.PricePerUnit < localMin;
+                    var color = isCheaper ? new Vector4(0, 1, 0, 1) : new Vector4(1, 1, 1, 1);
+                    
+                    ImGui.TextColored(color, $"{cheapestListing.PricePerUnit:N0} @ {cheapestListing.WorldName}");
+                    
+                    if (isCheaper)
+                    {
+                        if (ImGui.IsItemHovered())
+                        {
+                            var diff = localMin - cheapestListing.PricePerUnit;
+                            ImGui.SetTooltip($"Save {diff:N0} gil per item by buying on {cheapestListing.WorldName}");
+                        }
+                    }
+                }
+            }
 
             ImGui.EndTable();
         }
@@ -327,19 +425,30 @@ public class DetailWindow : Window, IDisposable
 
     private void DrawCurrentListings()
     {
-        if (currentItem?.MarketData == null || !currentItem.MarketData.Listings.Any())
+        // Use cross-world data if loaded, otherwise fallback to item's local data
+        var data = crossWorldData ?? currentItem?.MarketData;
+        
+        if (data == null || !data.Listings.Any())
         {
             ImGui.TextDisabled("No current listings found.");
             return;
         }
 
-        var listings = currentItem.MarketData.Listings.Take(20).ToList();
+        var listings = data.Listings.Take(20).ToList();
+        
+        // Check if we have multiple worlds
+        var hasMultipleWorlds = listings.Select(l => l.WorldName).Distinct().Count() > 1;
+        int columns = hasMultipleWorlds ? 5 : 4;
 
-        if (ImGui.BeginTable("CurrentListingsTable", 4, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
+        if (ImGui.BeginTable("CurrentListingsTable", columns, ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable))
         {
             ImGui.TableSetupColumn("Price", ImGuiTableColumnFlags.WidthFixed, 80);
             ImGui.TableSetupColumn("Qty", ImGuiTableColumnFlags.WidthFixed, 40);
             ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 80);
+            if (hasMultipleWorlds)
+            {
+                ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 100);
+            }
             ImGui.TableSetupColumn("Retainer", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableHeadersRow();
 
@@ -363,6 +472,13 @@ public class DetailWindow : Window, IDisposable
                 // Total Column
                 ImGui.TableNextColumn();
                 ImGui.Text($"{listing.Total:N0}");
+
+                // World Column (if applicable)
+                if (hasMultipleWorlds)
+                {
+                    ImGui.TableNextColumn();
+                    ImGui.Text(listing.WorldName);
+                }
 
                 // Retainer Column
                 ImGui.TableNextColumn();

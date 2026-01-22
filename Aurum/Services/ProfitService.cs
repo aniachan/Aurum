@@ -58,6 +58,9 @@ public class ProfitService
             // Calculate profit
             var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
             
+            // Check cross-world prices (Aurum-ykb.1.3)
+            await CheckCrossWorldPricesAsync(recipe, profit, worldName);
+
             // Generate suggestions for alternative items to craft
             if (profit != null)
             {
@@ -600,6 +603,77 @@ public class ProfitService
         }
 
     
+    /// <summary>
+    /// Check other worlds in the DC for better prices
+    /// </summary>
+    private async Task CheckCrossWorldPricesAsync(RecipeData recipe, ProfitCalculation? profit, string currentWorldName)
+    {
+        if (profit == null) return;
+        
+        try
+        {
+            // Get cross-world data from Universalis (fetching for the whole DC)
+            var dcData = await universalisService.GetMarketDataCrossWorldAsync(currentWorldName, recipe.ResultItemId);
+            
+            if (dcData == null || dcData.Listings == null || !dcData.Listings.Any())
+                return;
+                
+            // Filter for listings on other worlds
+            var otherWorldListings = dcData.Listings
+                .Where(l => !string.IsNullOrEmpty(l.WorldName) && !l.WorldName.Equals(currentWorldName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+                
+            if (!otherWorldListings.Any())
+                return;
+
+            // Find the best price (highest) on another world
+            // We are looking for where to SELL, so we want the HIGHEST price.
+            // But we should be realistic - look at recent sales or average, not just one high listing.
+            // Let's use the average of the cheapest 5 listings on that world to gauge "market price"
+            
+            var worldGroups = otherWorldListings
+                .GroupBy(l => l.WorldName)
+                .Select(g => new 
+                { 
+                    WorldName = g.Key,
+                    // Estimate market price on that world using simple average of top 3 cheapest listings (to undercut)
+                    // If we want to sell, we are competing with these.
+                    // Wait, if we want to SELL, we want a world where prices are HIGH.
+                    // So we look for the world with the HIGHEST 'MinPrice' or 'AveragePrice'.
+                    MinPrice = g.Min(l => l.PricePerUnit),
+                    AveragePrice = g.Average(l => l.PricePerUnit)
+                })
+                .OrderByDescending(x => x.MinPrice) // Sort by highest minimum price (best place to sell)
+                .ToList();
+
+            var bestWorld = worldGroups.FirstOrDefault();
+            
+            if (bestWorld != null)
+            {
+                // Only suggest if it's significantly better (> 20% better than current world)
+                if (profit.ExpectedSalePrice > 0)
+                {
+                    float improvement = (float)bestWorld.MinPrice / profit.ExpectedSalePrice;
+                    if (improvement > 1.2f) // 20% better
+                    {
+                        profit.BestWorldName = bestWorld.WorldName;
+                        profit.BestWorldPrice = (uint)bestWorld.MinPrice;
+                    }
+                }
+                else
+                {
+                    // If current world has no price, any price is better
+                    profit.BestWorldName = bestWorld.WorldName;
+                    profit.BestWorldPrice = (uint)bestWorld.MinPrice;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, $"Failed to check cross-world prices for {recipe.ItemName}");
+        }
+    }
+
     /// <summary>
     /// Calculate estimated gathering time for self-gathered materials
     /// </summary>

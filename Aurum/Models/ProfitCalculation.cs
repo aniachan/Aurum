@@ -112,4 +112,8 @@ public class ProfitCalculation
     public CostMode CostMode { get; set; }
     public bool IsDataComplete { get; set; }     // False if missing market data
     public bool IsStale { get; set; }            // True if data is from stale cache
+
+    // Cross-World Analysis
+    public string? BestWorldName { get; set; }
+    public uint BestWorldPrice { get; set; }
 }
