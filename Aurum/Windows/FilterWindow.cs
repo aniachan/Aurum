@@ -170,9 +170,83 @@ public class FilterWindow : Window, IDisposable
             // Job Classes
             if (ImGui.TreeNode("Jobs / Classes"))
             {
-                // This would be populated with checkboxes for each crafter class
-                // For now, placeholder
-                ImGui.TextDisabled("Class selection coming soon...");
+                ImGui.TextDisabled("Select specific jobs to include:");
+                
+                var jobs = new[] { "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
+                bool allJobs = criteria.IncludedJobIds.Count == 0;
+                
+                if (ImGui.Checkbox("All Jobs", ref allJobs))
+                {
+                    if (allJobs)
+                        criteria.IncludedJobIds.Clear();
+                    changed = true;
+                }
+                
+                if (!allJobs)
+                {
+                    int cols = 4;
+                    int i = 0;
+                    foreach (var job in jobs)
+                    {
+                        if (i % cols != 0) ImGui.SameLine();
+                        
+                        bool isIncluded = criteria.IncludedJobIds.Contains(job);
+                        if (ImGui.Checkbox(job, ref isIncluded))
+                        {
+                            if (isIncluded)
+                                criteria.IncludedJobIds.Add(job);
+                            else
+                                criteria.IncludedJobIds.Remove(job);
+                                
+                            // If all deselected, maybe switch back to "All"? 
+                            // Or leave empty as "None"? Let's leave as "None" if user explicitly unchecked all.
+                            changed = true;
+                        }
+                        i++;
+                    }
+                }
+                
+                ImGui.TreePop();
+            }
+
+            // Equipment Slots
+            if (ImGui.TreeNode("Equipment Slots"))
+            {
+                // Helper for slot checkbox
+                void SlotCheckbox(string label, EquipSlot slot)
+                {
+                    bool included = criteria.IncludedEquipSlots.Contains(slot);
+                    if (ImGui.Checkbox(label, ref included))
+                    {
+                        if (included) criteria.IncludedEquipSlots.Add(slot);
+                        else criteria.IncludedEquipSlots.Remove(slot);
+                        changed = true;
+                    }
+                }
+                
+                ImGui.TextDisabled("Filter by equipment slot:");
+                
+                // Left Side (Weapon/Shield/Head/Body/Hands/Waist)
+                ImGui.BeginGroup();
+                SlotCheckbox("Main Hand", EquipSlot.MainHand);
+                SlotCheckbox("Head", EquipSlot.Head);
+                SlotCheckbox("Body", EquipSlot.Body);
+                SlotCheckbox("Hands", EquipSlot.Hands);
+                SlotCheckbox("Legs", EquipSlot.Legs);
+                SlotCheckbox("Feet", EquipSlot.Feet);
+                ImGui.EndGroup();
+                
+                ImGui.SameLine(150);
+                
+                // Right Side (OffHand/Accessories)
+                ImGui.BeginGroup();
+                SlotCheckbox("Off Hand", EquipSlot.OffHand);
+                SlotCheckbox("Ears", EquipSlot.Ears);
+                SlotCheckbox("Neck", EquipSlot.Neck);
+                SlotCheckbox("Wrists", EquipSlot.Wrists);
+                SlotCheckbox("Rings", EquipSlot.Ring);
+                ImGui.EndGroup();
+
                 ImGui.TreePop();
             }
             

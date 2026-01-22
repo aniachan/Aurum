@@ -56,6 +56,7 @@ public class RecipeData
     
     // Derived Categories
     public ItemMainCategory MainCategory { get; set; }
+    public EquipSlot EquipSlot { get; set; } = EquipSlot.None;
 
     // Source Types (flags to help filtering)
     public bool IsCrafted => RecipeId > 0;

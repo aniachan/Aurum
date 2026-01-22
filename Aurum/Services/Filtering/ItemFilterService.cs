@@ -46,6 +46,8 @@ public class ItemFilterService
             MinProfitAmount = criteria.MinProfitAmount,
             MinROI = criteria.MinROI,
             MinSaleVelocity = criteria.MinSaleVelocity,
+            IncludedEquipSlots = new HashSet<EquipSlot>(criteria.IncludedEquipSlots),
+            IncludedJobIds = new HashSet<string>(criteria.IncludedJobIds),
             // ... copy other fields
         };
         _presets[id] = (name, copy);
@@ -70,6 +72,8 @@ public class ItemFilterService
                 MinProfitAmount = preset.Criteria.MinProfitAmount,
                 MinROI = preset.Criteria.MinROI,
                 MinSaleVelocity = preset.Criteria.MinSaleVelocity,
+                IncludedEquipSlots = new HashSet<EquipSlot>(preset.Criteria.IncludedEquipSlots),
+                IncludedJobIds = new HashSet<string>(preset.Criteria.IncludedJobIds),
                 // ... copy others
             };
         }
@@ -181,6 +185,20 @@ public class ItemFilterService
 
             // Item Level (ILvl)
             if (item.Recipe.ItemLevel < criteria.MinItemLevel || item.Recipe.ItemLevel > criteria.MaxItemLevel) return false;
+            
+            // 9. Equipment Slot Filtering
+            // Only filter by slot if the item actually has a slot (is equipment)
+            if (item.Recipe.EquipSlot != EquipSlot.None)
+            {
+                if (!criteria.IncludedEquipSlots.Contains(item.Recipe.EquipSlot)) return false;
+            }
+            
+            // 10. Job/Class Filtering
+            // If the criteria list is empty, we include all. If populated, we check if the recipe's class is in the list.
+            if (criteria.IncludedJobIds.Count > 0)
+            {
+                if (!criteria.IncludedJobIds.Contains(item.Recipe.CraftingClassName)) return false;
+            }
         }
 
         return true;

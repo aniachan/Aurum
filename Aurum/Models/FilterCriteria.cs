@@ -55,6 +55,18 @@ public class FilterCriteria
     public int MinItemLevel { get; set; } = 1;
     public int MaxItemLevel { get; set; } = int.MaxValue;
 
+    // Equipment Slots
+    public HashSet<EquipSlot> IncludedEquipSlots { get; set; } = new()
+    {
+        EquipSlot.MainHand, EquipSlot.OffHand,
+        EquipSlot.Head, EquipSlot.Body, EquipSlot.Hands, EquipSlot.Legs, EquipSlot.Feet,
+        EquipSlot.Ears, EquipSlot.Neck, EquipSlot.Wrists, EquipSlot.Ring
+    };
+    
+    // Jobs/Classes (by Abbreviation e.g. "CRP", "PLD")
+    // If empty, all jobs are included. If populated, only these jobs are included.
+    public HashSet<string> IncludedJobIds { get; set; } = new();
+
     // Helper properties for UI binding
     public int MinLevel { get => MinJobLevel; set => MinJobLevel = value; }
     public int MaxLevel { get => MaxJobLevel; set => MaxJobLevel = value; }

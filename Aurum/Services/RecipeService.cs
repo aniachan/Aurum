@@ -165,6 +165,56 @@ public class RecipeService
     }
     
     /// <summary>
+    /// Helper to map Lumina Item to EquipSlot enum
+    /// </summary>
+    private EquipSlot DetermineEquipSlot(Item item)
+    {
+        // Use EquipSlotCategory from Item
+        // These IDs are from the EquipSlotCategory sheet
+        var slotId = item.EquipSlotCategory.RowId;
+        
+        // 1=MainHand, 2=OffHand, 3=Head, 4=Body, 5=Gloves, 6=Waist(RIP), 7=Legs, 8=Feet, 
+        // 9=Ears, 10=Neck, 11=Wrists, 12=Ring, 13=SoulCrystal
+        // 14-22ish are combinations (e.g. Body+Head) which we simplify
+        
+        return slotId switch
+        {
+            1 => EquipSlot.MainHand, // Main Hand
+            2 => EquipSlot.OffHand, // Off Hand
+            3 => EquipSlot.Head, // Head
+            4 => EquipSlot.Body, // Body
+            5 => EquipSlot.Hands, // Gloves
+            6 => EquipSlot.None, // Waist (removed)
+            7 => EquipSlot.Legs, // Legs
+            8 => EquipSlot.Feet, // Feet
+            9 => EquipSlot.Ears, // Ears
+            10 => EquipSlot.Neck, // Neck
+            11 => EquipSlot.Wrists, // Wrists
+            12 => EquipSlot.Ring, // Ring
+            
+            // Complex slots (e.g. 2-handed weapons, body+head, etc)
+            13 => EquipSlot.MainHand, // 2-handed weapon usually occupies Main+Off, treating as Main
+            // 14: Main Hand + Off Hand ?
+            // 15: Body + Head
+            15 => EquipSlot.Body,
+            // 16: Body + Legs + Feet?
+            16 => EquipSlot.Body, 
+            // 17: Soul Crystal
+            17 => EquipSlot.None,
+            // 18: Legs + Feet
+            18 => EquipSlot.Legs,
+            // 19: Full set?
+            19 => EquipSlot.Body,
+            // 20: Body + Hands?
+            20 => EquipSlot.Body,
+            // 21: Body + Legs?
+            21 => EquipSlot.Body,
+            
+            _ => EquipSlot.None
+        };
+    }
+
+    /// <summary>
     /// Helper to determine the main category from Item data
     /// </summary>
     private ItemMainCategory DetermineMainCategory(Item item)
@@ -272,6 +322,7 @@ public class RecipeService
             RecipeLevelTable = recipe.RecipeLevelTable.RowId,
             ItemCategory = recipe.ItemResult.Value.ItemUICategory.RowId,
             MainCategory = DetermineMainCategory(recipe.ItemResult.Value),
+            EquipSlot = DetermineEquipSlot(recipe.ItemResult.Value),
             EstimatedCraftTimeSeconds = EstimateCraftTime(recipe)
         };
         
