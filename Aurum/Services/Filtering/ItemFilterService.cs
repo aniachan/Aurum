@@ -133,11 +133,10 @@ public class ItemFilterService
             if (!PassesMarketFilter(item.MarketData, criteria))
                 return false;
         }
-        // Note: If MarketData is null but criteria requires market checks (like velocity), 
-        // we might need to handle that. 
-        // Current logic in PassesMarketFilter handles non-null MarketData.
-        // If MarketData is null, we skip market checks unless they are mandatory (like "exclude untradeable" which implies market data existence usually, 
-        // but we relaxed that in original code).
+
+        // 4. Risk Metrics
+        if (item.RiskScore > criteria.MaxRiskScore) return false;
+        if (!criteria.AllowedRiskLevels.Contains(item.RiskLevel)) return false;
         
         // 7. Favorites
         if (criteria.OnlyFavorites)
