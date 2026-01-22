@@ -201,6 +201,17 @@ public class ConfigWindow : Window, IDisposable
             configuration.ApiRequestTimeoutSeconds = timeout;
             configuration.Save();
         }
+
+        var workOffline = configuration.WorkOffline;
+        if (ImGui.Checkbox("Work Offline (Disable API)", ref workOffline))
+        {
+            configuration.WorkOffline = workOffline;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("If enabled, no network requests will be made.\nThe plugin will only use cached data.");
+        }
         
         ImGui.Separator();
         ImGui.Text("Filtering & Sorting");

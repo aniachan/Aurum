@@ -30,6 +30,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public int ApiRequestTimeoutSeconds { get; set; } = 30; // Default 30s timeout
     public int ApiErrorThreshold { get; set; } = 10; // Trigger degradation after 10 errors in a minute
     public int ApiDegradationMinutes { get; set; } = 5; // Stay degraded for 5 minutes
+    public bool WorkOffline { get; set; } = false; // Disable all network requests
     
     // Calculation Settings
     public CostMode DefaultCostMode { get; set; } = CostMode.Cheapest;

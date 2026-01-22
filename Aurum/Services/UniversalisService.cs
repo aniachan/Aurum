@@ -260,6 +260,21 @@ public class UniversalisService : IDisposable
         {
             return memCached;
         }
+
+        // CHECK FOR OFFLINE MODE
+        if (configuration.WorkOffline)
+        {
+            if (currentWorldId != 0)
+            {
+                 var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+                 if (staleVal != null)
+                 {
+                     staleVal.IsCachedData = true;
+                     return staleVal;
+                 }
+            }
+            return null;
+        }
         
         // 2. Check Database Cache (persistent)
         // Note: We need worldId. If not set, we might miss DB hits.
@@ -386,6 +401,27 @@ public class UniversalisService : IDisposable
         if (uncachedItems.Count == 0)
         {
             log.Info($"All {allItems.Count} items found in cache");
+            return results;
+        }
+
+        // CHECK FOR OFFLINE MODE
+        if (configuration.WorkOffline)
+        {
+            log.Info("Offline mode active: Skipping batch API request, checking for stale cache.");
+            
+            // In offline mode, try to fetch stale data for uncached items
+            foreach (var itemId in uncachedItems)
+            {
+                if (currentWorldId != 0)
+                {
+                    var staleVal = database.GetMarketData((int)itemId, currentWorldId, TimeSpan.MaxValue);
+                    if (staleVal != null)
+                    {
+                         staleVal.IsCachedData = true;
+                         results[itemId] = staleVal;
+                    }
+                }
+            }
             return results;
         }
 

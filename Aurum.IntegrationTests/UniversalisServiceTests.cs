@@ -304,5 +304,45 @@ namespace Aurum.IntegrationTests
             // Or if we WANT to test partial failure, we need to exhaust retries.
             Assert.Equal(2, result.Count);
         }
+
+        [Fact]
+        public async Task GetMarketDataAsync_RespectsOfflineMode()
+        {
+            // Arrange
+            _mockConfig.Object.WorkOffline = true;
+            int callCount = 0;
+            var service = CreateServiceWithMockHttp(req => 
+            {
+                callCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+            // Act
+            var result = await service.GetMarketDataAsync("TestWorld", 123);
+
+            // Assert
+            Assert.Null(result); // Should return null or stale cache, but we have no cache
+            Assert.Equal(0, callCount); // NO HTTP requests
+        }
+
+        [Fact]
+        public async Task GetMarketDataBatchAsync_RespectsOfflineMode()
+        {
+            // Arrange
+            _mockConfig.Object.WorkOffline = true;
+            int callCount = 0;
+            var service = CreateServiceWithMockHttp(req => 
+            {
+                callCount++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            });
+
+            // Act
+            var result = await service.GetMarketDataBatchAsync("TestWorld", new List<uint> { 1, 2 });
+
+            // Assert
+            Assert.Empty(result); // Should be empty as we have no cache
+            Assert.Equal(0, callCount); // NO HTTP requests
+        }
     }
 }
