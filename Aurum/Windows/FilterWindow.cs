@@ -84,6 +84,8 @@ public class FilterWindow : Window, IDisposable
         // Basic Filters Section
         if (ImGui.CollapsingHeader("Basic Requirements", ImGuiTreeNodeFlags.DefaultOpen))
         {
+            ImGui.Indent();
+            
             // Level Range (Equip Level)
             int minLvl = criteria.MinLevel;
             int maxLvl = criteria.MaxLevel >= 100 ? 100 : criteria.MaxLevel; // Cap display at current level cap
@@ -141,11 +143,15 @@ public class FilterWindow : Window, IDisposable
                 criteria.MaxItemLevel = Math.Clamp(maxILvl, minILvl, 999);
                 changed = true;
             }
+            
+            ImGui.Unindent();
         }
         
         // Market & Profit Section
         if (ImGui.CollapsingHeader("Market & Profit", ImGuiTreeNodeFlags.DefaultOpen))
         {
+            ImGui.Indent();
+            
             // Min Profit
             int minProfit = criteria.MinProfit;
             if (ImGui.InputInt("Min Profit (Gil)", ref minProfit, 1000))
@@ -153,6 +159,7 @@ public class FilterWindow : Window, IDisposable
                 criteria.MinProfit = Math.Max(0, minProfit);
                 changed = true;
             }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Minimum expected profit per unit.");
             
             // Min ROI
             float minRoi = criteria.MinRoi;
@@ -161,6 +168,7 @@ public class FilterWindow : Window, IDisposable
                 criteria.MinRoi = minRoi;
                 changed = true;
             }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Minimum Return on Investment percentage.");
             
             // Min Velocity
             float minVelocity = criteria.MinVelocity;
@@ -169,6 +177,7 @@ public class FilterWindow : Window, IDisposable
                 criteria.MinVelocity = minVelocity;
                 changed = true;
             }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Minimum number of sales per day (Sale Velocity).");
             
             // Profitable Only
             bool profitableOnly = criteria.ProfitableOnly;
@@ -177,6 +186,8 @@ public class FilterWindow : Window, IDisposable
                 criteria.ProfitableOnly = profitableOnly;
                 changed = true;
             }
+            
+            ImGui.Unindent();
         }
         
         // Categories Section
