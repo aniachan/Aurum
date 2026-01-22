@@ -76,6 +76,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 5) ApplyMigration(connection, 5, Migration_5_AddGilPerHourColumn);
             if (currentVersion < 6) ApplyMigration(connection, 6, Migration_6_AddApiPayloadSize);
             if (currentVersion < 7) ApplyMigration(connection, 7, Migration_7_AddArbitrageHistory);
+            if (currentVersion < 8) ApplyMigration(connection, 8, Migration_8_AddArbitrageMetrics);
             
             log.Information("Database initialization complete");
         }
@@ -295,6 +296,19 @@ public class DatabaseService : IDisposable
             CREATE INDEX IF NOT EXISTS idx_arbitrage_history_timestamp ON ArbitrageHistory(timestamp);
         ";
         ExecuteNonQuery(connection, createArbitrageHistoryTable, transaction);
+    }
+
+    private void Migration_8_AddArbitrageMetrics(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add missing columns if they don't exist
+        // Usually needed if Migration_7 was minimal or changed
+        // For now, let's just ensure indices or add a 'transferred_at' if we want to track actual execution?
+        // But the history table is for opportunities recorded, not necessarily executed trades unless we hook into inventory.
+        // Let's assume Migration_7 covers the table structure.
+        
+        // Let's add an index on (home_world_id, target_world_id) for route analysis
+        var createRouteIndex = "CREATE INDEX IF NOT EXISTS idx_arbitrage_route ON ArbitrageHistory(home_world_id, target_world_id);";
+        ExecuteNonQuery(connection, createRouteIndex, transaction);
     }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)

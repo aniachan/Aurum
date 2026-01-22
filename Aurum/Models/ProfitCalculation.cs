@@ -122,4 +122,15 @@ public class ProfitCalculation
     
     public int CrossWorldTravelCost { get; set; } // Estimated cost to visit the other world
     public int ArbitrageProfit { get; set; } // Potential profit from buying on CheapestWorld and selling on CurrentWorld
+    public DateTime? LastTransferTime { get; set; } // Track when we last transferred (for cooldown warning)
+    public List<ArbitrageOpportunity> HistoricalArbitrage { get; set; } = new();
+}
+
+public class ArbitrageOpportunity
+{
+    public DateTime Timestamp { get; set; }
+    public string FromWorld { get; set; } = string.Empty;
+    public string ToWorld { get; set; } = string.Empty;
+    public int Profit { get; set; }
+    public float ROI { get; set; }
 }

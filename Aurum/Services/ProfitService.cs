@@ -720,6 +720,7 @@ public class ProfitService
                     long priceDiff = (long)bestSellWorld.MinPrice - profit.ExpectedSalePrice;
                     
                     // Only suggest if it's significantly better or covers travel cost
+                    // Aurum-ykb.2.2: Calculate profit after transfer fee
                     if (improvement > 1.2f || priceDiff > (travelCost * 2)) 
                     {
                         profit.BestWorldName = bestSellWorld.WorldName;
@@ -741,6 +742,7 @@ public class ProfitService
                 
             if (cheapestBuyWorld != null)
             {
+                // Aurum-ykb.2.1: Identify items with large price differences
                 profit.CheapestWorldName = cheapestBuyWorld.WorldName;
                 profit.CheapestWorldPrice = (uint)cheapestBuyWorld.MinPrice;
 
@@ -755,12 +757,30 @@ public class ProfitService
                     var tax = (int)(sellRevenue * 0.05); // 5% tax on sale
                     var netRevenue = sellRevenue - tax;
                     
+                    // Aurum-ykb.2.2: Calculate profit after transfer fee
                     var arbitrageProfit = (int)netRevenue - (int)buyCost - travelCost;
                     
                     // Only record if it's profitable
                     if (arbitrageProfit > 0)
                     {
                         profit.ArbitrageProfit = arbitrageProfit;
+                        
+                        // Aurum-ykb.2.3: Warn about transfer cooldowns
+                        // If arbitrage profit is small (< 50k) and we just transferred, it might not be worth the lock
+                        if (arbitrageProfit < 50000 && profit.LastTransferTime.HasValue)
+                        {
+                            var timeSinceTransfer = DateTime.UtcNow - profit.LastTransferTime.Value;
+                            if (timeSinceTransfer.TotalMinutes < 30) // Assuming 30m "mental cooldown" or effort barrier
+                            {
+                                profit.Warnings.Add(new MarketWarningInfo
+                                {
+                                    Type = MarketWarning.TransferCooldown,
+                                    Message = "Recent Transfer Cooldown",
+                                    Details = $"You transferred {timeSinceTransfer.TotalMinutes:F0}m ago. Small profit ({arbitrageProfit:N0}g) may not be worth the effort.",
+                                    Level = WarningLevel.Info
+                                });
+                            }
+                        }
                     }
                 }
             }

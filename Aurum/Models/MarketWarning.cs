@@ -13,7 +13,8 @@ public enum MarketWarning
     HighCompetition,
     OversupplyExpected,
     ApiUnreachable,
-    PriceManipulation
+    PriceManipulation,
+    TransferCooldown
 }
 
 /// <summary>
