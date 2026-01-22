@@ -87,6 +87,10 @@ public class CommunitySyncService
         }
     }
 
+    // Local aggregation state
+    private LocalMarketStats currentStats = new();
+    public LocalMarketStats CurrentStats => currentStats;
+
     /// <summary>
     /// Process buffered trends (locally aggregate for now)
     /// </summary>
@@ -107,8 +111,8 @@ public class CommunitySyncService
                 // In the future, this will POST to the community API
                 // await UploadTrendsAsync(batch);
                 
-                // For now, we'll just log aggregated stats to show it's working
-                AggregateLocalTrends(batch);
+                // Update local aggregation
+                UpdateLocalStats(batch);
                 
                 await Task.CompletedTask;
             }
@@ -120,36 +124,55 @@ public class CommunitySyncService
     }
 
     /// <summary>
-    /// Aggregates trends locally to identify broad market movements
+    /// Updates the local market statistics with the new batch of data
     /// </summary>
-    private void AggregateLocalTrends(List<TrendRecord> records)
+    private void UpdateLocalStats(List<TrendRecord> records)
     {
-        // 1. Group by Trend Direction
-        var trends = records
+        var stats = new LocalMarketStats
+        {
+            LastUpdated = DateTime.UtcNow,
+            TotalItemsAnalyzed = records.Count
+        };
+
+        // 1. Trend Distribution
+        stats.TrendDistribution = records
             .GroupBy(r => r.TrendDirection)
-            .Select(g => new { Direction = g.Key, Count = g.Count() })
-            .OrderByDescending(x => x.Count);
+            .ToDictionary(g => g.Key, g => g.Count());
 
-        log.Debug("Community Trend Sync - Local Batch Summary:");
-        foreach (var t in trends)
-        {
-            log.Debug($"  - {t.Direction}: {t.Count} items");
-        }
+        // 2. Average Volatility
+        stats.AverageVolatility = records.Any() ? records.Average(r => r.PriceVolatility) : 0;
 
-        // 2. Identify High Volatility Items
-        var volatileItems = records
-            .Where(r => r.PriceVolatility > 0.5f)
+        // 3. Highlights - High Volatility
+        stats.TopVolatileItems = records
             .OrderByDescending(r => r.PriceVolatility)
-            .Take(5);
+            .Take(5)
+            .Select(r => new MarketHighlight 
+            { 
+                ItemId = r.ItemId, 
+                WorldName = r.WorldName, 
+                Value = r.PriceVolatility, 
+                Label = $"{r.PriceVolatility:P0} volatility" 
+            })
+            .ToList();
 
-        if (volatileItems.Any())
-        {
-            log.Debug("  High Volatility Detected:");
-            foreach (var v in volatileItems)
-            {
-                log.Debug($"    - Item {v.ItemId} ({v.WorldName}): {v.PriceVolatility:P0} volatility");
-            }
-        }
+        // 4. Highlights - High Demand (Velocity > 1 + Undersupplied)
+        stats.TopDemandItems = records
+            .Where(r => r.SaleVelocity > 1.0f && r.SupplyDemandRatio < 1.0f)
+            .OrderByDescending(r => r.SaleVelocity)
+            .Take(5)
+            .Select(r => new MarketHighlight 
+            { 
+                ItemId = r.ItemId, 
+                WorldName = r.WorldName, 
+                Value = r.SaleVelocity, 
+                Label = $"{r.SaleVelocity:F1} sales/day" 
+            })
+            .ToList();
+
+        // Atomic update of the exposed stats
+        this.currentStats = stats;
+        
+        log.Debug($"Market Stats Updated: {stats.TotalItemsAnalyzed} items processed. Avg Volatility: {stats.AverageVolatility:P1}");
     }
 
     /// <summary>
