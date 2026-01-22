@@ -67,6 +67,25 @@ public class ShoppingList
         
         return sb.ToString();
     }
+
+    public string ToTeamcraftJson()
+    {
+        var sb = new System.Text.StringBuilder();
+        // Simple JSON format for Teamcraft import
+        sb.Append($"{{\"name\":\"Aurum List {DateTime.Now:MM-dd HH:mm}\",\"items\":[");
+        
+        var items = Items.OrderBy(i => i.SourceType).ThenBy(i => i.ItemName).ToList();
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            // 0 for recipe means it might try to auto-detect or just treat as item
+            sb.Append($"{{\"id\":{item.ItemId},\"amount\":{item.AmountNeeded},\"scrip\":0,\"hq\":false}}");
+            if (i < items.Count - 1) sb.Append(",");
+        }
+        
+        sb.Append("]}");
+        return sb.ToString();
+    }
 }
 
 public class CraftingTarget

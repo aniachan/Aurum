@@ -81,6 +81,18 @@ public class ShoppingListWindow : Window, IDisposable
              }
         }
         
+        ImGui.SameLine();
+
+        if (ImGui.Button("Teamcraft Import JSON"))
+        {
+            var json = currentList.ToTeamcraftJson();
+            ImGui.SetClipboardText(json);
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Copies a JSON string to clipboard that can be imported into Teamcraft.\n(Lists -> Import List -> Paste JSON)");
+        }
+        
         ImGui.Separator();
 
         if (ImGui.BeginTabBar("ShoppingListTabs"))
