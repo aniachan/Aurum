@@ -949,6 +949,47 @@ public class DatabaseService : IDisposable
             }
         }
     }
+
+    public List<ApiRequestLogEntry> GetRecentApiRequests(int limit = 100)
+    {
+        lock (dbLock)
+        {
+            var results = new List<ApiRequestLogEntry>();
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+
+                command.CommandText = @"
+                    SELECT id, endpoint, timestamp, response_time_ms, status_code, success
+                    FROM ApiRequestLog
+                    ORDER BY timestamp DESC
+                    LIMIT @limit
+                ";
+                command.Parameters.AddWithValue("@limit", limit);
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    results.Add(new ApiRequestLogEntry
+                    {
+                        Id = reader.GetInt64(0),
+                        Endpoint = reader.GetString(1),
+                        Timestamp = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(2)).UtcDateTime,
+                        ResponseTimeMs = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
+                        StatusCode = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
+                        Success = reader.GetBoolean(5)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, "Failed to get recent API requests");
+            }
+            return results;
+        }
+    }
     
     public void Vacuum()
     {
