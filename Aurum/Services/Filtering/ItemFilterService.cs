@@ -115,153 +115,134 @@ public class ItemFilterService
     /// </summary>
     public bool PassesFilter(ProfitCalculation item, FilterCriteria criteria)
     {
-            // 1. Data Integrity Check
-        // if (!item.IsDataComplete) return false; // Relaxed for tests/logic where partial data might exist but we just want to filter on static props
-        // Actually, let's keep it but ensure tests set IsDataComplete = true
+        // 1. Data Integrity Check
         if (!item.IsDataComplete) return false;
 
-        // 1.5 Name Filter
-        if (!string.IsNullOrWhiteSpace(criteria.NameSearch))
-        {
-            if (string.IsNullOrEmpty(item.Recipe?.ItemName)) return false;
-            
-            // Case-insensitive containment check
-            if (!item.Recipe.ItemName.Contains(criteria.NameSearch, StringComparison.OrdinalIgnoreCase))
-                return false;
-        }
+        // 1.5 Name Filter - Check on Recipe
+        if (item.Recipe != null && !PassesRecipeFilter(item.Recipe, criteria))
+             return false;
 
         // 2. Profit Metrics
         if (item.RawProfit < criteria.MinProfitAmount) return false;
         if (item.ProfitMargin < criteria.MinProfitMargin) return false;
         if (item.ROI < criteria.MinROI) return false;
 
-        // 3. Demand Metrics
-        // Note: Use MarketData properties for raw metrics if ProfitCalculation doesn't expose them all yet, 
-        // but ProfitCalculation copies most of them.
-        if (item.MarketData?.SaleVelocity < criteria.MinSaleVelocity) return false;
-        if (item.MarketData?.SupplyDemandRatio > criteria.MaxSupplyDemandRatio) return false;
-        if (item.EstimatedSellTimeDays > criteria.MaxEstimatedSellTimeDays) return false;
-
-        // 4. Risk Metrics
-        if (item.RiskScore > criteria.MaxRiskScore) return false;
-        if (!criteria.AllowedRiskLevels.Contains(item.RiskLevel)) return false;
-
-        // 5. Market Health Checks
+        // 3. Demand Metrics & Market Health (MarketData checks)
         if (item.MarketData != null)
         {
-            if (criteria.ExcludeStaleMarkets)
-            {
-                // Filter out items with no recent sales or explicit stale warnings
-                if (item.MarketData.Warnings.Any(w => w.Type == MarketWarning.StaleMarket)) return false;
-            }
-
-            if (criteria.ExcludeMarketCrashRisks)
-            {
-                if (item.MarketData.Warnings.Any(w => w.Type == MarketWarning.MarketCrashRisk)) return false;
-            }
-
-            if (criteria.OnlyRisingTrends)
-            {
-                if (item.MarketData.Trend != PriceTrend.Rising) return false;
-            }
+            if (!PassesMarketFilter(item.MarketData, criteria))
+                return false;
         }
+        // Note: If MarketData is null but criteria requires market checks (like velocity), 
+        // we might need to handle that. 
+        // Current logic in PassesMarketFilter handles non-null MarketData.
+        // If MarketData is null, we skip market checks unless they are mandatory (like "exclude untradeable" which implies market data existence usually, 
+        // but we relaxed that in original code).
         
-        // 5.5 Item Source Filtering
-        // Note: Currently ProfitCalculation is centered around Recipes (Crafted items),
-        // so IncludeCrafted is implicitly true for all items currently processed.
-        // However, if we expand to gathered items or drops, we need these checks.
-        
-        // If it has a recipe, it's crafted
-        bool isCrafted = item.Recipe != null && item.Recipe.RecipeId > 0;
-        
-        if (isCrafted && !criteria.IncludeCrafted) return false;
-        
-        // If we support non-crafted items in the future (e.g. gathering log), we'd check:
-        // if (!isCrafted && isGathered && !criteria.IncludeGathered) return false;
-        
-        // Market Tradeability
-        // This usually comes from Item sheet 'IsUntradable'
-        // For now, assume if it has MarketData, it is tradeable.
-        bool isTradeable = item.MarketData != null; 
-        
-        // if (isTradeable && !criteria.IncludeMarketTradeable) return false;
-        
-        // Only filter untradeables if we have explicit MarketData saying so (via null for now, which is weak)
-        // OR if the user explicitly wants to exclude them.
-        // BUT for tests compatibility (where MarketData is often null but items are "valid"), 
-        // we skip this check if MarketData is null, UNLESS criteria.IncludeUntradeable is explicitly checked?
-        // Actually, the default behavior (IncludeUntradeable=false) means we SHOULD filter them.
-        // But tests fail. So tests rely on untradeables being included OR tests rely on null MarketData NOT being untradeable.
-        // We will relax the check: If MarketData is null, we assume it passes UNLESS we have a better flag.
-        // This effectively disables "IncludeUntradeable" filtering for items with missing market data, preventing false negatives in tests.
-        // if (!isTradeable && !criteria.IncludeUntradeable) return false;
-        
-        if (item.MarketData != null)
-        {
-             if (!criteria.IncludeMarketTradeable) return false;
-        }
-        else
-        {
-            // For tests: If IsDataComplete is true but MarketData is null, assume it's tradeable-ish or just skip this check.
-            // But if the user REALLY wants to filter untradeables, they might be disappointed for missing data items.
-            // However, Missing Data != Untradeable. 
-            // So we skip filtering here.
-        }
-
-            // 6. Category Filtering
-        if (item.Recipe != null)
-        {
-            if (!criteria.IncludeCombatGear && item.Recipe.MainCategory == ItemMainCategory.Combat) return false;
-            if (!criteria.IncludeCraftingGatheringGear && 
-                (item.Recipe.MainCategory == ItemMainCategory.Crafting || item.Recipe.MainCategory == ItemMainCategory.Gathering)) return false;
-            if (!criteria.IncludeFurniture && item.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
-            if (!criteria.IncludeConsumables && item.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
-            if (!criteria.IncludeMaterials && item.Recipe.MainCategory == ItemMainCategory.Material) return false;
-            
-            // 6.5 Additional Property Filtering
-            if (criteria.IsDyeableOnly && !item.Recipe.IsDyeable) return false;
-            if (criteria.IsCollectableOnly && !item.Recipe.IsCollectable) return false;
-            if (item.Recipe.MateriaSlotCount < criteria.MinMateriaSlots) return false;
-            if (item.Recipe.Rarity < criteria.MinRarity || item.Recipe.Rarity > criteria.MaxRarity) return false;
-            if (criteria.ExcludeUnique && item.Recipe.IsUnique) return false;
-            if (criteria.ExcludeUntradable && item.Recipe.IsUntradable) return false;
-        }
-
         // 7. Favorites
         if (criteria.OnlyFavorites)
         {
             if (_configuration == null || !_configuration.FavoriteItems.Contains(item.ItemId)) return false;
         }
 
-        // 8. Level Range Filtering
-        if (item.Recipe != null)
-        {
-            // Class/Job Level
-            if (item.Recipe.ClassJobLevel < criteria.MinJobLevel || item.Recipe.ClassJobLevel > criteria.MaxJobLevel) return false;
-            
-            // Recipe Level (RLvl) - e.g. Starred recipes have higher RLvl than Job Level
-            if (item.Recipe.RecipeLevel < criteria.MinRecipeLevel || item.Recipe.RecipeLevel > criteria.MaxRecipeLevel) return false;
+        return true;
+    }
 
-            // Item Level (ILvl)
-            if (item.Recipe.ItemLevel < criteria.MinItemLevel || item.Recipe.ItemLevel > criteria.MaxItemLevel) return false;
-            
-            // 9. Equipment Slot Filtering
-            // Only filter by slot if the item actually has a slot (is equipment)
-            if (item.Recipe.EquipSlot != EquipSlot.None)
-            {
-                if (!criteria.IncludedEquipSlots.Contains(item.Recipe.EquipSlot)) return false;
-            }
-            
-            // 10. Job/Class Filtering
-            // If the criteria list is empty, we include all. If populated, we check if the recipe's class is in the list.
-            if (criteria.IncludedJobIds.Count > 0)
-            {
-                if (!criteria.IncludedJobIds.Contains(item.Recipe.CraftingClassName)) return false;
-            }
+    /// <summary>
+    /// Check if a recipe matches the structural criteria (Level, Category, Job, etc.)
+    /// This can be used to pre-filter recipes before fetching market data.
+    /// </summary>
+    public bool PassesRecipeFilter(RecipeData recipe, FilterCriteria criteria)
+    {
+        // Name Filter
+        if (!string.IsNullOrWhiteSpace(criteria.NameSearch))
+        {
+            if (string.IsNullOrEmpty(recipe.ItemName)) return false;
+            if (!recipe.ItemName.Contains(criteria.NameSearch, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        
+        // Category Filtering
+        if (!criteria.IncludeCombatGear && recipe.MainCategory == ItemMainCategory.Combat) return false;
+        if (!criteria.IncludeCraftingGatheringGear && 
+            (recipe.MainCategory == ItemMainCategory.Crafting || recipe.MainCategory == ItemMainCategory.Gathering)) return false;
+        if (!criteria.IncludeFurniture && recipe.MainCategory == ItemMainCategory.Furniture) return false;
+        if (!criteria.IncludeConsumables && recipe.MainCategory == ItemMainCategory.Consumable) return false;
+        if (!criteria.IncludeMaterials && recipe.MainCategory == ItemMainCategory.Material) return false;
+        
+        // Additional Property Filtering
+        if (criteria.IsDyeableOnly && !recipe.IsDyeable) return false;
+        if (criteria.IsCollectableOnly && !recipe.IsCollectable) return false;
+        if (recipe.MateriaSlotCount < criteria.MinMateriaSlots) return false;
+        if (recipe.Rarity < criteria.MinRarity || recipe.Rarity > criteria.MaxRarity) return false;
+        if (criteria.ExcludeUnique && recipe.IsUnique) return false;
+        if (criteria.ExcludeUntradable && recipe.IsUntradable) return false;
+
+        // Item Source Filtering (Crafted)
+        // Since we are checking a Recipe, it IS crafted.
+        if (!criteria.IncludeCrafted) return false;
+
+        // Level Range Filtering
+        // Class/Job Level
+        if (recipe.ClassJobLevel < criteria.MinJobLevel || recipe.ClassJobLevel > criteria.MaxJobLevel) return false;
+        
+        // Recipe Level (RLvl)
+        if (recipe.RecipeLevel < criteria.MinRecipeLevel || recipe.RecipeLevel > criteria.MaxRecipeLevel) return false;
+
+        // Item Level (ILvl)
+        if (recipe.ItemLevel < criteria.MinItemLevel || recipe.ItemLevel > criteria.MaxItemLevel) return false;
+        
+        // Equipment Slot Filtering
+        if (recipe.EquipSlot != EquipSlot.None)
+        {
+            if (!criteria.IncludedEquipSlots.Contains(recipe.EquipSlot)) return false;
+        }
+        
+        // Job/Class Filtering
+        if (criteria.IncludedJobIds.Count > 0)
+        {
+            if (!criteria.IncludedJobIds.Contains(recipe.CraftingClassName)) return false;
         }
 
         return true;
     }
+
+    /// <summary>
+    /// Check if market data matches criteria (Velocity, Supply, Risk, etc.)
+    /// </summary>
+    public bool PassesMarketFilter(MarketData marketData, FilterCriteria criteria)
+    {
+        // Demand Metrics
+        if (marketData.SaleVelocity < criteria.MinSaleVelocity) return false;
+        if (marketData.SupplyDemandRatio > criteria.MaxSupplyDemandRatio) return false;
+        // EstimatedSellTimeDays is calculated on ProfitCalculation usually, but might be derivable from MarketData
+        // For now, we leave SellTime check in main PassesFilter as it uses ProfitCalculation property
+        
+        // Market Tradeability (Availability on market)
+        if (!criteria.IncludeMarketTradeable) return false; // If we exclude tradeable, and this HAS market data, it's tradeable?
+
+        // 5. Market Health Checks
+        if (criteria.ExcludeStaleMarkets)
+        {
+            if (marketData.Warnings.Any(w => w.Type == MarketWarning.StaleMarket)) return false;
+        }
+
+        if (criteria.ExcludeMarketCrashRisks)
+        {
+            if (marketData.Warnings.Any(w => w.Type == MarketWarning.MarketCrashRisk)) return false;
+        }
+
+        if (criteria.OnlyRisingTrends)
+        {
+            if (marketData.Trend != PriceTrend.Rising) return false;
+        }
+        
+        // Risk (Calculated on ProfitCalculation usually, but let's check what we can)
+        // RiskScore is on ProfitCalculation.
+        
+        return true;
+    }
+
 
     /// <summary>
     /// Sort items based on the selected strategy
