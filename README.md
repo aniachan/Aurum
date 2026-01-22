@@ -90,18 +90,7 @@ Recommendation: ❌ AVOID - Try something else!
 - `/aurum` - Open main dashboard
 - `/aurum config` - Open settings
 
-### Dashboard Features
-- **Search & Filter** - Find recipes by name, class, level
-- **Sort Options** - By profit, margin, gil/hour, demand, recommendation score
-- **Risk Indicators** - Color-coded risk levels with warnings
-- **Detail View** - Click any item for in-depth analysis
-- **Charts** - Price history, volume trends, market health
-
-### Configuration
-- **Cost Modes**: Market board, vendor, cheapest, self-gathered
-- **Risk Tolerance**: Filter by acceptable risk level
-- **Cache Duration**: Adjust API refresh rate (default 5 minutes)
-- **Display Options**: UI scale, chart animations
+See the [User Guide](docs/USER_GUIDE.md) for detailed usage instructions.
 
 ---
 
@@ -126,6 +115,8 @@ Aurum/
 │   └── ConfigWindow.cs      # Settings
 └── Configuration.cs  # Plugin settings
 ```
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for more details.
 
 ### Technologies
 - **.NET 10.0** with C# 12
@@ -181,21 +172,13 @@ Max Safe = Until supply ratio hits 7.0 (oversupply threshold)
 
 ## 🤝 Contributing
 
-Contributions are welcome! This plugin aims to help the FFXIV crafting community make better decisions.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ### Development Setup
 1. Install .NET 10 SDK
 2. Clone the repo
 3. Open `Aurum.sln` in Visual Studio 2022 or Rider
 4. Build and test
-
-### Feature Ideas
-- [ ] Artisan IPC integration (one-click crafting)
-- [ ] Retainer price management
-- [ ] Discord alerts for price opportunities
-- [ ] Machine learning price predictions
-- [ ] Multi-world comparison
-- [ ] Portfolio diversification suggestions
 
 ---
 
@@ -217,7 +200,6 @@ This project is licensed under the AGPL-3.0 License - see [LICENSE.md](LICENSE.m
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/Aurum/issues)
-- **Discord**: Coming soon
 - **Wiki**: [Documentation](https://github.com/yourusername/Aurum/wiki)
 
 ---
