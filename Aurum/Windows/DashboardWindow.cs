@@ -257,74 +257,82 @@ public class DashboardWindow : Window, IDisposable
             _ = RefreshDataAsync();
         }
 
-        ImGui.SameLine();
-        if (ImGui.Button("📥 Export CSV"))
-        {
-            _ = ExportToCsvAsync();
-        }
-        
-        // Error Reporting Button (shows when an error has occurred recently)
-        if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
-        {
             ImGui.SameLine();
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (ImGui.Button($"{FontAwesomeIcon.Bug.ToIconString()}##ReportError"))
+            if (ImGui.Button("📥 Export CSV"))
             {
-                 // Open GitHub issues page with pre-filled title
-                 try 
-                 {
-                     var title = $"[Bug] Error: {lastErrorMessage}";
-                     var url = $"https://github.com/Dicklesworthstone/Aurum/issues/new?title={Uri.EscapeDataString(title)}&body=Describe%20what%20you%20were%20doing%20when%20this%20occurred...";
-                     
-                     Process.Start(new ProcessStartInfo
-                     {
-                         FileName = url,
-                         UseShellExecute = true
-                     });
-                 }
-                 catch { /* Ignore navigation errors */ }
+                _ = ExportToCsvAsync();
             }
-            ImGui.PopFont();
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Report this error on GitHub");
-        }
-        
-        // Stats row
-        if (profitResults.Any())
-        {
-            ImGui.Text($"Showing {filteredResults.Count} of {profitResults.Count} recipes");
             
-            var avgProfit = filteredResults.Any() ? (int)filteredResults.Average(p => p.RawProfit) : 0;
-            var profitText = $"Avg Profit: {FormatGil(avgProfit)}";
-            
-            // Calculate proper alignment for right-side stats
-            var cursorPos = ImGui.GetCursorPosX();
-            var availWidth = ImGui.GetContentRegionAvail().X;
-            
-            if (lastRefresh > DateTime.MinValue)
+            // Defer UI rendering until visible - Check visibility before complex drawing
+            // Note: ImGui.IsWindowCollapsed() checks if the window is collapsed (rolled up)
+            // But for simple visibility check we might just rely on the fact that if we are here, Draw() is being called.
+            // However, to be extra safe and optimize, we can check if we are collapsed.
+            // ImGui.IsWindowVisible() is not available in all bindings or versions, so let's stick to IsWindowCollapsed.
+            if (!ImGui.IsWindowCollapsed())
             {
-                var timeSinceRefresh = DateTime.UtcNow - lastRefresh;
-                var updateText = $"(Updated {timeSinceRefresh.TotalMinutes:F0}m ago)";
-                var padding = 10f; // Add some padding to the right
-                var combinedText = $"{profitText} {updateText}";
-                var textWidth = ImGui.CalcTextSize(combinedText).X + padding;
+                // Error Reporting Button (shows when an error has occurred recently)
+                if (!string.IsNullOrEmpty(lastErrorMessage) && (DateTime.UtcNow - lastErrorTime).TotalMinutes < 5)
+                {
+                    ImGui.SameLine();
+                    ImGui.PushFont(UiBuilder.IconFont);
+                    if (ImGui.Button($"{FontAwesomeIcon.Bug.ToIconString()}##ReportError"))
+                    {
+                         // Open GitHub issues page with pre-filled title
+                         try 
+                         {
+                             var title = $"[Bug] Error: {lastErrorMessage}";
+                             var url = $"https://github.com/Dicklesworthstone/Aurum/issues/new?title={Uri.EscapeDataString(title)}&body=Describe%20what%20you%20were%20doing%20when%20this%20occurred...";
+                             
+                             Process.Start(new ProcessStartInfo
+                             {
+                                 FileName = url,
+                                 UseShellExecute = true
+                             });
+                         }
+                         catch { /* Ignore navigation errors */ }
+                    }
+                    ImGui.PopFont();
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Report this error on GitHub");
+                }
                 
-                ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
-                ImGui.Text(profitText);
-                ImGui.SameLine(0, ImGui.GetStyle().ItemSpacing.X);
-                ImGui.TextDisabled(updateText);
-            }
-            else
-            {
-                var textWidth = ImGui.CalcTextSize(profitText).X;
-                ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
-                ImGui.Text(profitText);
+                // Stats row
+                if (profitResults.Any())
+                {
+                    ImGui.Text($"Showing {filteredResults.Count} of {profitResults.Count} recipes");
+                    
+                    var avgProfit = filteredResults.Any() ? (int)filteredResults.Average(p => p.RawProfit) : 0;
+                    var profitText = $"Avg Profit: {FormatGil(avgProfit)}";
+                    
+                    // Calculate proper alignment for right-side stats
+                    var cursorPos = ImGui.GetCursorPosX();
+                    var availWidth = ImGui.GetContentRegionAvail().X;
+                    
+                    if (lastRefresh > DateTime.MinValue)
+                    {
+                        var timeSinceRefresh = DateTime.UtcNow - lastRefresh;
+                        var updateText = $"(Updated {timeSinceRefresh.TotalMinutes:F0}m ago)";
+                        var padding = 10f; // Add some padding to the right
+                        var combinedText = $"{profitText} {updateText}";
+                        var textWidth = ImGui.CalcTextSize(combinedText).X + padding;
+                        
+                        ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
+                        ImGui.Text(profitText);
+                        ImGui.SameLine(0, ImGui.GetStyle().ItemSpacing.X);
+                        ImGui.TextDisabled(updateText);
+                    }
+                    else
+                    {
+                        var textWidth = ImGui.CalcTextSize(profitText).X;
+                        ImGui.SetCursorPosX(cursorPos + availWidth - textWidth);
+                        ImGui.Text(profitText);
+                    }
+                }
+                else
+                {
+                    ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Click 'Refresh' to load profit data");
+                }
             }
         }
-        else
-        {
-            ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Click 'Refresh' to load profit data");
-        }
-    }
     
     private void DrawFilters()
     {
