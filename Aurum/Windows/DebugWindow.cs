@@ -46,6 +46,12 @@ public class DebugWindow : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem("Rate Limiter"))
+            {
+                DrawRateLimiterTab();
+                ImGui.EndTabItem();
+            }
+
             if (ImGui.BeginTabItem("Cache & DB"))
             {
                 DrawDatabaseTab();
@@ -137,6 +143,84 @@ public class DebugWindow : Window, IDisposable
         else if (recentRequests == null)
         {
             ImGui.Text("Click Refresh to load logs.");
+        }
+    }
+
+    private void DrawRateLimiterTab()
+    {
+        ImGui.Text("Rate Limiter Status");
+        ImGui.Separator();
+
+        var limiter = plugin.RateLimiter;
+
+        // Current status overview
+        if (limiter.IsDegraded)
+        {
+            ImGui.TextColored(new Vector4(1, 0, 0, 1), "STATUS: DEGRADED / BACKOFF MODE");
+        }
+        else if (DateTime.UtcNow < limiter.PausedUntil)
+        {
+            var timeLeft = (limiter.PausedUntil - DateTime.UtcNow).TotalSeconds;
+            ImGui.TextColored(new Vector4(1, 0.5f, 0, 1), $"STATUS: PAUSED (Retry-After) - {timeLeft:F1}s");
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0, 1, 0, 1), "STATUS: HEALTHY");
+        }
+
+        ImGui.Dummy(new Vector2(0, 10));
+
+        // Real-time Metrics
+        ImGui.Columns(2, "RateLimitMetrics", false);
+        
+        ImGui.Text("Token Bucket:");
+        ImGui.ProgressBar((float)(limiter.CurrentTokens / limiter.MaxTokens), new Vector2(-1, 0), $"{limiter.CurrentTokens:F1} / {limiter.MaxTokens:F0}");
+        ImGui.Text($"Refill Rate: {limiter.RefillRate:F2} tokens/sec");
+        
+        ImGui.NextColumn();
+        
+        ImGui.Text("Queue:");
+        ImGui.Text($"Waiting Requests: {limiter.WaitingRequests}");
+        ImGui.Text($"Processing Rate: {limiter.RequestsLastMinute / 60.0:F2} req/sec (avg 1m)");
+
+        ImGui.Columns(1);
+        ImGui.Separator();
+
+        // Statistics
+        if (ImGui.BeginTable("RateStats", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Metric", ImGuiTableColumnFlags.WidthFixed, 150);
+            ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthStretch);
+            
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Total Requests");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.TotalRequests}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Rate Limited (Internal)");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.RateLimitedRequests}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Total Errors");
+            ImGui.TableNextColumn(); ImGui.TextColored(limiter.TotalErrors > 0 ? new Vector4(1, 0.5f, 0, 1) : new Vector4(1, 1, 1, 1), $"{limiter.TotalErrors}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Total Retries");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.TotalRetries}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Last Minute");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.RequestsLastMinute}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Last Hour");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.RequestsLastHour}");
+
+            ImGui.TableNextRow();
+            ImGui.TableNextColumn(); ImGui.Text("Today");
+            ImGui.TableNextColumn(); ImGui.Text($"{limiter.RequestsToday}");
+
+            ImGui.EndTable();
         }
     }
 

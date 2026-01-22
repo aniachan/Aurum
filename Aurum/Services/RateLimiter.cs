@@ -46,6 +46,7 @@ public class RateLimiter : IDisposable
 
     private DateTime _pausedUntil = DateTime.MinValue;
     private DateTime _lastAlertTime = DateTime.MinValue;
+    private int _waitingRequests;
 
     public long TotalErrors { get; private set; }
     public long TotalRetries { get; private set; }
@@ -60,6 +61,9 @@ public class RateLimiter : IDisposable
     }
 
     public double MaxTokens => _maxTokens;
+    public double RefillRate => _refillRatePerSecond;
+    public DateTime PausedUntil => _pausedUntil;
+    public int WaitingRequests => _waitingRequests;
 
     public int RequestsLastMinute 
     { 
@@ -172,10 +176,13 @@ public class RateLimiter : IDisposable
     /// </summary>
     public virtual async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default, RequestPriority priority = RequestPriority.Normal)
     {
-        // Simple loop with delay
-        while (true)
+        Interlocked.Increment(ref _waitingRequests);
+        try 
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            // Simple loop with delay
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
             // Check if paused (e.g. due to 429)
             DateTime pausedUntil;
@@ -260,6 +267,11 @@ public class RateLimiter : IDisposable
             
             // log.Debug($"Rate limited. Waiting {waitTimeMs}ms...");
             await Task.Delay(waitTimeMs, cancellationToken);
+        }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _waitingRequests);
         }
     }
     
