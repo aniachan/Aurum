@@ -21,9 +21,17 @@ public class DatabaseService : IDisposable
     {
         this.log = log;
         
-        this.dbFilePath = Path.Combine(pluginDir, "aurum.db");
-        // Enable pooling explicitly, though it is often default.
-        this.connectionString = $"Data Source={dbFilePath};Pooling=True";
+        if (pluginDir == ":memory:")
+        {
+            this.dbFilePath = ":memory:";
+            this.connectionString = "Data Source=:memory:";
+        }
+        else
+        {
+            this.dbFilePath = Path.Combine(pluginDir, "aurum.db");
+            // Enable pooling explicitly, though it is often default.
+            this.connectionString = $"Data Source={dbFilePath};Pooling=True";
+        }
         
         log.Information($"Initializing database at: {dbFilePath}");
         
@@ -907,7 +915,11 @@ public class DatabaseService : IDisposable
         }
     }
     
-    public void LogApiRequest(string endpoint, DateTime timestamp, long responseTimeMs, int statusCode, bool success)
+    /// <summary>
+    /// Log API request for debugging and rate limiting analysis.
+    /// Virtual for testing/mocking.
+    /// </summary>
+    public virtual void LogApiRequest(string endpoint, DateTime timestamp, long responseTimeMs, int statusCode, bool success)
     {
         // Don't block the main thread for logging
         lock (dbLock)

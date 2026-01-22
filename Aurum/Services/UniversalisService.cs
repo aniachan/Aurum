@@ -592,6 +592,22 @@ public class UniversalisService : IDisposable
             target.TrySetResult(false);
     }
 
+    /// <summary>
+    /// Virtual method for Task.Delay to allow mocking in tests
+    /// </summary>
+    protected virtual Task Delay(int milliseconds, CancellationToken token)
+    {
+        return Task.Delay(milliseconds, token);
+    }
+    
+    /// <summary>
+    /// Virtual method for Task.Delay to allow mocking in tests
+    /// </summary>
+    protected virtual Task Delay(TimeSpan delay, CancellationToken token)
+    {
+        return Task.Delay(delay, token);
+    }
+
     private async Task ProcessQueueAsync()
     {
         log.Info("UniversalisService queue processor started");
@@ -602,7 +618,7 @@ public class UniversalisService : IDisposable
             // This allows requests to queue up without hammering the API until it recovers.
             if (rateLimiter.IsDegraded)
             {
-                await Task.Delay(5000, disposeCts.Token);
+                await Delay(5000, disposeCts.Token);
                 continue;
             }
 
@@ -636,7 +652,7 @@ public class UniversalisService : IDisposable
                 concurrencySemaphore.Release();
                 try 
                 {
-                    await Task.Delay(100, disposeCts.Token);
+                    await Delay(100, disposeCts.Token);
                 }
                 catch (OperationCanceledException) { break; }
                 continue;
@@ -674,7 +690,7 @@ public class UniversalisService : IDisposable
             // Wait for potential coalescing
             try 
             {
-                await Task.Delay(100, disposeCts.Token);
+                await Delay(100, disposeCts.Token);
             }
             catch (OperationCanceledException) { return; }
 
@@ -781,7 +797,7 @@ public class UniversalisService : IDisposable
                     break;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
+                await Delay(TimeSpan.FromSeconds(retryAfterSeconds), disposeCts.Token);
             }
             catch (HttpRequestException ex) when ((int)(ex.StatusCode ?? 0) >= 500)
             {
@@ -799,7 +815,8 @@ public class UniversalisService : IDisposable
                 // Exponential backoff: 1s, 2s, 4s
                 var delaySeconds = Math.Pow(2, retryCount - 1);
                 log.Warning($"API request failed (Attempt {retryCount}/{maxRetries}). Retrying in {delaySeconds}s...");
-                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), disposeCts.Token);
+                
+                await Delay(TimeSpan.FromSeconds(delaySeconds), disposeCts.Token);
             }
             catch (Exception ex)
             {
@@ -815,14 +832,11 @@ public class UniversalisService : IDisposable
     /// <summary>
     /// Internal method to fetch a single item (bypass queue logic)
     /// </summary>
-    private async Task<MarketData?> FetchSingleItemInternalAsync(string worldName, uint itemId)
+    public virtual async Task<MarketData?> FetchSingleItemInternalAsync(string worldName, uint itemId)
     {
         var url = $"{BaseUrl}/{worldName}/{itemId}?listings=20&entries=50";
         log.Info($"Fetching market data: {url}");
         
-        // Update timeout based on config before request
-        httpClient.Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30);
-
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var statusCode = 0;
         var success = false;
@@ -899,9 +913,6 @@ public class UniversalisService : IDisposable
             var itemList = string.Join(",", itemIds);
             var url = $"{BaseUrl}/{worldName}/{itemList}?listings=20&entries=50";
             
-            // Update timeout based on config before request
-            httpClient.Timeout = TimeSpan.FromSeconds(configuration.ApiRequestTimeoutSeconds > 0 ? configuration.ApiRequestTimeoutSeconds : 30);
-
             log.Info($"Fetching batch market data for {itemIds.Count} items");
 
             var response = await httpClient.GetAsync(url, disposeCts.Token);

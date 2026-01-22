@@ -26,7 +26,7 @@ public class CacheService
     /// <summary>
     /// Try to get a cached value
     /// </summary>
-    public bool TryGet<T>(string key, out T? value) where T : class
+    public virtual bool TryGet<T>(string key, out T? value) where T : class
     {
         lock (lockObject)
         {
@@ -62,7 +62,7 @@ public class CacheService
     /// <summary>
     /// Set a cached value with default TTL from config
     /// </summary>
-    public void Set<T>(string key, T value) where T : class
+    public virtual void Set<T>(string key, T value) where T : class
     {
         Set(key, value, TimeSpan.FromSeconds(config.MarketDataCacheDurationSeconds));
     }
@@ -70,7 +70,7 @@ public class CacheService
     /// <summary>
     /// Set a cached value with custom TTL
     /// </summary>
-    public void Set<T>(string key, T value, TimeSpan ttl) where T : class
+    public virtual void Set<T>(string key, T value, TimeSpan ttl) where T : class
     {
         lock (lockObject)
         {

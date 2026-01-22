@@ -134,7 +134,7 @@ public class RateLimiter : IDisposable
     /// Pauses all requests until the specified time.
     /// Used when encountering HTTP 429 Too Many Requests.
     /// </summary>
-    public void PauseRequestsUntil(DateTime until)
+    public virtual void PauseRequestsUntil(DateTime until)
     {
         lock (_lock)
         {
@@ -170,7 +170,7 @@ public class RateLimiter : IDisposable
     /// Waits until a token is available to make a request.
     /// Thread-safe.
     /// </summary>
-    public async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default, RequestPriority priority = RequestPriority.Normal)
+    public virtual async Task WaitForTokenAsync(string? endpoint = null, CancellationToken cancellationToken = default, RequestPriority priority = RequestPriority.Normal)
     {
         // Simple loop with delay
         while (true)
@@ -263,7 +263,7 @@ public class RateLimiter : IDisposable
         }
     }
     
-    public void RecordError()
+    public virtual void RecordError()
     {
         TotalErrors++;
         
@@ -292,7 +292,7 @@ public class RateLimiter : IDisposable
         }
     }
 
-    public void RecordRetry()
+    public virtual void RecordRetry()
     {
         TotalRetries++;
     }
