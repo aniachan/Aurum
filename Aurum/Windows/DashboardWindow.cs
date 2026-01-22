@@ -40,9 +40,8 @@ public class DashboardWindow : Window, IDisposable
     private string? sortColumn = null;
     private bool sortAscending = false;
     
-    // Pagination
-    private int currentPage = 1;
-    // private int itemsPerPage = 50; // Removed in favor of config
+    // Pagination - Removed in favor of Virtualization
+    // private int currentPage = 1; 
     
     private readonly string[] craftingClasses = { "All", "CRP", "BSM", "ARM", "GSM", "LTW", "WVR", "ALC", "CUL" };
     private string lastErrorMessage = string.Empty;
@@ -604,39 +603,18 @@ public class DashboardWindow : Window, IDisposable
             return;
         }
 
-        // Pagination controls
-        int itemsPerPage = plugin.Configuration.RowsPerPage;
-        int totalPages = (int)Math.Ceiling(filteredResults.Count / (double)itemsPerPage);
-        currentPage = Math.Clamp(currentPage, 1, totalPages);
-        
-        ImGui.Text($"Page {currentPage} of {totalPages} ({filteredResults.Count} items)");
-        ImGui.SameLine();
-        if (ImGui.Button("<") && currentPage > 1) currentPage--;
-        ImGui.SameLine();
-        if (ImGui.Button(">") && currentPage < totalPages) currentPage++;
-        
-        ImGui.SameLine();
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 20); // Add some spacing
-        ImGui.Text("Rows per page:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(100);
-        int rowsPerPage = plugin.Configuration.RowsPerPage;
-        if (ImGui.InputInt("##RowsPerPage", ref rowsPerPage))
-        {
-            rowsPerPage = Math.Clamp(rowsPerPage, 5, 200);
-            if (rowsPerPage != plugin.Configuration.RowsPerPage)
-            {
-                plugin.Configuration.RowsPerPage = rowsPerPage;
-                plugin.Configuration.Save();
-            }
-        }
+        // Virtualization: We render all items in a scrolling list using ListClipper
+        // This is much more performant than pagination for large lists in ImGui
         
         // Table header
         // Count visible columns to set table column count correctly
         var allColumns = new[] { "Item", "Class", "Profit", "Margin", "Gil/Hr", "Demand", "Risk", "Score", "Actions" };
         var visibleColumns = allColumns.Where(c => !plugin.Configuration.HiddenColumns.Contains(c)).ToList();
         
-        if (ImGui.BeginTable("ProfitTable", visibleColumns.Count, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY))
+        // Use a child window to constrain height for scrolling if not already in one (though Draw() calls us inside a child)
+        // But the table itself handles scrolling via ScrollY flag.
+        
+        if (ImGui.BeginTable("ProfitTable", visibleColumns.Count, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable | ImGuiTableFlags.Reorderable | ImGuiTableFlags.Hideable))
         {
             ImGui.TableSetupScrollFreeze(0, 1);
             
@@ -700,14 +678,42 @@ public class DashboardWindow : Window, IDisposable
                 ImGui.Text("Actions");
             }
             
-            // Draw rows
-            var pageItems = filteredResults
-                .Skip((currentPage - 1) * itemsPerPage)
-                .Take(itemsPerPage);
-                
-            foreach (var profit in pageItems)
+            // VIRTUALIZATION (Manual)
+            // Using manual virtualization since bindings vary
+            
+            float itemHeight = ImGui.GetTextLineHeight() + (ImGui.GetStyle().CellPadding.Y * 2); 
+            int totalItems = filteredResults.Count;
+            
+            // We are inside a child window "ListRegion", so GetScrollY works for the list
+            float scrollY = ImGui.GetScrollY();
+            float viewHeight = ImGui.GetWindowHeight();
+            
+            int displayStart = (int)(scrollY / itemHeight);
+            int displayEnd = displayStart + (int)(viewHeight / itemHeight) + 5; // Extra buffer
+            
+            displayStart = Math.Clamp(displayStart, 0, totalItems);
+            displayEnd = Math.Clamp(displayEnd, 0, totalItems);
+            
+            // Top spacer
+            if (displayStart > 0)
             {
-                DrawProfitRow(profit);
+                ImGui.TableNextRow(ImGuiTableRowFlags.None, displayStart * itemHeight);
+            }
+            
+            // Draw visible items
+            for (int i = displayStart; i < displayEnd; i++)
+            {
+                if (i < filteredResults.Count)
+                {
+                    DrawProfitRow(filteredResults[i]);
+                }
+            }
+            
+            // Bottom spacer
+            if (displayEnd < totalItems)
+            {
+                float remainingHeight = (totalItems - displayEnd) * itemHeight;
+                ImGui.TableNextRow(ImGuiTableRowFlags.None, remainingHeight);
             }
             
             ImGui.EndTable();
@@ -1147,8 +1153,8 @@ public class DashboardWindow : Window, IDisposable
             return true;
         }).ToList();
         
-        // Reset page on filter change
-        currentPage = 1;
+        // Reset page (not used anymore but kept for logic structure if needed later)
+        // currentPage = 1;
         
         // Apply column-based sorting if active
         if (sortColumn != null)
