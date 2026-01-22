@@ -272,7 +272,12 @@ public class ProfitService
     /// <summary>
     /// Build complete ingredient tree with costs resolved recursively
     /// </summary>
-    private async Task<IngredientTree> BuildIngredientTreeAsync(RecipeData recipe, string worldName, CostMode? overrideMode = null)
+    private async Task<IngredientTree> BuildIngredientTreeAsync(
+        RecipeData recipe, 
+        string worldName, 
+        CostMode? overrideMode = null,
+        int depth = 0,
+        HashSet<uint>? existingProcessedItems = null)
     {
         var tree = new IngredientTree
         {
@@ -281,12 +286,12 @@ public class ProfitService
             CalculationMode = overrideMode ?? config.DefaultCostMode
         };
         
-        var processedItems = new HashSet<uint>(); // Prevent cycles
+        var processedItems = existingProcessedItems ?? new HashSet<uint>(); // Prevent cycles
         
         // Process regular ingredients
         foreach (var ingredient in recipe.Ingredients)
         {
-            var cost = await CalculateIngredientCostAsync(ingredient, worldName, processedItems, 0, overrideMode);
+            var cost = await CalculateIngredientCostAsync(ingredient, worldName, processedItems, depth, overrideMode);
             tree.RootIngredients.Add(cost);
             AddToFlatList(tree.FlatIngredientList, cost);
         }
@@ -294,7 +299,7 @@ public class ProfitService
         // Process crystals (usually cheap, often vendor-bought)
         foreach (var crystal in recipe.Crystals)
         {
-            var cost = await CalculateIngredientCostAsync(crystal, worldName, processedItems, 0, overrideMode);
+            var cost = await CalculateIngredientCostAsync(crystal, worldName, processedItems, depth, overrideMode);
             tree.RootIngredients.Add(cost);
             AddToFlatList(tree.FlatIngredientList, cost);
         }
@@ -357,8 +362,18 @@ public class ProfitService
                 break;
                 
             case CostMode.Vendor:
-                cost.UnitCost = GetVendorPrice(ingredient.ItemId);
-                cost.Source = CostSource.Vendor;
+                var price = GetVendorPrice(ingredient.ItemId);
+                if (price > 0)
+                {
+                    cost.UnitCost = price;
+                    cost.Source = CostSource.Vendor;
+                }
+                else
+                {
+                    // Fallback to market if no vendor price
+                    cost.UnitCost = await GetMarketPriceAsync(ingredient.ItemId, worldName);
+                    cost.Source = CostSource.MarketBoard;
+                }
                 break;
                 
             case CostMode.Cheapest:
@@ -390,7 +405,8 @@ public class ProfitService
             if (subRecipe != null)
             {
                 // Calculate crafting cost for this sub-recipe
-                var subTree = await BuildIngredientTreeAsync(subRecipe, worldName, overrideMode);
+                // Pass current recursion depth and processed items to prevent cycles
+                var subTree = await BuildIngredientTreeAsync(subRecipe, worldName, overrideMode, depth + 1, processedItems);
                 var craftCost = subTree.TotalCost / (uint)subRecipe.ResultAmount;
                 
                 // Use whichever is cheaper (craft or buy)

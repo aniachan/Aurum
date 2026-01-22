@@ -248,7 +248,7 @@ public class UniversalisService : IDisposable
     /// <summary>
     /// Fetch market data for a single item
     /// </summary>
-    public async Task<MarketData?> GetMarketDataAsync(string worldName, uint itemId)
+    public virtual async Task<MarketData?> GetMarketDataAsync(string worldName, uint itemId)
     {
         // Auto-detect world ID if not yet set
         EnsureWorldId(worldName);
