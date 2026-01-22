@@ -75,6 +75,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 4) ApplyMigration(connection, 4, Migration_4_AddSupplyDemandMetrics);
             if (currentVersion < 5) ApplyMigration(connection, 5, Migration_5_AddGilPerHourColumn);
             if (currentVersion < 6) ApplyMigration(connection, 6, Migration_6_AddApiPayloadSize);
+            if (currentVersion < 7) ApplyMigration(connection, 7, Migration_7_AddArbitrageHistory);
             
             log.Information("Database initialization complete");
         }
@@ -270,6 +271,30 @@ public class DatabaseService : IDisposable
             ExecuteNonQuery(connection, addPayloadSize, transaction);
         }
         catch { /* Column might already exist, ignore */ }
+    }
+    
+    private void Migration_7_AddArbitrageHistory(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add Arbitrage History Table
+        // Tracks historical arbitrage opportunities
+        var createArbitrageHistoryTable = @"
+            CREATE TABLE IF NOT EXISTS ArbitrageHistory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                home_world_id INTEGER NOT NULL,
+                target_world_id INTEGER NOT NULL,
+                timestamp INTEGER NOT NULL,
+                profit INTEGER NOT NULL,
+                roi REAL NOT NULL,
+                buy_price INTEGER NOT NULL,
+                sell_price INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                travel_cost INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_arbitrage_history_item ON ArbitrageHistory(item_id);
+            CREATE INDEX IF NOT EXISTS idx_arbitrage_history_timestamp ON ArbitrageHistory(timestamp);
+        ";
+        ExecuteNonQuery(connection, createArbitrageHistoryTable, transaction);
     }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
@@ -778,11 +803,62 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@ingredientsJson", JsonSerializer.Serialize(recipe.Ingredients));
                 
                 command.ExecuteNonQuery();
+
+                // Record Arbitrage Opportunity if profitable
+                if (profit.ArbitrageProfit > 0 && !string.IsNullOrEmpty(profit.CheapestWorldName))
+                {
+                    // Need to resolve World IDs. We don't have UniversalisService here to resolve names.
+                    // But we can store names if we change schema or just skip for now?
+                    // Actually, we should probably add a method to record arbitrage separately or pass in world IDs.
+                    
+                    // For now, let's just log it if we can resolve IDs, or maybe we update RecordArbitrageOpportunity separately.
+                }
+
                 transaction.Commit();
             }
             catch (Exception ex)
             {
                 log.Error(ex, $"Failed to upsert recipe cache for recipe {recipe.RecipeId}");
+            }
+        }
+    }
+    
+    public void RecordArbitrageOpportunity(uint itemId, int homeWorldId, int targetWorldId, int profit, float roi, int buyPrice, int sellPrice, int quantity, int travelCost)
+    {
+        lock (dbLock)
+        {
+            try
+            {
+                using var connection = GetConnection();
+                connection.Open();
+                using var command = connection.CreateCommand();
+                
+                command.CommandText = @"
+                    INSERT INTO ArbitrageHistory (
+                        item_id, home_world_id, target_world_id, timestamp, 
+                        profit, roi, buy_price, sell_price, quantity, travel_cost
+                    ) VALUES (
+                        @itemId, @homeId, @targetId, @timestamp,
+                        @profit, @roi, @buyPrice, @sellPrice, @quantity, @travelCost
+                    );
+                ";
+                
+                command.Parameters.AddWithValue("@itemId", itemId);
+                command.Parameters.AddWithValue("@homeId", homeWorldId);
+                command.Parameters.AddWithValue("@targetId", targetWorldId);
+                command.Parameters.AddWithValue("@timestamp", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                command.Parameters.AddWithValue("@profit", profit);
+                command.Parameters.AddWithValue("@roi", roi);
+                command.Parameters.AddWithValue("@buyPrice", buyPrice);
+                command.Parameters.AddWithValue("@sellPrice", sellPrice);
+                command.Parameters.AddWithValue("@quantity", quantity);
+                command.Parameters.AddWithValue("@travelCost", travelCost);
+                
+                command.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex, $"Failed to record arbitrage opportunity for item {itemId}");
             }
         }
     }

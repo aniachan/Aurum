@@ -77,6 +77,35 @@ public class ProfitService
                     // Set item priority based on recommendation score
                     var priority = Math.Max(1, profit.RecommendationScore);
                     Plugin.Instance?.DatabaseService?.UpsertItemPriority((int)recipe.ResultItemId, priority);
+                    
+                    // Track historical arbitrage (Aurum-ykb.2.4)
+                    if (profit.ArbitrageProfit > 0 && !string.IsNullOrEmpty(profit.CheapestWorldName))
+                    {
+                        var homeWorldId = universalisService.GetWorldIdByName(worldName);
+                        var targetWorldId = universalisService.GetWorldIdByName(profit.CheapestWorldName);
+                        
+                        if (homeWorldId != 0 && targetWorldId != 0)
+                        {
+                            // Calculate simple ROI for arbitrage
+                            float roi = 0;
+                            if (profit.CheapestWorldPrice > 0)
+                            {
+                                roi = (float)profit.ArbitrageProfit / ((float)profit.CheapestWorldPrice + profit.CrossWorldTravelCost) * 100f;
+                            }
+                            
+                            Plugin.Instance?.DatabaseService?.RecordArbitrageOpportunity(
+                                recipe.ResultItemId, 
+                                homeWorldId, 
+                                targetWorldId, 
+                                profit.ArbitrageProfit, 
+                                roi, 
+                                (int)profit.CheapestWorldPrice, 
+                                (int)profit.ExpectedSalePrice, 
+                                1, // Quantity 1 for unit analysis
+                                profit.CrossWorldTravelCost
+                            );
+                        }
+                    }
                 }
                 catch (Exception cacheEx)
                 {
