@@ -693,13 +693,10 @@ public class DashboardWindow : Window, IDisposable
     
     private void DrawProfitList()
     {
-        if (!filteredResults.Any())
+        // If no data at all, show message (but allow table to show while loading if we have partial results)
+        if (!filteredResults.Any() && !isLoading)
         {
-            if (isLoading)
-            {
-                ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Loading market data...");
-            }
-            else if (!profitResults.Any())
+            if (!profitResults.Any())
             {
                 ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1f), "No data loaded. Click 'Refresh' to analyze the market.");
             }
@@ -1123,7 +1120,16 @@ public class DashboardWindow : Window, IDisposable
 
     private async Task RefreshDataAsync()
     {
-        if (isLoading) return;
+        // If already loading, cancel the previous operation and allow restart
+        if (isLoading)
+        {
+            Plugin.Log.Warning("Refresh already in progress - cancelling previous operation");
+            refreshCts?.Cancel();
+            refreshCts?.Dispose();
+            refreshCts = null;
+            isLoading = false;
+            await Task.Delay(100); // Give a moment for cleanup
+        }
         
         isLoading = true;
         profitResults.Clear();
@@ -1131,6 +1137,7 @@ public class DashboardWindow : Window, IDisposable
         
         // Cancel previous refresh if any
         refreshCts?.Cancel();
+        refreshCts?.Dispose();
         refreshCts = new CancellationTokenSource();
         
         try
@@ -1199,6 +1206,7 @@ public class DashboardWindow : Window, IDisposable
                         lastErrorMessage = $"No recipes found for {selectedExpansion.GetDisplayName()}";
                         lastErrorSuggestion = "Try selecting a different expansion.";
                         lastErrorTime = DateTime.UtcNow;
+                        isLoading = false;
                         return;
                     }
                     
@@ -1292,7 +1300,7 @@ public class DashboardWindow : Window, IDisposable
         }
         catch (OperationCanceledException)
         {
-            Plugin.Log.Information("Refresh cancelled");
+            Plugin.Log.Information("Refresh cancelled by user or timeout");
         }
         catch (Exception ex)
         {
@@ -1303,6 +1311,7 @@ public class DashboardWindow : Window, IDisposable
         }
         finally
         {
+            Plugin.Log.Debug("RefreshDataAsync finally block - resetting isLoading");
             isLoading = false;
             refreshCts?.Dispose();
             refreshCts = null;

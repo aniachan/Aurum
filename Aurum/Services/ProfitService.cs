@@ -209,9 +209,20 @@ public class ProfitService
                         return;
                     }
                     
-                    marketAnalysisService.AnalyzeMarket(marketData);
-                    var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName);
-                    var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
+                    log.Debug($"Processing recipe: {recipe.ItemName} (ID: {recipe.RecipeId})");
+                    
+                    // Add timeout to prevent hanging indefinitely
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+                    
+                    try
+                    {
+                        marketAnalysisService.AnalyzeMarket(marketData);
+                        log.Debug($"Building ingredient tree for: {recipe.ItemName}");
+                        var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName);
+                        log.Debug($"Calculating profit for: {recipe.ItemName}");
+                        var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
+                        log.Debug($"Completed profit calc for: {recipe.ItemName}");
                     
                     if (profit != null)
                     {
@@ -233,6 +244,11 @@ public class ProfitService
                     else
                     {
                         log.Debug($"Profit calculation returned null for {recipe.ItemName} (ID: {recipe.ResultItemId})");
+                    }
+                    }
+                    catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+                    {
+                        log.Warning($"Timeout calculating profit for {recipe.ItemName} - skipping");
                     }
                 }
                 catch (Exception ex)
@@ -662,13 +678,14 @@ public class ProfitService
         var totalTimeSeconds = craftTimeSeconds + gatheringTimeSeconds;
         var totalTimeHours = totalTimeSeconds / 3600f;
         
-        // Add estimated sell time to get realistic gil/hour
-        // Convert sell time from days to hours
-        var sellTimeHours = marketData.EstimatedSellTimeDays * 24f;
-        var totalTimeWithSellHours = totalTimeHours + sellTimeHours;
+        // Calculate realistic gil/hour based on market velocity
+        // Formula: profit × items_sold_per_hour
+        // Sale velocity is in items/day, convert to items/hour
+        var saleVelocityPerHour = marketData.SaleVelocity / 24f;
         
-        calculation.GilPerHour = totalTimeWithSellHours > 0 
-            ? (int)(calculation.RawProfit / totalTimeWithSellHours)
+        // Gil/hour = profit per item × how many you can sell per hour
+        calculation.GilPerHour = saleVelocityPerHour > 0 
+            ? (int)(calculation.RawProfit * saleVelocityPerHour)
             : 0;
         
         // Calculate profit score (0-100 based on profit alone)
