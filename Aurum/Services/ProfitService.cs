@@ -159,16 +159,30 @@ public class ProfitService
         var recipeList = recipes.ToList();
         if (!recipeList.Any()) yield break;
 
+        // Deduplicate recipes by ResultItemId - prefer higher level recipes for the same item
+        var uniqueRecipes = recipeList
+            .GroupBy(r => r.ResultItemId)
+            .Select(g => g.OrderByDescending(r => r.RecipeLevel).First())
+            .ToList();
+        
+        log.Information($"Deduplicated {recipeList.Count} recipes to {uniqueRecipes.Count} unique items");
+
         // Process in chunks to balance network efficiency with streaming responsiveness
         int batchSize = config.ApiBatchSize > 0 ? config.ApiBatchSize : 20;
-        var chunks = recipeList.Chunk(batchSize);
+        var chunks = uniqueRecipes.Chunk(batchSize);
 
+        int chunkIndex = 0;
+        int totalChunks = (uniqueRecipes.Count + batchSize - 1) / batchSize;
+        
         foreach (var chunk in chunks)
         {
             if (cancellationToken.IsCancellationRequested) break;
 
+            chunkIndex++;
             var chunkList = chunk.ToList();
             var itemIds = chunkList.Select(r => r.ResultItemId).Distinct().ToList();
+            
+            log.Information($"Processing chunk {chunkIndex}/{totalChunks}: {itemIds.Count} unique items");
             
             // Fetch market data for this chunk
             Dictionary<uint, MarketData> marketDataDict;
@@ -191,6 +205,7 @@ public class ProfitService
                 {
                     if (!marketDataDict.TryGetValue(recipe.ResultItemId, out var marketData))
                     {
+                        log.Debug($"No market data returned for item {recipe.ItemName} (ID: {recipe.ResultItemId})");
                         return;
                     }
                     
@@ -215,6 +230,10 @@ public class ProfitService
 
                         chunkResults.Add(profit);
                     }
+                    else
+                    {
+                        log.Debug($"Profit calculation returned null for {recipe.ItemName} (ID: {recipe.ResultItemId})");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -222,6 +241,8 @@ public class ProfitService
                 }
             });
 
+            log.Information($"Chunk {chunkIndex}/{totalChunks} produced {chunkResults.Count} profit calculations from {chunkList.Count} recipes");
+            
             foreach (var result in chunkResults)
             {
                 yield return result;
@@ -641,8 +662,13 @@ public class ProfitService
         var totalTimeSeconds = craftTimeSeconds + gatheringTimeSeconds;
         var totalTimeHours = totalTimeSeconds / 3600f;
         
-        calculation.GilPerHour = totalTimeHours > 0 
-            ? (int)(calculation.RawProfit / totalTimeHours)
+        // Add estimated sell time to get realistic gil/hour
+        // Convert sell time from days to hours
+        var sellTimeHours = marketData.EstimatedSellTimeDays * 24f;
+        var totalTimeWithSellHours = totalTimeHours + sellTimeHours;
+        
+        calculation.GilPerHour = totalTimeWithSellHours > 0 
+            ? (int)(calculation.RawProfit / totalTimeWithSellHours)
             : 0;
         
         // Calculate profit score (0-100 based on profit alone)
@@ -877,10 +903,32 @@ public class ProfitService
     private int CalculateRecommendationScore(ProfitCalculation calc)
     {
         // Weighted scoring:
-        // 30% Profit Score
-        // 70% Demand Score (from market analysis)
+        // 25% Profit Score
+        // 60% Demand Score (from market analysis)
+        // 15% Efficiency (gil/hour normalized)
         
-        float score = (calc.ProfitScore * 0.3f) + (calc.DemandScore * 0.7f);
+        float score = (calc.ProfitScore * 0.25f) + (calc.DemandScore * 0.6f);
+        
+        // Add efficiency bonus based on gil/hour (normalize to 0-100 scale)
+        // Good gil/hour = 10k+, Excellent = 50k+
+        float efficiencyBonus = calc.GilPerHour switch
+        {
+            >= 50000 => 15f,
+            >= 20000 => 12f,
+            >= 10000 => 9f,
+            >= 5000 => 6f,
+            >= 2000 => 3f,
+            _ => 0f
+        };
+        score += efficiencyBonus;
+        
+        // Apply penalty for slow sell times
+        if (calc.EstimatedSellTimeDays > 7f)
+            score *= 0.4f; // Massive penalty for week+ sell time
+        else if (calc.EstimatedSellTimeDays > 3f)
+            score *= 0.6f; // Heavy penalty for 3-7 day sell time
+        else if (calc.EstimatedSellTimeDays > 1f)
+            score *= 0.8f; // Moderate penalty for 1-3 day sell time
         
         // Apply penalty for very high risk
         if (calc.RiskLevel == RiskLevel.VeryHigh)

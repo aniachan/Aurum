@@ -194,6 +194,17 @@ public class ConfigWindow : Window, IDisposable
         {
             ImGui.SetTooltip("Number of items to fetch in a single API call.\nUniversalis supports up to 100, but lower values may improve responsiveness.");
         }
+        
+        var maxRecipes = configuration.MaxRecipesToAnalyze;
+        if (ImGui.SliderInt("Max Recipes to Analyze", ref maxRecipes, 100, 5000))
+        {
+            configuration.MaxRecipesToAnalyze = maxRecipes;
+            configuration.Save();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Maximum number of recipes to fetch and analyze when refreshing.\nHigher values take longer but provide more comprehensive results.\nRecommended: 1000-2000 for balance between speed and coverage.");
+        }
 
         var timeout = configuration.ApiRequestTimeoutSeconds;
         if (ImGui.SliderInt("API Request Timeout (Seconds)", ref timeout, 5, 60))

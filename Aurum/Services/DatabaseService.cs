@@ -77,6 +77,7 @@ public class DatabaseService : IDisposable
             if (currentVersion < 6) ApplyMigration(connection, 6, Migration_6_AddApiPayloadSize);
             if (currentVersion < 7) ApplyMigration(connection, 7, Migration_7_AddArbitrageHistory);
             if (currentVersion < 8) ApplyMigration(connection, 8, Migration_8_AddArbitrageMetrics);
+            if (currentVersion < 9) ApplyMigration(connection, 9, Migration_9_AddProfitCacheFields);
             
             log.Information("Database initialization complete");
         }
@@ -168,7 +169,11 @@ public class DatabaseService : IDisposable
                 margin_snapshot REAL,
                 risk_score INTEGER,
                 recommendation_score INTEGER,
-                ingredients_json TEXT
+                ingredients_json TEXT,
+                expected_sale_price INTEGER DEFAULT 0,
+                total_craft_cost INTEGER DEFAULT 0,
+                market_board_tax INTEGER DEFAULT 0,
+                net_sale_price INTEGER DEFAULT 0
             );
         ";
         ExecuteNonQuery(connection, createRecipeCacheTable, transaction);
@@ -309,6 +314,36 @@ public class DatabaseService : IDisposable
         // Let's add an index on (home_world_id, target_world_id) for route analysis
         var createRouteIndex = "CREATE INDEX IF NOT EXISTS idx_arbitrage_route ON ArbitrageHistory(home_world_id, target_world_id);";
         ExecuteNonQuery(connection, createRouteIndex, transaction);
+    }
+
+    private void Migration_9_AddProfitCacheFields(SqliteConnection connection, SqliteTransaction transaction)
+    {
+        // Add missing critical fields to RecipeCache for proper profit display
+        // These fields are essential for showing accurate profit breakdowns to users
+        // Without these, cached data shows 0 for ExpectedSalePrice and TotalCraftCost
+        try
+        {
+            ExecuteNonQuery(connection, "ALTER TABLE RecipeCache ADD COLUMN expected_sale_price INTEGER DEFAULT 0;", transaction);
+        }
+        catch { /* Column might already exist */ }
+        
+        try
+        {
+            ExecuteNonQuery(connection, "ALTER TABLE RecipeCache ADD COLUMN total_craft_cost INTEGER DEFAULT 0;", transaction);
+        }
+        catch { /* Column might already exist */ }
+        
+        try
+        {
+            ExecuteNonQuery(connection, "ALTER TABLE RecipeCache ADD COLUMN market_board_tax INTEGER DEFAULT 0;", transaction);
+        }
+        catch { /* Column might already exist */ }
+        
+        try
+        {
+            ExecuteNonQuery(connection, "ALTER TABLE RecipeCache ADD COLUMN net_sale_price INTEGER DEFAULT 0;", transaction);
+        }
+        catch { /* Column might already exist */ }
     }
     
     private void ExecuteNonQuery(SqliteConnection connection, string sql, SqliteTransaction? transaction = null)
@@ -799,10 +834,12 @@ public class DatabaseService : IDisposable
                 command.CommandText = @"
                     INSERT OR REPLACE INTO RecipeCache (
                         recipe_id, item_id, last_analyzed, profit_snapshot, margin_snapshot, 
-                        risk_score, recommendation_score, gil_per_hour, ingredients_json
+                        risk_score, recommendation_score, gil_per_hour, ingredients_json,
+                        expected_sale_price, total_craft_cost, market_board_tax, net_sale_price
                     ) VALUES (
                         @recipeId, @itemId, @lastAnalyzed, @profit, @margin,
-                        @risk, @recommendation, @gilPerHour, @ingredientsJson
+                        @risk, @recommendation, @gilPerHour, @ingredientsJson,
+                        @expectedSalePrice, @totalCraftCost, @marketBoardTax, @netSalePrice
                     );
                 ";
 
@@ -815,6 +852,10 @@ public class DatabaseService : IDisposable
                 command.Parameters.AddWithValue("@recommendation", profit.RecommendationScore);
                 command.Parameters.AddWithValue("@gilPerHour", profit.GilPerHour);
                 command.Parameters.AddWithValue("@ingredientsJson", JsonSerializer.Serialize(recipe.Ingredients));
+                command.Parameters.AddWithValue("@expectedSalePrice", profit.ExpectedSalePrice);
+                command.Parameters.AddWithValue("@totalCraftCost", profit.TotalCraftCost);
+                command.Parameters.AddWithValue("@marketBoardTax", profit.MarketBoardTax);
+                command.Parameters.AddWithValue("@netSalePrice", profit.NetSalePrice);
                 
                 command.ExecuteNonQuery();
 
@@ -942,7 +983,8 @@ public class DatabaseService : IDisposable
                 using var command = connection.CreateCommand();
 
                 command.CommandText = @"
-                    SELECT profit_snapshot, margin_snapshot, risk_score, recommendation_score, last_analyzed
+                    SELECT profit_snapshot, margin_snapshot, risk_score, recommendation_score, last_analyzed,
+                           expected_sale_price, total_craft_cost, market_board_tax, net_sale_price
                     FROM RecipeCache
                     WHERE recipe_id = @recipeId
                 ";
@@ -959,6 +1001,10 @@ public class DatabaseService : IDisposable
                         ProfitMargin = reader.GetFloat(1),
                         RiskScore = reader.GetInt32(2),
                         RecommendationScore = reader.GetInt32(3),
+                        ExpectedSalePrice = reader.IsDBNull(5) ? 0u : (uint)reader.GetInt32(5),
+                        TotalCraftCost = reader.IsDBNull(6) ? 0u : (uint)reader.GetInt32(6),
+                        MarketBoardTax = reader.IsDBNull(7) ? 0u : (uint)reader.GetInt32(7),
+                        NetSalePrice = reader.IsDBNull(8) ? 0u : (uint)reader.GetInt32(8),
                         // We might want to add a Timestamp property to ProfitCalculation or just use it to validate freshness
                     };
                 }
@@ -985,7 +1031,8 @@ public class DatabaseService : IDisposable
                 var cutoffTime = DateTimeOffset.UtcNow.AddHours(-maxAgeHours).ToUnixTimeSeconds();
                 command.CommandText = @"
                     SELECT recipe_id, profit_snapshot, margin_snapshot, risk_score, 
-                           recommendation_score, gil_per_hour, last_analyzed
+                           recommendation_score, gil_per_hour, last_analyzed,
+                           expected_sale_price, total_craft_cost, market_board_tax, net_sale_price
                     FROM RecipeCache
                     WHERE last_analyzed > @cutoff
                     ORDER BY recommendation_score DESC
@@ -1005,6 +1052,10 @@ public class DatabaseService : IDisposable
                         RiskScore = reader.GetInt32(3),
                         RecommendationScore = reader.GetInt32(4),
                         GilPerHour = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+                        ExpectedSalePrice = reader.IsDBNull(7) ? 0u : (uint)reader.GetInt32(7),
+                        TotalCraftCost = reader.IsDBNull(8) ? 0u : (uint)reader.GetInt32(8),
+                        MarketBoardTax = reader.IsDBNull(9) ? 0u : (uint)reader.GetInt32(9),
+                        NetSalePrice = reader.IsDBNull(10) ? 0u : (uint)reader.GetInt32(10),
                     };
                     results.Add(((uint)reader.GetInt32(0), profit, reader.GetInt64(6)));
                 }

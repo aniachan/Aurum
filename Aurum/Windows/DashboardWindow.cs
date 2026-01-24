@@ -33,8 +33,15 @@ public class DashboardWindow : Window, IDisposable
     private int maxItemLevel = 999;
     private int minProfit = 0;
     private SortMode currentSort = SortMode.RecommendationScore;
-    private bool showOnlyProfitable = true;
+    private bool showOnlyProfitable = false; // Changed from true - show all items by default
     private DateTime lastRefresh = DateTime.MinValue;
+    
+    // Expansion filter
+    private bool useExpansionFilter = false;
+    private GameExpansion selectedExpansion = GameExpansion.Dawntrail;
+    
+    // Data mode: Live (fetch from API) vs Cached (use pre-downloaded data only)
+    private bool useCachedDataMode = false;
     
     // Column sorting
     private string? sortColumn = null;
@@ -233,17 +240,29 @@ public class DashboardWindow : Window, IDisposable
         float settingsWidth = ImGui.CalcTextSize("⚙️ Settings").X + ImGui.GetStyle().FramePadding.X * 2;
         float refreshWidth = ImGui.CalcTextSize("🔄 Refresh").X + ImGui.GetStyle().FramePadding.X * 2;
         float exportWidth = ImGui.CalcTextSize("📥 Export CSV").X + ImGui.GetStyle().FramePadding.X * 2;
+        float dataWidth = ImGui.CalcTextSize("📦 Download Data").X + ImGui.GetStyle().FramePadding.X * 2;
         float loadingWidth = ImGui.CalcTextSize("Loading...").X;
         float spacing = ImGui.GetStyle().ItemSpacing.X;
         float rightPadding = 5f; // Right padding
         
-        float totalButtonWidth = settingsWidth + refreshWidth + exportWidth + (spacing * 2) + rightPadding;
+        float totalButtonWidth = settingsWidth + refreshWidth + exportWidth + dataWidth + (spacing * 3) + rightPadding;
         
         ImGui.SameLine(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - totalButtonWidth);
         
         if (ImGui.Button("⚙️ Settings"))
         {
             plugin.ToggleConfigUi();
+        }
+        
+        ImGui.SameLine();
+        
+        if (ImGui.Button("📦 Download Data"))
+        {
+            plugin.DataManagerWindow.IsOpen = true;
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Open Data Manager to bulk download market data by expansion");
         }
         
         ImGui.SameLine();
@@ -346,10 +365,70 @@ public class DashboardWindow : Window, IDisposable
     
     private void DrawFilters()
     {
+        // Data Mode Toggle
+        ImGui.Text("Data Mode:");
+        ImGui.SameLine();
+        
+        bool liveMode = !useCachedDataMode;
+        if (ImGui.RadioButton("Live (Fetch from API)", liveMode))
+        {
+            useCachedDataMode = false;
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Fetch fresh market data from Universalis API on each refresh.\nSlower but always up-to-date.");
+        }
+        
+        ImGui.SameLine();
+        
+        if (ImGui.RadioButton("Cached (Pre-downloaded)", useCachedDataMode))
+        {
+            useCachedDataMode = true;
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Use only pre-downloaded market data from your database.\nMuch faster but requires downloading data first via Data Manager.\nData freshness depends on when you last downloaded.");
+        }
+        
+        // Show expansion selector only in cached mode
+        if (useCachedDataMode)
+        {
+            ImGui.SameLine();
+            ImGui.Text("|");
+            ImGui.SameLine();
+            
+            ImGui.Text("Expansion:");
+            ImGui.SameLine();
+            
+            ImGui.SetNextItemWidth(250);
+            if (ImGui.BeginCombo("##ExpansionFilter", selectedExpansion.GetDisplayName()))
+            {
+                foreach (GameExpansion exp in Enum.GetValues(typeof(GameExpansion)))
+                {
+                    bool isSelected = selectedExpansion == exp;
+                    if (ImGui.Selectable(exp.GetDisplayName(), isSelected))
+                    {
+                        selectedExpansion = exp;
+                    }
+                    
+                    if (isSelected)
+                    {
+                        ImGui.SetItemDefaultFocus();
+                    }
+                }
+                ImGui.EndCombo();
+            }
+        }
+        
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        
+        // First line: Search, Class, Level ranges, Item Level range, Min Profit
         ImGui.Text("Filters:");
         ImGui.SameLine();
         
-        // Calculate widths for all controls after search box
+        // Calculate widths for first row controls
         float classWidth = 100f;
         float levelLabelWidth = ImGui.CalcTextSize("Level:").X;
         float levelInputWidth = 60f;
@@ -357,13 +436,12 @@ public class DashboardWindow : Window, IDisposable
         float dashWidth = ImGui.CalcTextSize("-").X;
         float minProfitLabelWidth = ImGui.CalcTextSize("Min Profit:").X;
         float minProfitWidth = 80f;
-        float checkboxWidth = ImGui.CalcTextSize("Profitable Only").X + 30f; // checkbox + text
         float spacing = ImGui.GetStyle().ItemSpacing.X;
         
-        // Calculate remaining width for search box
+        // Calculate remaining width for search box (first row only)
         float totalRightSideWidth = classWidth + levelLabelWidth + levelInputWidth + dashWidth + levelInputWidth + 
                                     itemLevelLabelWidth + levelInputWidth + dashWidth + levelInputWidth +
-                                    minProfitLabelWidth + minProfitWidth + checkboxWidth + (spacing * 13);
+                                    minProfitLabelWidth + minProfitWidth + (spacing * 11);
         float searchWidth = Math.Max(150f, ImGui.GetContentRegionAvail().X - totalRightSideWidth);
         
         // Search box with dynamic width
@@ -450,12 +528,39 @@ public class DashboardWindow : Window, IDisposable
             ApplyFilters();
         }
         
-        ImGui.SameLine();
-        
+        // Second line: Profitable Only checkbox, Expansion Filter, Category/Column buttons, Sort options
         // Profitable only
         if (ImGui.Checkbox("Profitable Only", ref showOnlyProfitable))
         {
             ApplyFilters();
+        }
+        
+        ImGui.SameLine();
+        
+        // Expansion filter
+        if (ImGui.Checkbox("Expansion Filter", ref useExpansionFilter))
+        {
+            // When toggling on, we don't auto-refresh, just enable the filter for next refresh
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Enable to scan ALL items from a specific expansion (ignores level filters).\nClick Refresh after enabling.");
+        }
+        
+        if (useExpansionFilter)
+        {
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(180);
+            var expansionNames = Enum.GetNames<GameExpansion>();
+            var currentExpansionIndex = (int)selectedExpansion;
+            if (ImGui.Combo("##expansion", ref currentExpansionIndex, expansionNames, expansionNames.Length))
+            {
+                selectedExpansion = (GameExpansion)currentExpansionIndex;
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(selectedExpansion.GetDisplayName());
+            }
         }
         
         ImGui.SameLine();
@@ -472,6 +577,33 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.Button("Columns..."))
         {
             ImGui.OpenPopup("ColumnVisibility");
+        }
+        
+        ImGui.SameLine();
+        
+        // Sort options on second line
+        ImGui.Text("Sort by:");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(200);
+        var sortNames = Enum.GetNames<SortMode>();
+        var currentSortIndex = (int)currentSort;
+        if (ImGui.Combo("##sort", ref currentSortIndex, sortNames, sortNames.Length))
+        {
+            currentSort = (SortMode)currentSortIndex;
+            sortColumn = null; // Clear column sort when using dropdown
+            ApplyFilters();
+        }
+        
+        ImGui.SameLine();
+        if (ImGui.Button("Reset Sort"))
+        {
+            sortColumn = null;
+            currentSort = SortMode.RecommendationScore;
+            ApplyFilters();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Reset to default sort (Recommendation Score)");
         }
 
         if (ImGui.BeginPopup("ColumnVisibility"))
@@ -556,31 +688,6 @@ public class DashboardWindow : Window, IDisposable
             }
 
             ImGui.EndPopup();
-        }
-        
-        // Sort options
-        ImGui.Text("Sort by:");
-        ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
-        var sortNames = Enum.GetNames<SortMode>();
-        var currentSortIndex = (int)currentSort;
-        if (ImGui.Combo("##sort", ref currentSortIndex, sortNames, sortNames.Length))
-        {
-            currentSort = (SortMode)currentSortIndex;
-            sortColumn = null; // Clear column sort when using dropdown
-            ApplyFilters();
-        }
-        
-        ImGui.SameLine();
-        if (ImGui.Button("Reset Sort"))
-        {
-            sortColumn = null;
-            currentSort = SortMode.RecommendationScore;
-            ApplyFilters();
-        }
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Reset to default sort (Recommendation Score)");
         }
     }
     
@@ -1065,31 +1172,123 @@ public class DashboardWindow : Window, IDisposable
                 Plugin.Log.Warning("Unable to determine world name. Please log in or specify a world in settings.");
                 lastErrorMessage = "Unable to determine world name. Please log in or specify a world in settings.";
                 lastErrorTime = DateTime.UtcNow;
+                isLoading = false;
                 return;
             }
             
-            // Get recipes to analyze - use filter settings if available, otherwise get recent level recipes
-            var recipes = plugin.RecipeService.GetRecipesByLevel(minLevel, maxLevel).Take(500).ToList();
+            // Get recipes to analyze based on filter mode
+            List<RecipeData> recipes;
             
-            Plugin.Log.Information($"Analyzing {recipes.Count} recipes for {worldName}...");
-            
-            // Stream results as they come in
-            await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+            // In cached mode, we use expansion filter and work offline
+            if (useCachedDataMode)
             {
-                profitResults.Add(profit);
+                Plugin.Log.Information($"Cached data mode: Loading ALL recipes from {selectedExpansion.GetDisplayName()} using pre-downloaded data...");
                 
-                // Only re-apply filters periodically to avoid UI stutter on every item
-                // or just do it if list is small enough
-                if (profitResults.Count % 10 == 0) 
+                // Enable offline mode temporarily
+                var originalOfflineMode = plugin.Configuration.WorkOffline;
+                plugin.Configuration.WorkOffline = true;
+                
+                try
                 {
-                    ApplyFilters(); 
+                    // Get ALL recipes from selected expansion (NO LIMITS)
+                    recipes = plugin.RecipeService.GetRecipesByExpansion(selectedExpansion).ToList();
+                    Plugin.Log.Information($"Found {recipes.Count} recipes in {selectedExpansion.GetDisplayName()}. Calculating profits from cached data...");
+                    
+                    if (recipes.Count == 0)
+                    {
+                        lastErrorMessage = $"No recipes found for {selectedExpansion.GetDisplayName()}";
+                        lastErrorSuggestion = "Try selecting a different expansion.";
+                        lastErrorTime = DateTime.UtcNow;
+                        return;
+                    }
+                    
+                    // Stream results as they come in (will use cached data only)
+                    int cachedCount = 0;
+                    int missingCount = 0;
+                    
+                    await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+                    {
+                        profitResults.Add(profit);
+                        
+                        if (profit.MarketData?.IsCachedData == true || profit.IsStale)
+                            cachedCount++;
+                        else
+                            missingCount++;
+                        
+                        // Only re-apply filters periodically to avoid UI stutter
+                        if (profitResults.Count % 20 == 0) 
+                        {
+                            ApplyFilters(); 
+                        }
+                    }
+                    
+                    Plugin.Log.Information($"Cached mode analysis complete: {cachedCount} items from cache, {missingCount} items missing data");
+                    
+                    if (missingCount > cachedCount)
+                    {
+                        lastErrorMessage = $"Many items are missing cached data ({missingCount} missing vs {cachedCount} cached)";
+                        lastErrorSuggestion = "Use the 'Download Data' button to pre-download market data for this expansion.";
+                        lastErrorTime = DateTime.UtcNow;
+                    }
+                }
+                finally
+                {
+                    // Restore original offline mode
+                    plugin.Configuration.WorkOffline = originalOfflineMode;
+                }
+            }
+            else if (useExpansionFilter)
+            {
+                // Live mode with expansion filter (old behavior)
+                Plugin.Log.Information($"Live expansion mode: Scanning ALL recipes from {selectedExpansion.GetDisplayName()}...");
+                recipes = plugin.RecipeService.GetRecipesByExpansion(selectedExpansion).ToList();
+                Plugin.Log.Information($"Expansion scan complete: {recipes.Count} recipes found. Starting profit analysis for {worldName}...");
+                
+                // Show warning if this is a large number
+                if (recipes.Count > 5000)
+                {
+                    Plugin.Log.Warning($"Large expansion scan: {recipes.Count} recipes will take significant time due to API rate limits");
+                }
+                
+                // Stream results as they come in
+                await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+                {
+                    profitResults.Add(profit);
+                    
+                    // Only re-apply filters periodically to avoid UI stutter on every item
+                    // or just do it if list is small enough
+                    if (profitResults.Count % 10 == 0) 
+                    {
+                        ApplyFilters(); 
+                    }
+                }
+            }
+            else
+            {
+                // Live mode with level-based filtering (default behavior)
+                int maxRecipes = plugin.Configuration.MaxRecipesToAnalyze;
+                recipes = plugin.RecipeService.GetRecipesByLevel(minLevel, maxLevel).Take(maxRecipes).ToList();
+                Plugin.Log.Information($"Analyzing {recipes.Count} recipes (level {minLevel}-{maxLevel}) for {worldName}...");
+                
+                // Stream results as they come in
+                await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+                {
+                    profitResults.Add(profit);
+                    
+                    if (profitResults.Count % 10 == 0) 
+                    {
+                        ApplyFilters(); 
+                    }
                 }
             }
             
             Plugin.Log.Information($"Loaded {profitResults.Count} profit calculations");
             
+            // Even if we got zero results, consider it a successful refresh
             lastRefresh = DateTime.UtcNow;
             ApplyFilters(); // Final filter application
+            
+            Plugin.Log.Information($"After filtering: {filteredResults.Count} items visible (Mode: {(useCachedDataMode ? "Cached" : "Live")}, Filters: Profitable={showOnlyProfitable}, MinProfit={minProfit}, Level={minLevel}-{maxLevel}, ILvl={minItemLevel}-{maxItemLevel}, Class={selectedClass})");
         }
         catch (OperationCanceledException)
         {
@@ -1112,46 +1311,69 @@ public class DashboardWindow : Window, IDisposable
     
     private void ApplyFilters()
     {
-        filteredResults = profitResults.Where(p =>
+        // In cached mode or expansion mode, show more items with fewer restrictions
+        if (useCachedDataMode || useExpansionFilter)
         {
-            // Search filter
-            if (!string.IsNullOrWhiteSpace(searchText) && 
-                !p.Recipe.ItemName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
-                return false;
-            
-            // Class filter
-            if (selectedClass != "All" && p.Recipe.CraftingClassName != selectedClass)
-                return false;
-            
-            // Level filter
-            if (p.Recipe.ClassJobLevel < minLevel || p.Recipe.ClassJobLevel > maxLevel)
-                return false;
-            
-            // Item Level filter
-            if (p.Recipe.ItemLevel < minItemLevel || p.Recipe.ItemLevel > maxItemLevel)
-                return false;
-
-            // Profitable only
-            if (showOnlyProfitable && p.RawProfit <= 0)
-                return false;
-
-            // Min profit filter
-            if (p.RawProfit < minProfit)
-                return false;
-            
-            // Category Filters
-            if (p.Recipe != null)
+            filteredResults = profitResults.Where(p =>
             {
-                if (!plugin.Configuration.FilterIncludeCombat && p.Recipe.MainCategory == ItemMainCategory.Combat) return false;
-                if (!plugin.Configuration.FilterIncludeCraftingGathering && 
-                    (p.Recipe.MainCategory == ItemMainCategory.Crafting || p.Recipe.MainCategory == ItemMainCategory.Gathering)) return false;
-                if (!plugin.Configuration.FilterIncludeFurniture && p.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
-                if (!plugin.Configuration.FilterIncludeConsumables && p.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
-                if (!plugin.Configuration.FilterIncludeMaterials && p.Recipe.MainCategory == ItemMainCategory.Material) return false;
-            }
+                // Only apply search filter
+                if (!string.IsNullOrWhiteSpace(searchText) && 
+                    !p.Recipe.ItemName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                
+                // Only apply class filter if not "All"
+                if (selectedClass != "All" && p.Recipe.CraftingClassName != selectedClass)
+                    return false;
+                
+                return true;
+            }).ToList();
+            
+            Plugin.Log.Debug($"Cached/Expansion mode filtering: {filteredResults.Count} items from {profitResults.Count} total (search='{searchText}', class='{selectedClass}')");
+        }
+        else
+        {
+            // Normal live mode - apply all filters
+            filteredResults = profitResults.Where(p =>
+            {
+                // Search filter
+                if (!string.IsNullOrWhiteSpace(searchText) && 
+                    !p.Recipe.ItemName.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                
+                // Class filter
+                if (selectedClass != "All" && p.Recipe.CraftingClassName != selectedClass)
+                    return false;
+                
+                // Level filter
+                if (p.Recipe.ClassJobLevel < minLevel || p.Recipe.ClassJobLevel > maxLevel)
+                    return false;
+                
+                // Item Level filter
+                if (p.Recipe.ItemLevel < minItemLevel || p.Recipe.ItemLevel > maxItemLevel)
+                    return false;
 
-            return true;
-        }).ToList();
+                // Profitable only
+                if (showOnlyProfitable && p.RawProfit <= 0)
+                    return false;
+
+                // Min profit filter
+                if (p.RawProfit < minProfit)
+                    return false;
+                
+                // Category Filters
+                if (p.Recipe != null)
+                {
+                    if (!plugin.Configuration.FilterIncludeCombat && p.Recipe.MainCategory == ItemMainCategory.Combat) return false;
+                    if (!plugin.Configuration.FilterIncludeCraftingGathering && 
+                        (p.Recipe.MainCategory == ItemMainCategory.Crafting || p.Recipe.MainCategory == ItemMainCategory.Gathering)) return false;
+                    if (!plugin.Configuration.FilterIncludeFurniture && p.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
+                    if (!plugin.Configuration.FilterIncludeConsumables && p.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
+                    if (!plugin.Configuration.FilterIncludeMaterials && p.Recipe.MainCategory == ItemMainCategory.Material) return false;
+                }
+
+                return true;
+            }).ToList();
+        }
         
         // Reset page (not used anymore but kept for logic structure if needed later)
         // currentPage = 1;

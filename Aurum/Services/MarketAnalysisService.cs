@@ -287,9 +287,20 @@ public class MarketAnalysisService
         riskScore += (volatility / 0.5f) * 25f;
         
         // Velocity contribution (0-25 points) - lower velocity = higher risk
-        float velocityScore = marketData.SaleVelocity < 1f ? 25f :
-                             marketData.SaleVelocity < 5f ? 15f :
-                             marketData.SaleVelocity < 20f ? 5f : 0f;
+        // Also factor in estimated sell time for more accurate risk assessment
+        float velocityScore;
+        if (marketData.EstimatedSellTimeDays > 7f) // More than a week to sell
+            velocityScore = 25f;
+        else if (marketData.EstimatedSellTimeDays > 3f) // 3-7 days to sell
+            velocityScore = 20f;
+        else if (marketData.EstimatedSellTimeDays > 1f) // 1-3 days to sell
+            velocityScore = 15f;
+        else if (marketData.SaleVelocity < 5f) // Under 1 day but slow velocity
+            velocityScore = 10f;
+        else if (marketData.SaleVelocity < 20f) // Fast enough
+            velocityScore = 5f;
+        else
+            velocityScore = 0f;
         riskScore += velocityScore;
         
         // Competition contribution (0-25 points)

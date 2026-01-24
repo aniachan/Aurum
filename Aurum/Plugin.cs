@@ -62,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     public FilterWindow FilterWindow { get; init; }
     public ShoppingListWindow ShoppingListWindow { get; init; }
     public DebugWindow DebugWindow { get; init; }
+    public DataManagerWindow DataManagerWindow { get; init; }
 
     public Plugin()
     {
@@ -124,6 +125,7 @@ public sealed class Plugin : IDalamudPlugin
         FilterWindow = new FilterWindow(this);
         ShoppingListWindow = new ShoppingListWindow(this);
         DebugWindow = new DebugWindow(this);
+        DataManagerWindow = new DataManagerWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(DashboardWindow);
@@ -132,6 +134,7 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(FilterWindow);
         WindowSystem.AddWindow(ShoppingListWindow);
         WindowSystem.AddWindow(DebugWindow);
+        WindowSystem.AddWindow(DataManagerWindow);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -186,6 +189,7 @@ public sealed class Plugin : IDalamudPlugin
         FilterWindow.Dispose();
         ShoppingListWindow.Dispose();
         DebugWindow.Dispose();
+        DataManagerWindow.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
         
@@ -237,6 +241,10 @@ public sealed class Plugin : IDalamudPlugin
         else if (argsTrimmed == "debug")
         {
             DebugWindow.IsOpen = true;
+        }
+        else if (argsTrimmed == "data" || argsTrimmed == "download")
+        {
+            DataManagerWindow.IsOpen = true;
         }
         else
         {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Plugin.Services;
@@ -16,15 +17,16 @@ public class RecipeService
     private readonly IPluginLog log;
     private readonly Configuration config;
     
-    private Dictionary<uint, RecipeData> recipeCache = new();
+    private ConcurrentDictionary<uint, RecipeData> recipeCache = new();
     private List<uint> recipeLruList = new();
-    private Dictionary<uint, string> itemNameCache = new();
-    private Dictionary<uint, uint> itemIconCache = new();
+    private readonly object lruLock = new();
+    private ConcurrentDictionary<uint, string> itemNameCache = new();
+    private ConcurrentDictionary<uint, uint> itemIconCache = new();
     
     // Indices for fast lookups without full loading
-    private Dictionary<uint, List<uint>> itemResultIndex = new();
-    private Dictionary<uint, List<uint>> jobIndex = new();
-    private Dictionary<int, List<uint>> levelIndex = new();
+    private ConcurrentDictionary<uint, List<uint>> itemResultIndex = new();
+    private ConcurrentDictionary<uint, List<uint>> jobIndex = new();
+    private ConcurrentDictionary<int, List<uint>> levelIndex = new();
     
     private bool isInitialized = false;
     
@@ -146,19 +148,16 @@ public class RecipeService
             var level = (int)recipe.RecipeLevelTable.Value.ClassJobLevel;
             
             // Index by Result Item
-            if (!itemResultIndex.ContainsKey(resultItemId))
-                itemResultIndex[resultItemId] = new List<uint>();
-            itemResultIndex[resultItemId].Add(recipeId);
+            var resultList = itemResultIndex.GetOrAdd(resultItemId, _ => new List<uint>());
+            lock (resultList) { resultList.Add(recipeId); }
             
             // Index by Job
-            if (!jobIndex.ContainsKey(jobType))
-                jobIndex[jobType] = new List<uint>();
-            jobIndex[jobType].Add(recipeId);
+            var jobList = jobIndex.GetOrAdd(jobType, _ => new List<uint>());
+            lock (jobList) { jobList.Add(recipeId); }
             
             // Index by Level
-            if (!levelIndex.ContainsKey(level))
-                levelIndex[level] = new List<uint>();
-            levelIndex[level].Add(recipeId);
+            var levelList = levelIndex.GetOrAdd(level, _ => new List<uint>());
+            lock (levelList) { levelList.Add(recipeId); }
         }
         
         log.Info($"Indexed {totalRecipes} recipes (skipped {skippedNonCrafting} non-crafting, {skippedNoResult} no-result). Recipes will be loaded on demand.");
@@ -396,6 +395,75 @@ public class RecipeService
     }
 
     /// <summary>
+    /// Get recipes by expansion (filters by item patch number)
+    /// Returns EVERY SINGLE craftable recipe from the specified expansion with no limits
+    /// </summary>
+    public IEnumerable<RecipeData> GetRecipesByExpansion(GameExpansion expansion)
+    {
+        if (!isInitialized)
+            Initialize();
+        
+        var (minPatch, maxPatch) = expansion.GetPatchRange();
+        var itemSheet = dataManager.GetExcelSheet<Item>();
+        if (itemSheet == null)
+        {
+            log.Error("Failed to load Item sheet for expansion filter");
+            yield break;
+        }
+        
+        log.Information($"Starting expansion scan for {expansion.GetDisplayName()} (patch range: {minPatch}-{maxPatch})");
+        
+        // Get ALL recipe IDs from our index (no filtering, no limits)
+        var allRecipeIds = itemResultIndex.Values.SelectMany(list => list).Distinct().ToList();
+        log.Information($"Total indexed recipes to check: {allRecipeIds.Count}");
+        
+        int matchedCount = 0;
+        int checkedCount = 0;
+        
+        foreach (var recipeId in allRecipeIds)
+        {
+            checkedCount++;
+            
+            var recipe = GetRecipe(recipeId);
+            if (recipe == null)
+            {
+                log.Warning($"Failed to load recipe {recipeId}");
+                continue;
+            }
+            
+            // Get the item for expansion filtering
+            var item = itemSheet.GetRow(recipe.ResultItemId);
+            if (item.RowId == 0)
+            {
+                log.Warning($"Failed to load item {recipe.ResultItemId} for recipe {recipeId}");
+                continue;
+            }
+            
+            // Filter by item level as proxy for expansion
+            // Each expansion has characteristic item level ranges
+            int itemLevel = (int)item.LevelItem.RowId;
+            bool matchesExpansion = expansion switch
+            {
+                GameExpansion.ARealmReborn => itemLevel >= 1 && itemLevel <= 135,      // 2.x: ilvl 1-135
+                GameExpansion.Heavensward => itemLevel >= 136 && itemLevel <= 270,    // 3.x: ilvl 136-270  
+                GameExpansion.Stormblood => itemLevel >= 271 && itemLevel <= 400,     // 4.x: ilvl 271-400
+                GameExpansion.Shadowbringers => itemLevel >= 401 && itemLevel <= 530, // 5.x: ilvl 401-530
+                GameExpansion.Endwalker => itemLevel >= 531 && itemLevel <= 660,      // 6.x: ilvl 531-660
+                GameExpansion.Dawntrail => itemLevel >= 661,                          // 7.x: ilvl 661+
+                _ => true
+            };
+            
+            if (matchesExpansion)
+            {
+                matchedCount++;
+                yield return recipe;
+            }
+        }
+        
+        log.Information($"Expansion scan complete: {matchedCount} recipes matched from {checkedCount} total recipes checked");
+    }
+    
+    /// <summary>
     /// Get all loaded recipes
     /// </summary>
     public IEnumerable<RecipeData> GetAllRecipes()
@@ -463,18 +531,25 @@ public class RecipeService
     
     private void UpdateLru(uint recipeId)
     {
-        recipeLruList.Remove(recipeId);
-        recipeLruList.Add(recipeId);
+        lock (lruLock)
+        {
+            recipeLruList.Remove(recipeId);
+            recipeLruList.Add(recipeId);
+        }
     }
     
     private void EvictLru()
     {
-        if (recipeLruList.Count == 0) return;
-        
-        // Remove oldest 10% or just 1? Let's remove 1 for now to keep it strict
-        var idToRemove = recipeLruList[0];
-        recipeLruList.RemoveAt(0);
-        recipeCache.Remove(idToRemove);
+        uint idToRemove;
+        lock (lruLock)
+        {
+            if (recipeLruList.Count == 0) return;
+            
+            // Remove oldest entry
+            idToRemove = recipeLruList[0];
+            recipeLruList.RemoveAt(0);
+        }
+        recipeCache.TryRemove(idToRemove, out _);
     }
     
     /// <summary>
