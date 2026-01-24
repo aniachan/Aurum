@@ -56,7 +56,7 @@ public class FilterCriteria
     public bool IsDyeableOnly { get; set; } = false;
     public bool IsCollectableOnly { get; set; } = false;
     public int MinMateriaSlots { get; set; } = 0;
-    public int MinRarity { get; set; } = 1;
+    public int MinRarity { get; set; } = 0; // 0 allows unset rarity, 1=Common, 2=Uncommon, etc.
     public int MaxRarity { get; set; } = 7; // 1-4 standard, 7=Relic? 
     public bool ExcludeUnique { get; set; } = false;
     public bool ExcludeUntradable { get; set; } = true; // Default to excluding untradable for profit
@@ -64,16 +64,17 @@ public class FilterCriteria
     public bool OnlyFavorites { get; set; } = false;
 
     // Job/Level
-    public int MinJobLevel { get; set; } = 1;
+    public int MinJobLevel { get; set; } = 0; // Allow items with unset job level
     public int MaxJobLevel { get; set; } = int.MaxValue;
-    public int MinRecipeLevel { get; set; } = 1;
+    public int MinRecipeLevel { get; set; } = 0; // Allow items with unset recipe level
     public int MaxRecipeLevel { get; set; } = int.MaxValue;
-    public int MinItemLevel { get; set; } = 1;
+    public int MinItemLevel { get; set; } = 0; // Allow items with unset item level
     public int MaxItemLevel { get; set; } = int.MaxValue;
 
     // Equipment Slots
     public HashSet<EquipSlot> IncludedEquipSlots { get; set; } = new()
     {
+        EquipSlot.None, // Non-equipment items (consumables, materials, furniture, etc.)
         EquipSlot.MainHand, EquipSlot.OffHand,
         EquipSlot.Head, EquipSlot.Body, EquipSlot.Hands, EquipSlot.Legs, EquipSlot.Feet,
         EquipSlot.Ears, EquipSlot.Neck, EquipSlot.Wrists, EquipSlot.Ring

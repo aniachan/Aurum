@@ -6,3 +6,6 @@ integration-tests-results.txt
 
 # bv (beads viewer) local config and caches
 .bv/
+
+aurum.db
+aurum.db*
