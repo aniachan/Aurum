@@ -158,10 +158,6 @@ public class UniversalisService : IDisposable
              await rateLimiter.WaitForTokenAsync("api", disposeCts.Token);
              
              using var response = await httpClient.GetAsync(url, disposeCts.Token);
-             
-             // Log
-             _ = Task.Run(() => database.LogApiRequest($"item/{itemId}/dc/{dcName}", DateTime.UtcNow, 0, (int)response.StatusCode, response.IsSuccessStatusCode, response.Content.Headers.ContentLength ?? 0));
-             
              if (!response.IsSuccessStatusCode)
              {
                  log.Warning($"DC request failed: {response.StatusCode}");
@@ -522,7 +518,8 @@ public class UniversalisService : IDisposable
         marketData.MaxPriceHQ = (uint)Math.Round(response.MaxPriceHQ);
         marketData.CachedAt = DateTime.UtcNow;
 
-        // Initialize supply/demand metrics that can be derived from raw response
+        // UnitsForSale from the API = total units on MB (not limited by our listings request)
+        marketData.TotalUnitsForSale = response.UnitsForSale;
         marketData.ListingsCount = response.Listings?.Count ?? 0;
         
         // Convert listings
@@ -875,101 +872,38 @@ public class UniversalisService : IDisposable
         var statusCode = 0;
         var success = false;
         
-        try 
+        try
         {
-            HttpResponseMessage response = null!;
-            
-            if (_performanceMonitor != null)
-            {
-                 response = await _performanceMonitor.Measure("Universalis_FetchSingle", async () => 
-                     await httpClient.GetAsync(url, disposeCts.Token)
-                 );
-            }
-            else
-            {
-                 response = await httpClient.GetAsync(url, disposeCts.Token);
-            }
-            
+            var response = await httpClient.GetAsync(url, disposeCts.Token);
+            stopwatch.Stop();
             statusCode = (int)response.StatusCode;
             success = response.IsSuccessStatusCode;
-            
-            // Log to DB asynchronously
-            stopwatch.Stop();
-            var elapsedMs = stopwatch.ElapsedMilliseconds;
-            
-            // Fire and forget logging
-            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, elapsedMs, statusCode, success, response.Content.Headers.ContentLength ?? 0));
-            
             response.EnsureSuccessStatusCode();
-            
-            string json = string.Empty;
-            if (_performanceMonitor != null)
+
+            var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
+            var apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
             {
-                json = await _performanceMonitor.Measure("Universalis_ReadContent", async () => 
-                    await response.Content.ReadAsStringAsync(disposeCts.Token)
-                );
-            }
-            else
-            {
-                json = await response.Content.ReadAsStringAsync(disposeCts.Token);
-            }
-            
-            UniversalisItemResponse? apiResponse = null;
-            
-            if (_performanceMonitor != null)
-            {
-                 apiResponse = _performanceMonitor.Measure("Universalis_Deserialize", () => 
-                     JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
-                     {
-                         PropertyNameCaseInsensitive = true
-                     })
-                 );
-            }
-            else
-            {
-                 apiResponse = JsonSerializer.Deserialize<UniversalisItemResponse>(json, new JsonSerializerOptions
-                 {
-                     PropertyNameCaseInsensitive = true
-                 });
-            }
-            
+                PropertyNameCaseInsensitive = true
+            });
+
             if (apiResponse == null)
             {
                 log.Warning($"Failed to parse market data for item {itemId}");
                 return null;
             }
-            
+
             var marketData = ConvertToMarketData(apiResponse, worldName, itemId);
-            
             var cacheKey = $"market_{worldName}_{itemId}";
             cache.Set(cacheKey, marketData);
-            
+
             if (currentWorldId != 0)
-            {
-                // Fire and forget upsert? Or measure it
-                if (_performanceMonitor != null)
-                {
-                    _performanceMonitor.Measure("Database_Upsert", () => database.UpsertMarketData(marketData, currentWorldId));
-                }
-                else
-                {
-                    database.UpsertMarketData(marketData, currentWorldId);
-                }
-            }
-            
+                database.UpsertMarketData(marketData, currentWorldId);
+
             return marketData;
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            if (statusCode == 0 && ex is HttpRequestException hrex && hrex.StatusCode.HasValue)
-            {
-                statusCode = (int)hrex.StatusCode.Value;
-            }
-            
-            // Fire and forget logging for error case
-            _ = Task.Run(() => database.LogApiRequest($"item/{itemId}", DateTime.UtcNow, stopwatch.ElapsedMilliseconds, statusCode, false));
-            
             log.Error(ex, $"Error fetching single item {itemId}");
             throw;
         }
@@ -995,15 +929,9 @@ public class UniversalisService : IDisposable
             log.Info($"Fetching batch market data for {itemIds.Count} items");
 
             var response = await httpClient.GetAsync(url, disposeCts.Token);
+            stopwatch.Stop();
             statusCode = (int)response.StatusCode;
             success = response.IsSuccessStatusCode;
-            
-            stopwatch.Stop();
-            var elapsedMs = stopwatch.ElapsedMilliseconds;
-            
-            // Fire and forget logging
-            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, elapsedMs, statusCode, success, response.Content.Headers.ContentLength ?? 0));
-            
             response.EnsureSuccessStatusCode();
             
             var json = await response.Content.ReadAsStringAsync(disposeCts.Token);
@@ -1036,14 +964,6 @@ public class UniversalisService : IDisposable
         catch (Exception ex)
         {
             stopwatch.Stop();
-            if (statusCode == 0 && ex is HttpRequestException hrex && hrex.StatusCode.HasValue)
-            {
-                statusCode = (int)hrex.StatusCode.Value;
-            }
-            
-            // Fire and forget logging for error case
-            _ = Task.Run(() => database.LogApiRequest($"items/batch/{itemIds.Count}", DateTime.UtcNow, stopwatch.ElapsedMilliseconds, statusCode, false));
-
             log.Error(ex, "Error fetching batch items");
             throw;
         }
@@ -1074,7 +994,11 @@ public class UniversalisItemResponse
     public double MinPriceHQ { get; set; }
     public double MaxPriceNQ { get; set; }
     public double MaxPriceHQ { get; set; }
-    
+
+    // Total units/listings on the market board (not capped like the listings array)
+    public int UnitsForSale { get; set; }
+    public int UnitsSold { get; set; }
+
     // Additional fields for multi-world/DC requests
     public Dictionary<string, long>? WorldUploadTimes { get; set; }
 }

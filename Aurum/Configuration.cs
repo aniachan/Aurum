@@ -12,6 +12,8 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
 
     // UI Settings
     public bool IsConfigWindowMovable { get; set; } = true;
+    public float UIScale { get; set; } = 1.0f;
+    public Theme ColorTheme { get; set; } = Theme.Default;
     public int RowsPerPage { get; set; } = 50;
     public List<string> HiddenColumns { get; set; } = new();
     public List<string> RecentSearches { get; set; } = new();
@@ -92,4 +94,6 @@ public enum Theme
 {
     Default,
     Dark,
+    Light,
+    HighContrast,
 }

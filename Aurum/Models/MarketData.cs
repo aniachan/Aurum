@@ -97,11 +97,14 @@ public class MarketData
     // These are loaded on demand usually, but we can store them here for chart convenience
     public List<MarketSnapshot> HistorySnapshots { get; set; } = new();
 
+    // Total supply (from Universalis, not capped by our listings request)
+    public int TotalUnitsForSale { get; set; }
+
     // Demand metrics (calculated)
-    public float SaleVelocity { get; set; }              // sales per day
-    public float SupplyDemandRatio { get; set; }         // listings / daily_sales
+    public float SaleVelocity { get; set; }              // sales per day (units)
+    public float SupplyDemandRatio { get; set; }         // total_units_for_sale / daily_sales
     public float PriceVolatility { get; set; }           // stddev / avg (0-1)
-    public float EstimatedSellTimeDays { get; set; }     // listings / velocity
+    public float EstimatedSellTimeDays { get; set; }     // total_units_for_sale / velocity
     public float MarketMomentum { get; set; }            // % change in velocity (-1 to 1)
     
     // Additional metrics for Supply/Demand analysis

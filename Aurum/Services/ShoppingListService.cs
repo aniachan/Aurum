@@ -52,10 +52,11 @@ public class ShoppingListService
             {
                 foreach (var shop in gilShopSheet)
                 {
-                    // Attempt to get the items for this shop using its RowId
-                    // GetRow on a Subrow sheet returns a collection of subrows (the items in the shop)
+                    // GetRow throws ArgumentOutOfRangeException if the rowId doesn't exist in the subrow sheet.
+                    // Not every GilShop entry has a corresponding GilShopItem row, so we guard here.
+                    if (!gilShopItemSheet.HasRow(shop.RowId)) continue;
                     var shopItems = gilShopItemSheet.GetRow(shop.RowId);
-                    
+
                     // SubrowCollection is a struct or non-nullable? Checking count instead.
                     if (shopItems.Count > 0)
                     {

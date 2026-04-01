@@ -1333,7 +1333,6 @@ public class DashboardWindow : Window, IDisposable
                 SortMode.FastestSelling => filteredResults.OrderByDescending(p => p.MarketData?.SaleVelocity ?? 0).ToList(),
                 SortMode.LowestCompetition => filteredResults.OrderBy(p => p.MarketData?.CurrentListings ?? int.MaxValue).ToList(),
                 SortMode.RecommendationScore => filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
-                SortMode.BestEfficiency => filteredResults.OrderByDescending(p => p.EfficiencyScore).ToList(),
                 _ => filteredResults
             };
         }

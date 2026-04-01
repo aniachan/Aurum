@@ -114,8 +114,14 @@ public class MarketAnalysisService
             marketData.EstimatedSellTimeDays = float.MaxValue;
             return;
         }
-        
-        marketData.SupplyDemandRatio = marketData.CurrentListings / marketData.SaleVelocity;
+
+        // Use TotalUnitsForSale from Universalis (actual total supply, not our capped listing count).
+        // Fall back to summing the listings we fetched if the API didn't return unitsForSale.
+        float totalSupplyUnits = marketData.TotalUnitsForSale > 0
+            ? marketData.TotalUnitsForSale
+            : marketData.Listings.Sum(l => (int)l.Quantity);
+
+        marketData.SupplyDemandRatio = totalSupplyUnits / marketData.SaleVelocity;
         marketData.EstimatedSellTimeDays = marketData.SupplyDemandRatio;
     }
     
@@ -219,7 +225,13 @@ public class MarketAnalysisService
         
         var oldAvg = olderHalf.Average(h => h.PricePerUnit);
         var newAvg = newerHalf.Average(h => h.PricePerUnit);
-        
+
+        if (oldAvg <= 0)
+        {
+            marketData.Trend = PriceTrend.Unknown;
+            return;
+        }
+
         var change = (newAvg - oldAvg) / oldAvg;
         
         if (change > 0.10) // > 10% increase

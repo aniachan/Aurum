@@ -175,14 +175,41 @@ public class ProfitService
             chunkIndex++;
             var chunkList = chunk.ToList();
             var itemIds = chunkList.Select(r => r.ResultItemId).Distinct().ToList();
-            
+
             log.Information($"Processing chunk {chunkIndex}/{totalChunks}: {itemIds.Count} unique items");
-            
-            // Fetch market data for this chunk
-            Dictionary<uint, MarketData> marketDataDict;
-            try 
+
+            // Pre-collect all ingredient IDs so we can batch-fetch them alongside the output items.
+            // Without this, BuildIngredientTreeAsync makes individual API calls per ingredient,
+            // turning 1 batch request into potentially hundreds of serial queue entries.
+            var allFetchIds = new HashSet<uint>(itemIds);
+            foreach (var recipe in chunkList)
             {
-                marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, itemIds);
+                foreach (var ing in recipe.Ingredients)
+                {
+                    allFetchIds.Add(ing.ItemId);
+                    if (ing.SubRecipeId.HasValue)
+                    {
+                        var subRecipe = recipeService.GetRecipe(ing.SubRecipeId.Value);
+                        if (subRecipe != null)
+                        {
+                            foreach (var subIng in subRecipe.Ingredients)
+                                allFetchIds.Add(subIng.ItemId);
+                            foreach (var crystal in subRecipe.Crystals)
+                                allFetchIds.Add(crystal.ItemId);
+                        }
+                    }
+                }
+                foreach (var crystal in recipe.Crystals)
+                    allFetchIds.Add(crystal.ItemId);
+            }
+
+            log.Information($"Batch-fetching {allFetchIds.Count} item IDs (output + ingredients) for chunk {chunkIndex}");
+
+            // Fetch market data for this chunk (output items + all ingredients pre-populated into cache)
+            Dictionary<uint, MarketData> marketDataDict;
+            try
+            {
+                marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, allFetchIds);
             }
             catch (Exception ex)
             {
@@ -423,22 +450,17 @@ public class ProfitService
     private async Task<uint> GetMarketPriceAsync(uint itemId, string worldName)
     {
         var marketData = await universalisService.GetMarketDataAsync(worldName, itemId);
-        
-        if (marketData == null || marketData.CurrentListings == 0)
-        {
-            return 0; // No listings available
-        }
-        
-        // Use HQ prices if configured and available
-        if (config.UseHQPricesWhenAvailable && marketData.CurrentAveragePriceHQ > 0)
-        {
-            return marketData.CurrentAveragePriceHQ;
-        }
-        
-        // Otherwise use NQ or overall average
-        return marketData.CurrentAveragePriceNQ > 0 
-            ? marketData.CurrentAveragePriceNQ 
-            : marketData.MinPrice;
+
+        if (marketData == null || !marketData.Listings.Any())
+            return 0;
+
+        // For ingredient costs we want the cheapest NQ price you can actually buy at.
+        // Using average inflates costs because you buy the cheapest listing first.
+        if (marketData.MinPriceNQ > 0)
+            return marketData.MinPriceNQ;
+
+        // Fall back to overall min (may be HQ) if NQ data is absent
+        return marketData.MinPrice;
     }
     
     /// <summary>
@@ -592,14 +614,12 @@ public class ProfitService
         
         var totalTimeSeconds = craftTimeSeconds + gatheringTimeSeconds;
         var totalTimeHours = totalTimeSeconds / 3600f;
-        
-        // Add estimated sell time to get realistic gil/hour
-        // Convert sell time from days to hours
-        var sellTimeHours = marketData.EstimatedSellTimeDays * 24f;
-        var totalTimeWithSellHours = totalTimeHours + sellTimeHours;
-        
-        calculation.GilPerHour = totalTimeWithSellHours > 0 
-            ? (int)(calculation.RawProfit / totalTimeWithSellHours)
+
+        // GilPerHour = pure crafting throughput (profit per hour of crafting).
+        // Sell time is a separate risk/demand concern already captured in RiskScore and EstimatedSellTimeDays.
+        // Including sell time here would double-penalise slow markets.
+        calculation.GilPerHour = totalTimeHours > 0
+            ? (int)(calculation.RawProfit / totalTimeHours)
             : 0;
         
         // Calculate profit score (0-100 based on profit alone)
@@ -833,44 +853,40 @@ public class ProfitService
     /// </summary>
     private int CalculateRecommendationScore(ProfitCalculation calc)
     {
-        // Weighted scoring:
-        // 25% Profit Score
-        // 60% Demand Score (from market analysis)
-        // 15% Efficiency (gil/hour normalized)
-        
-        float score = (calc.ProfitScore * 0.25f) + (calc.DemandScore * 0.6f);
-        
-        // Add efficiency bonus based on gil/hour (normalize to 0-100 scale)
-        // Good gil/hour = 10k+, Excellent = 50k+
-        float efficiencyBonus = calc.GilPerHour switch
+        // Goal: surface items that make the most gil and will actually sell.
+        //
+        // Weighted scoring (sums to 100 base):
+        //   45% Profit Score  — raw profitability matters most
+        //   35% Demand Score  — items that never sell are worthless
+        //   20% Gil/Hr bonus  — rewards high craft throughput
+
+        float score = (calc.ProfitScore * 0.45f) + (calc.DemandScore * 0.35f);
+
+        // Gil/Hr bonus (normalised 0-20 points). Threshold: 50k/hr = max bonus.
+        float gilPerHrBonus = calc.GilPerHour switch
         {
-            >= 50000 => 15f,
-            >= 20000 => 12f,
-            >= 10000 => 9f,
-            >= 5000 => 6f,
-            >= 2000 => 3f,
+            >= 50000 => 20f,
+            >= 20000 => 16f,
+            >= 10000 => 12f,
+            >= 5000 =>  8f,
+            >= 2000 =>  4f,
             _ => 0f
         };
-        score += efficiencyBonus;
-        
-        // Apply penalty for slow sell times
-        if (calc.EstimatedSellTimeDays > 7f)
-            score *= 0.4f; // Massive penalty for week+ sell time
-        else if (calc.EstimatedSellTimeDays > 3f)
-            score *= 0.6f; // Heavy penalty for 3-7 day sell time
-        else if (calc.EstimatedSellTimeDays > 1f)
-            score *= 0.8f; // Moderate penalty for 1-3 day sell time
-        
-        // Apply penalty for very high risk
+        score += gilPerHrBonus;
+
+        // Sell-time penalty — but only for truly dead markets (>7 days).
+        // Moderate sell times (1-7 days) are already captured by the demand score.
+        if (calc.EstimatedSellTimeDays > 14f)
+            score *= 0.4f;
+        else if (calc.EstimatedSellTimeDays > 7f)
+            score *= 0.65f;
+
+        // Risk penalty for very high risk items
         if (calc.RiskLevel == RiskLevel.VeryHigh)
-        {
-            score *= 0.5f; // 50% penalty
-        }
+            score *= 0.6f;
         else if (calc.RiskLevel == RiskLevel.High)
-        {
-            score *= 0.75f; // 25% penalty
-        }
-        
+            score *= 0.8f;
+
         return (int)Math.Clamp(score, 0, 100);
     }
     
