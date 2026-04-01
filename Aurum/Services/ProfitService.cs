@@ -678,14 +678,13 @@ public class ProfitService
         var totalTimeSeconds = craftTimeSeconds + gatheringTimeSeconds;
         var totalTimeHours = totalTimeSeconds / 3600f;
         
-        // Calculate realistic gil/hour based on market velocity
-        // Formula: profit × items_sold_per_hour
-        // Sale velocity is in items/day, convert to items/hour
-        var saleVelocityPerHour = marketData.SaleVelocity / 24f;
+        // Add estimated sell time to get realistic gil/hour
+        // Convert sell time from days to hours
+        var sellTimeHours = marketData.EstimatedSellTimeDays * 24f;
+        var totalTimeWithSellHours = totalTimeHours + sellTimeHours;
         
-        // Gil/hour = profit per item × how many you can sell per hour
-        calculation.GilPerHour = saleVelocityPerHour > 0 
-            ? (int)(calculation.RawProfit * saleVelocityPerHour)
+        calculation.GilPerHour = totalTimeWithSellHours > 0 
+            ? (int)(calculation.RawProfit / totalTimeWithSellHours)
             : 0;
         
         // Calculate profit score (0-100 based on profit alone)
