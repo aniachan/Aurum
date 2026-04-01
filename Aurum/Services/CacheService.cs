@@ -1,32 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Aurum.Infrastructure;
 using Aurum.Models;
 
 namespace Aurum.Services;
 
-/// <summary>
-/// Simple in-memory cache with TTL support
-/// </summary>
 public class CacheService
 {
     private readonly Dictionary<string, CacheEntry> cache = new();
     private readonly object lockObject = new();
     private readonly ICacheConfig config;
-    
-    // Statistics
+
     private long _hits;
     private long _misses;
-    
+
     public CacheService(ICacheConfig config)
     {
         this.config = config;
     }
-    
-    /// <summary>
-    /// Try to get a cached value
-    /// </summary>
+
     public virtual bool TryGet<T>(string key, out T? value) where T : class
     {
         lock (lockObject)
@@ -42,52 +34,28 @@ public class CacheService
                 }
                 else
                 {
-                    // Remove expired entry
-                    var expiredValue = cache[key].Value;
                     cache.Remove(key);
-                    
-                    // If it was a MarketData object, return it to the pool
-                    if (expiredValue is MarketData marketData)
-                    {
-                        MarketDataPool.Return(marketData);
-                    }
                 }
             }
-            
+
             System.Threading.Interlocked.Increment(ref _misses);
             value = null;
             return false;
         }
     }
-    
-    /// <summary>
-    /// Set a cached value with default TTL from config
-    /// </summary>
+
     public virtual void Set<T>(string key, T value) where T : class
     {
         Set(key, value, TimeSpan.FromSeconds(config.MarketDataCacheDurationSeconds));
     }
-    
-    /// <summary>
-    /// Set a cached value with custom TTL
-    /// </summary>
+
     public virtual void Set<T>(string key, T value, TimeSpan ttl) where T : class
     {
         lock (lockObject)
         {
-            // If cache is full and we're adding a new key, evict LRU
             if (cache.Count >= config.MaxCacheEntries && !cache.ContainsKey(key))
             {
                 EvictLru();
-            }
-
-            // If overwriting existing key, check if we need to return old value to pool
-            if (cache.TryGetValue(key, out var existingEntry))
-            {
-                if (existingEntry.Value is MarketData oldMarketData && !ReferenceEquals(oldMarketData, value))
-                {
-                    MarketDataPool.Return(oldMarketData);
-                }
             }
 
             cache[key] = new CacheEntry
@@ -98,18 +66,14 @@ public class CacheService
             };
         }
     }
-    
+
     private void EvictLru()
     {
         if (cache.Count == 0) return;
 
-        // First remove any expired entries
         if (RemoveExpired() > 0 && cache.Count < config.MaxCacheEntries)
-        {
             return;
-        }
 
-        // Find the oldest accessed entry
         string? lruKey = null;
         DateTime oldestAccess = DateTime.MaxValue;
 
@@ -123,129 +87,53 @@ public class CacheService
         }
 
         if (lruKey != null)
-        {
-            var valueToRemove = cache[lruKey].Value;
             cache.Remove(lruKey);
-            
-            if (valueToRemove is MarketData marketData)
-            {
-                MarketDataPool.Return(marketData);
-            }
-        }
     }
-    
-    /// <summary>
-    /// Invalidate a specific cache entry
-    /// </summary>
+
     public void Invalidate(string key)
     {
         lock (lockObject)
         {
-            if (cache.TryGetValue(key, out var entry))
-            {
-                cache.Remove(key);
-                if (entry.Value is MarketData marketData)
-                {
-                    MarketDataPool.Return(marketData);
-                }
-            }
+            cache.Remove(key);
         }
     }
-    
-    /// <summary>
-    /// Invalidate all cache entries matching a pattern
-    /// </summary>
+
     public void InvalidatePattern(string pattern)
     {
         lock (lockObject)
         {
-            var keysToRemove = new List<string>();
-            foreach (var key in cache.Keys)
-            {
-                if (key.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                {
-                    keysToRemove.Add(key);
-                }
-            }
-            
+            var keysToRemove = cache.Keys
+                .Where(k => k.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             foreach (var key in keysToRemove)
-            {
-                if (cache.TryGetValue(key, out var entry))
-                {
-                    cache.Remove(key);
-                    if (entry.Value is MarketData marketData)
-                    {
-                        MarketDataPool.Return(marketData);
-                    }
-                }
-            }
+                cache.Remove(key);
         }
     }
-    
-    /// <summary>
-    /// Clear all cached data
-    /// </summary>
+
     public void Clear()
     {
         lock (lockObject)
         {
-            foreach (var entry in cache.Values)
-            {
-                if (entry.Value is MarketData marketData)
-                {
-                    MarketDataPool.Return(marketData);
-                }
-            }
             cache.Clear();
         }
     }
-    
-    /// <summary>
-    /// Remove expired entries (cleanup)
-    /// </summary>
+
     public int RemoveExpired()
     {
         lock (lockObject)
         {
-            var expiredKeys = new List<string>();
-            foreach (var kvp in cache)
-            {
-                if (kvp.Value.IsExpired)
-                {
-                    expiredKeys.Add(kvp.Key);
-                }
-            }
-            
+            var expiredKeys = cache.Where(kvp => kvp.Value.IsExpired).Select(kvp => kvp.Key).ToList();
             foreach (var key in expiredKeys)
-            {
-                if (cache.TryGetValue(key, out var entry))
-                {
-                    cache.Remove(key);
-                    if (entry.Value is MarketData marketData)
-                    {
-                        MarketDataPool.Return(marketData);
-                    }
-                }
-            }
-            
+                cache.Remove(key);
             return expiredKeys.Count;
         }
     }
-    
-    /// <summary>
-    /// Get cache statistics
-    /// </summary>
+
     public CacheStats GetStats()
     {
         lock (lockObject)
         {
-            var expired = 0;
-            foreach (var entry in cache.Values)
-            {
-                if (entry.IsExpired)
-                    expired++;
-            }
-            
+            var expired = cache.Values.Count(e => e.IsExpired);
             return new CacheStats
             {
                 TotalEntries = cache.Count,
@@ -256,7 +144,7 @@ public class CacheService
             };
         }
     }
-    
+
     public class CacheEntrySnapshot
     {
         public string Key { get; set; } = string.Empty;
@@ -267,14 +155,12 @@ public class CacheService
         public string? WorldName { get; set; }
     }
 
-    /// <summary>
-    /// Get a snapshot of all cache entries for debugging
-    /// </summary>
     public List<CacheEntrySnapshot> GetSnapshot()
     {
         lock (lockObject)
         {
-            return cache.Select(kvp => {
+            return cache.Select(kvp =>
+            {
                 var snapshot = new CacheEntrySnapshot
                 {
                     Key = kvp.Key,
@@ -282,18 +168,18 @@ public class CacheService
                     LastAccessed = kvp.Value.LastAccessed,
                     TypeName = kvp.Value.Value?.GetType().Name ?? "null"
                 };
-                
+
                 if (kvp.Value.Value is MarketData md)
                 {
                     snapshot.ItemId = md.ItemId;
                     snapshot.WorldName = md.WorldName;
                 }
-                
+
                 return snapshot;
             }).ToList();
         }
     }
-    
+
     private class CacheEntry
     {
         public object Value { get; set; } = null!;
@@ -310,8 +196,8 @@ public class CacheStats
     public int ActiveEntries { get; set; }
     public long Hits { get; set; }
     public long Misses { get; set; }
-    
-    public float HitRate => (Hits + Misses) > 0 
-        ? (float)Hits / (Hits + Misses) * 100 
+
+    public float HitRate => (Hits + Misses) > 0
+        ? (float)Hits / (Hits + Misses) * 100
         : 0;
 }

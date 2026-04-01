@@ -12,38 +12,37 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
 
     // UI Settings
     public bool IsConfigWindowMovable { get; set; } = true;
-    public float UIScale { get; set; } = 1.0f;
-    public bool EnableAnimatedCharts { get; set; } = true;
     public int RowsPerPage { get; set; } = 50;
     public List<string> HiddenColumns { get; set; } = new();
-    public Theme ColorTheme { get; set; } = Theme.Default;
-    
+    public List<string> RecentSearches { get; set; } = new();
+
     // API Settings
-    public string PreferredWorld { get; set; } = "Auto";  // or specific world name
-    public bool RememberLastWorld { get; set; } = true; // New setting
-    public int MarketDataCacheDurationSeconds { get; set; } = 300;  // 5 minutes
+    public string PreferredWorld { get; set; } = "Auto";
+    public bool RememberLastWorld { get; set; } = true;
+    public int MarketDataCacheDurationSeconds { get; set; } = 300;
     public int MaxCacheEntries { get; set; } = 1000;
     public int MaxRecipeCacheEntries { get; set; } = 2000;
     public int MaxConcurrentApiRequests { get; set; } = 5;
-    public int ApiRateLimitPerMinute { get; set; } = 900; // 15 requests/second * 60 = 900
-    public int ApiBatchSize { get; set; } = 20; // Default batch size
-    public int ApiRequestTimeoutSeconds { get; set; } = 30; // Default 30s timeout
-    public int ApiErrorThreshold { get; set; } = 10; // Trigger degradation after 10 errors in a minute
-    public int ApiDegradationMinutes { get; set; } = 5; // Stay degraded for 5 minutes
-    public bool WorkOffline { get; set; } = false; // Disable all network requests
-    
+    public int ApiRateLimitPerMinute { get; set; } = 900;
+    public int ApiBatchSize { get; set; } = 20;
+    public int ApiRequestTimeoutSeconds { get; set; } = 30;
+    public bool WorkOffline { get; set; } = false;
+    public int ApiErrorThreshold { get; set; } = 10;
+    public int ApiDegradationMinutes { get; set; } = 5;
+
     // Calculation Settings
     public CostMode DefaultCostMode { get; set; } = CostMode.Cheapest;
     public bool IncludeMarketTax { get; set; } = true;
     public bool UseHQPricesWhenAvailable { get; set; } = true;
     public bool CalculateOpportunityCost { get; set; } = true;
+    public int CrossWorldTravelCost { get; set; } = 2000;
     public int DefaultCraftingTimeSeconds { get; set; } = 20;
     public int EstimatedGatheringTimeSeconds { get; set; } = 15;
-    
+
     // Display Settings
     public bool ShowOnlyProfitableItems { get; set; } = true;
     public int MinimumProfitFilter { get; set; } = 1000;
-    
+
     // Category Filters
     public bool FilterIncludeCombat { get; set; } = true;
     public bool FilterIncludeCraftingGathering { get; set; } = true;
@@ -52,66 +51,33 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool FilterIncludeMaterials { get; set; } = true;
 
     public SortMode DefaultSortMode { get; set; } = SortMode.RecommendationScore;
-    public List<uint> FavoriteItems { get; set; } = new(); // User's pinned/favorite items
-    
-    // User Preferences (Search History)
-    public List<string> RecentSearches { get; set; } = new();
-    
-    // Notification Settings
-    public bool EnablePriceAlerts { get; set; } = false;
-    public List<uint> WatchedItems { get; set; } = new();  // ItemIds
-    
-    // Integration Settings
-    public bool ArtisanAutoDetect { get; set; } = true;
-    public bool ShowArtisanButtons { get; set; } = true;
-    
+    public List<uint> FavoriteItems { get; set; } = new();
+
     // Risk Tolerance
     public RiskLevel MaxAcceptableRisk { get; set; } = RiskLevel.Medium;
     public bool ShowHighRiskItems { get; set; } = true;
 
-    // Logging Settings
+    // Logging
     public bool EnableDebugLogging { get; set; } = false;
-    public bool EnableProfitCalculationLogging { get; set; } = false;
-    public bool EnableMarketAnalysisLogging { get; set; } = false;
-
-    // Cross-World Settings
-    public int CrossWorldTravelCost { get; set; } = 2000; // Estimated cost in gil (teleport fees) to visit another world
 
     // Fetch Settings
-    public int TopItemsToFetch { get; set; } = 50; // Default limit for API fetches
-    public int MaxItemsToTrack { get; set; } = 2000; // Limit for items stored/tracked (NEW)
-    public int MaxRecipesToAnalyze { get; set; } = 1000; // Max recipes to fetch and analyze on refresh
-    
-    // Database Settings
-    public int DatabaseVacuumFrequencyDays { get; set; } = 7; // Default weekly
-    public DateTime LastDatabaseVacuum { get; set; } = DateTime.MinValue;
-    
-    // Priority Calculation Weights
-    public float WeightRecipeLevel { get; set; } = 0.3f;
-    public float WeightMarketVelocity { get; set; } = 0.3f;
-    public float WeightProfitPotential { get; set; } = 0.2f;
-    public float WeightCategory { get; set; } = 0.1f;
-    public float WeightUserPreference { get; set; } = 0.1f;
+    public int TopItemsToFetch { get; set; } = 50;
+    public int MaxItemsToTrack { get; set; } = 2000;
+    public int MaxRecipesToAnalyze { get; set; } = 1000;
 
-    // Privacy & Analytics
-    public string PrivacySalt { get; set; } = string.Empty;
-    public string AnonymousId { get; set; } = string.Empty;
-    public bool AllowAnonymousAnalytics { get; set; } = false;
-    public bool AllowCommunityDataSync { get; set; } = false;
+    // Database Settings
+    public int DatabaseVacuumFrequencyDays { get; set; } = 7;
+    public DateTime LastDatabaseVacuum { get; set; } = DateTime.MinValue;
 
     // Filter Presets
     public Dictionary<string, (string Name, FilterCriteria Criteria)> FilterPresets { get; set; } = new();
 
-    // The below exists just to make saving less cumbersome
     public virtual void Save()
     {
         Plugin.PluginInterface?.SavePluginConfig(this);
     }
 }
 
-/// <summary>
-/// Sort modes for the profit list
-/// </summary>
 public enum SortMode
 {
     HighestProfit,
@@ -119,17 +85,11 @@ public enum SortMode
     BestGilPerHour,
     FastestSelling,
     LowestCompetition,
-    RecommendationScore,  // Weighted algorithm
-    BestEfficiency        // Profit / Effort Ratio
+    RecommendationScore,
 }
 
-/// <summary>
-/// Color themes for the UI
-/// </summary>
 public enum Theme
 {
     Default,
     Dark,
-    Light,
-    HighContrast
 }

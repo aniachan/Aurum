@@ -255,18 +255,7 @@ public class DashboardWindow : Window, IDisposable
         }
         
         ImGui.SameLine();
-        
-        if (ImGui.Button("📦 Download Data"))
-        {
-            plugin.DataManagerWindow.IsOpen = true;
-        }
-        if (ImGui.IsItemHovered())
-        {
-            ImGui.SetTooltip("Open Data Manager to bulk download market data by expansion");
-        }
-        
-        ImGui.SameLine();
-        
+
         if (isLoading)
         {
             ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Loading...");
@@ -956,54 +945,6 @@ public class DashboardWindow : Window, IDisposable
         if (!plugin.Configuration.HiddenColumns.Contains("Actions"))
         {
             ImGui.TableNextColumn();
-            
-            if (profit.MarketData != null)
-            {
-                // Full market data available - show chart button
-                if (ImGui.Button($"📈##{profit.Recipe.RecipeId}"))
-                {
-                    if (ImGui.GetIO().KeyShift)
-                    {
-                        plugin.ChartWindow.IsOpen = true;
-                        plugin.ChartWindow.AddComparisonData(profit.MarketData, profit.Recipe.ItemName);
-                    }
-                    else
-                    {
-                        plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
-                    }
-                }
-                
-                if (ImGui.BeginPopupContextItem($"ChartContext_{profit.Recipe.RecipeId}"))
-                {
-                    if (ImGui.Selectable("Open Chart"))
-                    {
-                        plugin.ChartWindow.SetMarketData(profit.MarketData, profit.Recipe.ItemName);
-                    }
-                    if (ImGui.Selectable("Add to Comparison"))
-                    {
-                        plugin.ChartWindow.IsOpen = true;
-                        plugin.ChartWindow.AddComparisonData(profit.MarketData, profit.Recipe.ItemName);
-                    }
-                    ImGui.EndPopup();
-                }
-
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.SetTooltip("View Price History\n(Shift+Click to add to comparison)\n(Right-click for options)");
-                }
-            }
-            else
-            {
-                // Cached data without market data - show fetch button
-                if (ImGui.Button($"📊##{profit.Recipe.RecipeId}"))
-                {
-                    _ = FetchAndShowChartAsync(profit.Recipe.ResultItemId, profit.Recipe.ItemName);
-                }
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.SetTooltip("Fetch & View Chart");
-                }
-            }
         }
     }
     
@@ -1036,44 +977,6 @@ public class DashboardWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
         {
             ImGui.SetTooltip($"Click to sort by {columnName}");
-        }
-    }
-    
-    private async Task FetchAndShowChartAsync(uint itemId, string itemName)
-    {
-        try
-        {
-            // Get world name
-            var worldName = plugin.Configuration.PreferredWorld;
-            if (string.IsNullOrEmpty(worldName) || worldName.Equals("Auto", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var currentWorld = Plugin.PlayerState.CurrentWorld;
-                    if (currentWorld.Value.RowId != 0)
-                    {
-                        worldName = currentWorld.Value.Name.ToString();
-                    }
-                }
-                catch { }
-            }
-            
-            if (string.IsNullOrEmpty(worldName) || worldName == "Auto")
-            {
-                Plugin.Log.Warning("Unable to determine world name for chart");
-                return;
-            }
-            
-            // Fetch market data
-            var marketData = await plugin.UniversalisService.GetMarketDataAsync(worldName, itemId);
-            if (marketData != null)
-            {
-                plugin.ChartWindow.SetMarketData(marketData, itemName);
-            }
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error(ex, $"Failed to fetch chart data for item {itemId}");
         }
     }
     

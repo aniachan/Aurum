@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Plugin.Services;
 using Aurum.Models;
-using Aurum.Infrastructure;
 
 namespace Aurum.Services;
 
@@ -28,9 +27,6 @@ public class UniversalisService : IDisposable
     private Task? processingTask;
     private readonly SemaphoreSlim concurrencySemaphore;
     
-    // Optional reference to performance monitor
-    private Utils.PerformanceMonitor? _performanceMonitor;
-
     private const string BaseUrl = "https://universalis.app/api/v2";
     private int currentWorldId = 0;
     private string currentWorldName = string.Empty;
@@ -44,14 +40,6 @@ public class UniversalisService : IDisposable
         this.configuration = configuration;
         this.dataManager = dataManager;
         this.requestQueue = new RequestQueue();
-        
-        // Try to access global plugin instance for perf monitor if available
-        // This is a bit of a hack but avoids changing the constructor signature for now
-        // A cleaner way would be to inject it
-        if (Plugin.Instance?.PerformanceMonitor != null)
-        {
-            _performanceMonitor = Plugin.Instance.PerformanceMonitor;
-        }
         
         // Initialize concurrency semaphore with configured limit
         // Default to 5 if not set or invalid
@@ -516,8 +504,7 @@ public class UniversalisService : IDisposable
     /// </summary>
     private MarketData ConvertToMarketData(UniversalisItemResponse response, string worldName, uint itemId)
     {
-        var marketData = MarketDataPool.Get();
-        
+        var marketData = new MarketData();
         marketData.ItemId = itemId;
         marketData.WorldName = worldName;
         marketData.LastUploadTime = DateTimeOffset.FromUnixTimeMilliseconds(response.LastUploadTime).UtcDateTime;

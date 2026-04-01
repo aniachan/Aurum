@@ -136,9 +136,6 @@ public class MarketData
     public bool IsSeasonal { get; set; }
     public string SeasonalTrend { get; set; } = string.Empty;
 
-    // Alternative item suggestions
-    public List<AlternativeItemSuggestion> AlternativeSuggestions { get; set; } = new();
-
     // Freshness tracking
     public DateTime CachedAt { get; set; }
     public DateTime? LastSaleTime { get; set; }

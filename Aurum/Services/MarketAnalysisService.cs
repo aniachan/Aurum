@@ -69,18 +69,10 @@ public class MarketAnalysisService
         // Seasonal trend analysis
         CalculateSeasonalTrend(marketData);
 
-        // Record for community sync
-        Aurum.Plugin.Instance?.CommunitySyncService?.RecordTrend(marketData);
-
-        // Generate alternative suggestions (if relevant)
-        // This requires access to RecipeService, which we don't have here directly.
-        // The ProfitService or a higher-level orchestrator should handle cross-item analysis.
-        // However, we can prep the data structure.
-
         // Generate final recommendation
         GenerateRecommendation(marketData);
 
-        if (config.EnableMarketAnalysisLogging)
+        if (config.EnableDebugLogging)
         {
             log.Information($"Market analysis for {marketData.ItemId}: Velocity={marketData.SaleVelocity:F2}, S/D={marketData.SupplyDemandRatio:F2}, Risk={marketData.RiskLevel} ({marketData.RiskScore})");
         }
