@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
+using Lumina.Excel.Sheets;
 
 namespace Aurum.Models;
 
@@ -21,31 +23,26 @@ public class ShoppingList
 
     public string ToClipboardString()
     {
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Aurum Shopping List");
-        sb.AppendLine($"Created: {CreatedAt}");
-        sb.AppendLine();
-        
-        sb.AppendLine("=== Materials Needed ===");
-        foreach (var item in Items.OrderBy(i => i.SourceType).ThenBy(i => i.ItemName))
+        var rng = new Random();
+        var al = new ArtisanList
         {
-            sb.AppendLine($"[ ] {item.AmountNeeded}x {item.ItemName} ({item.SourceType}) - approx. {item.TotalCost:N0} gil");
-        }
-        
-        sb.AppendLine();
-        sb.AppendLine($"Total Estimated Cost: {TotalEstimatedCost:N0} gil");
-        
-        if (CraftingSteps.Any())
+            ID = (uint) rng.Next(0,65535),
+            Name = $"Aurum - {CreatedAt}"
+        };
+
+        foreach (var step in CraftingSteps)
         {
-            sb.AppendLine();
-            sb.AppendLine("=== Suggested Crafting Order ===");
-            foreach (var step in CraftingSteps.OrderBy(s => s.StepIndex))
+            var r = new ArtisanListRecipe
             {
-                sb.AppendLine($"{step.StepIndex}. Craft {step.Quantity}x {step.ItemName} ({step.TotalCrafts} actions)");
-            }
+                ID = step.RecipeId,
+                Quantity = (uint) step.Quantity
+            };
+
+            al.Recipes.Add(r);
+            al.ExpandedList.Add(step.RecipeId);
         }
-        
-        return sb.ToString();
+
+        return JsonSerializer.Serialize(al);
     }
 
     public string ToCsvString()

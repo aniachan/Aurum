@@ -46,6 +46,9 @@ public class DashboardWindow : Window, IDisposable
     // Column sorting
     private string? sortColumn = null;
     private bool sortAscending = false;
+
+    // Artisan crafting list selection: recipeId -> quantity to produce
+    private Dictionary<uint, int> selectedRecipes = new();
     
     // Pagination - Removed in favor of Virtualization
     // private int currentPage = 1; 
@@ -349,9 +352,29 @@ public class DashboardWindow : Window, IDisposable
                 {
                     ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Click 'Refresh' to load profit data");
                 }
+
+                if (selectedRecipes.Count > 0)
+                {
+                    ImGui.Spacing();
+                    ImGui.TextColored(new Vector4(0.4f, 0.8f, 1f, 1f), $"{selectedRecipes.Count} item(s) selected");
+                    ImGui.SameLine();
+                    if (ImGui.Button("📋 Artisan Crafting List"))
+                    {
+                        CreateArtisanCraftingList();
+                    }
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip("Generate a full crafting list with all sub-crafts for selected items");
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.Button("Clear Selection"))
+                    {
+                        selectedRecipes.Clear();
+                    }
+                }
             }
         }
-    
+
     private void DrawFilters()
     {
         // Data Mode Toggle
@@ -720,7 +743,7 @@ public class DashboardWindow : Window, IDisposable
             if (!plugin.Configuration.HiddenColumns.Contains("Demand")) ImGui.TableSetupColumn("Demand", ImGuiTableColumnFlags.WidthFixed, 80);
             if (!plugin.Configuration.HiddenColumns.Contains("Risk")) ImGui.TableSetupColumn("Risk", ImGuiTableColumnFlags.WidthFixed, 100);
             if (!plugin.Configuration.HiddenColumns.Contains("Score")) ImGui.TableSetupColumn("Score", ImGuiTableColumnFlags.WidthFixed, 80);
-            if (!plugin.Configuration.HiddenColumns.Contains("Actions")) ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (!plugin.Configuration.HiddenColumns.Contains("Actions")) ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 110);
 
             // Draw custom clickable headers
             ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
@@ -941,13 +964,60 @@ public class DashboardWindow : Window, IDisposable
             ImGui.Text($"{starText} {profit.RecommendationScore}");
         }
 
-        // Chart Button
+        // Artisan List selection checkbox + quantity
         if (!plugin.Configuration.HiddenColumns.Contains("Actions"))
         {
             ImGui.TableNextColumn();
+            bool isSelected = selectedRecipes.ContainsKey(profit.Recipe.RecipeId);
+            if (ImGui.Checkbox($"##sel_{profit.Recipe.RecipeId}", ref isSelected))
+            {
+                if (isSelected)
+                    selectedRecipes[profit.Recipe.RecipeId] = 1;
+                else
+                    selectedRecipes.Remove(profit.Recipe.RecipeId);
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Add to Artisan Crafting List");
+
+            if (isSelected)
+            {
+                ImGui.SameLine();
+                int qty = selectedRecipes[profit.Recipe.RecipeId];
+                ImGui.SetNextItemWidth(55);
+                if (ImGui.InputInt($"##qty_{profit.Recipe.RecipeId}", ref qty, 0))
+                {
+                    selectedRecipes[profit.Recipe.RecipeId] = Math.Max(1, qty);
+                }
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Quantity to produce");
+            }
         }
     }
     
+    private void CreateArtisanCraftingList()
+    {
+        var targets = new List<CraftingTarget>();
+        foreach (var (recipeId, qty) in selectedRecipes)
+        {
+            var profit = profitResults.FirstOrDefault(p => p.Recipe.RecipeId == recipeId);
+            if (profit != null)
+            {
+                targets.Add(new CraftingTarget
+                {
+                    RecipeId = recipeId,
+                    ItemId = profit.Recipe.ResultItemId,
+                    ItemName = profit.Recipe.ItemName,
+                    AmountToCraft = qty
+                });
+            }
+        }
+
+        if (!targets.Any()) return;
+
+        var list = plugin.ShoppingListService.GenerateShoppingList(targets);
+        plugin.ShoppingListWindow.SetList(list);
+    }
+
     private void DrawSortableHeader(string columnName)
     {
         var isSorted = sortColumn == columnName;

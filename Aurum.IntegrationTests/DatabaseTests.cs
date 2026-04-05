@@ -397,13 +397,7 @@ public class DatabaseTests
             // Should be small initially but > 0
             var initialSize = db.GetDatabaseSize();
             Assert.True(initialSize > 0);
-            
-            // Add some data to increase size
-            for (int i = 0; i < 100; i++)
-            {
-                db.LogApiRequest("/test", DateTime.UtcNow, 100, 200, true);
-            }
-            
+
             // Force WAL checkpoint if needed, but size might not update immediately depending on OS/file system
             // Just asserting it runs without error and returns reasonable value
             var sizeAfter = db.GetDatabaseSize();

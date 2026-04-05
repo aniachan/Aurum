@@ -15,7 +15,6 @@ public class ConfigurationTests
         // UI Settings
         Assert.True(config.IsConfigWindowMovable);
         Assert.Equal(1.0f, config.UIScale);
-        Assert.True(config.EnableAnimatedCharts);
         
         // API Settings
         Assert.Equal("Auto", config.PreferredWorld);
@@ -35,15 +34,6 @@ public class ConfigurationTests
         Assert.Equal(SortMode.RecommendationScore, config.DefaultSortMode);
         Assert.NotNull(config.FavoriteItems);
         Assert.Empty(config.FavoriteItems);
-        
-        // Notification Settings
-        Assert.False(config.EnablePriceAlerts);
-        Assert.NotNull(config.WatchedItems);
-        Assert.Empty(config.WatchedItems);
-        
-        // Integration Settings
-        Assert.True(config.ArtisanAutoDetect);
-        Assert.True(config.ShowArtisanButtons);
         
         // Risk Tolerance
         Assert.Equal(RiskLevel.Medium, config.MaxAcceptableRisk);

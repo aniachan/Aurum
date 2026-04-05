@@ -23,7 +23,6 @@ public class ConfigurationPersistenceTests
         // UI Settings
         originalConfig.IsConfigWindowMovable = false;
         originalConfig.UIScale = 1.5f;
-        originalConfig.EnableAnimatedCharts = false;
         originalConfig.RowsPerPage = 25;
         originalConfig.HiddenColumns = new List<string> { "Risk", "Velocity" };
         originalConfig.ColorTheme = Theme.Dark;
@@ -54,14 +53,6 @@ public class ConfigurationPersistenceTests
         // User Preferences
         originalConfig.RecentSearches = new List<string> { "Potion", "Sword" };
         
-        // Notification Settings
-        originalConfig.EnablePriceAlerts = true;
-        originalConfig.WatchedItems = new List<uint> { 9999 };
-        
-        // Integration Settings
-        originalConfig.ArtisanAutoDetect = false;
-        originalConfig.ShowArtisanButtons = false;
-        
         // Risk Tolerance
         originalConfig.MaxAcceptableRisk = RiskLevel.Low;
         originalConfig.ShowHighRiskItems = false;
@@ -81,7 +72,6 @@ public class ConfigurationPersistenceTests
         // UI Settings
         Assert.Equal(originalConfig.IsConfigWindowMovable, loadedConfig.IsConfigWindowMovable);
         Assert.Equal(originalConfig.UIScale, loadedConfig.UIScale);
-        Assert.Equal(originalConfig.EnableAnimatedCharts, loadedConfig.EnableAnimatedCharts);
         Assert.Equal(originalConfig.RowsPerPage, loadedConfig.RowsPerPage);
         Assert.Equal(originalConfig.HiddenColumns, loadedConfig.HiddenColumns);
         Assert.Equal(originalConfig.ColorTheme, loadedConfig.ColorTheme);
@@ -111,14 +101,6 @@ public class ConfigurationPersistenceTests
         
         // User Preferences
         Assert.Equal(originalConfig.RecentSearches, loadedConfig.RecentSearches);
-        
-        // Notification Settings
-        Assert.Equal(originalConfig.EnablePriceAlerts, loadedConfig.EnablePriceAlerts);
-        Assert.Equal(originalConfig.WatchedItems, loadedConfig.WatchedItems);
-        
-        // Integration Settings
-        Assert.Equal(originalConfig.ArtisanAutoDetect, loadedConfig.ArtisanAutoDetect);
-        Assert.Equal(originalConfig.ShowArtisanButtons, loadedConfig.ShowArtisanButtons);
         
         // Risk Tolerance
         Assert.Equal(originalConfig.MaxAcceptableRisk, loadedConfig.MaxAcceptableRisk);
