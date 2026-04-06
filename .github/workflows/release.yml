@@ -34,18 +34,18 @@ jobs:
       - name: write version into jsons
         run: |
           $ver = '${{ github.ref_name }}'
-          $path = './Aurum/bin/x64/Release/Aurum.json'
+          $path = './Aurum/bin/Release/Aurum.json'
           $json = Get-Content -Raw $path | ConvertFrom-Json
           $json.AssemblyVersion = $ver
           $content = $json | ConvertTo-Json
           set-content -Path $path -Value $content
       - name: Archive
-        run: Compress-Archive -Path Aurum/bin/x64/Release/* -DestinationPath Aurum.zip
+        run: Compress-Archive -Path Aurum/bin/Release/* -DestinationPath Aurum.zip
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
         with:
           path: |
-            ./Aurum/bin/x64/Release/*
+            ./Aurum/bin/Release/*
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1

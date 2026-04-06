@@ -29,9 +29,9 @@ jobs:
         run: |
           dotnet build --no-restore --configuration Release --nologo
       - name: Archive
-        run: Compress-Archive -Path Aurum/bin/x64/Release/* -DestinationPath Aurum.zip
+        run: Compress-Archive -Path Aurum/bin/Release/* -DestinationPath Aurum.zip
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v4
         with:
           path: |
-            ./Aurum/bin/x64/Release/*
+            ./Aurum/bin/Release/*
