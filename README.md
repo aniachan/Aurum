@@ -21,6 +21,10 @@ The plugin combines recipe cost calculation with Universalis market data so you 
 - Risky price-war situations
 - Better quantities to craft
 
+## Community
+
+- Ani's Plugins Discord: [https://discord.gg/ydEM74N6SD](https://discord.gg/ydEM74N6SD)
+
 ## Screenshots
 
 ### Main Dashboard
@@ -100,17 +104,6 @@ This repository now includes the Creative Commons Attribution-ShareAlike
 Official source:
 [CC BY-SA 4.0 legal code](https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt)
 
-## Community
-
-- Ani's Plugins Discord: [https://discord.gg/ydEM74N6SD](https://discord.gg/ydEM74N6SD)
-
-## Status
-
-This repository is close to public-facing shape, but before a formal
-public release you should still verify:
-
-- Release assets and version numbers are finalized
-- The new screenshots in `Data/` are committed so GitHub can display them
 
 ## Credits
 
