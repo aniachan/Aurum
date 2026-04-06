@@ -358,7 +358,7 @@ public class DashboardWindow : Window, IDisposable
                     ImGui.Spacing();
                     ImGui.TextColored(new Vector4(0.4f, 0.8f, 1f, 1f), $"{selectedRecipes.Count} item(s) selected");
                     ImGui.SameLine();
-                    if (ImGui.Button("📋 Artisan Crafting List"))
+                    if (ImGui.Button("📋 Export Crafting List"))
                     {
                         CreateArtisanCraftingList();
                     }
@@ -977,7 +977,7 @@ public class DashboardWindow : Window, IDisposable
                     selectedRecipes.Remove(profit.Recipe.RecipeId);
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Add to Artisan Crafting List");
+                ImGui.SetTooltip("Add to Crafting List");
 
             if (isSelected)
             {
