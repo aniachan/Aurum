@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Version>0.0.0.2</Version>
     <PackageProjectUrl>https://github.com/aniachan/Aurum</PackageProjectUrl>
-    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <PackageLicenseExpression>CC-BY-SA-4.0</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
