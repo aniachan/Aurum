@@ -84,7 +84,7 @@ Data/                    README assets and plugin imagery
 ## Tech Stack
 
 - .NET 10
-- Dalamud SDK 14
+- Dalamud API 15
 - Lumina
 - ImGui
 - Universalis API
