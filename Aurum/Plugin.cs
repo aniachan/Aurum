@@ -6,6 +6,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using Aurum.Windows;
 using Aurum.Services;
+using System.Collections.Generic;
 
 namespace Aurum;
 
@@ -85,11 +86,10 @@ public sealed class Plugin : IDalamudPlugin
         FilterWindow = new FilterWindow(this);
         ShoppingListWindow = new ShoppingListWindow(this);
 
-        WindowSystem.AddWindow(ConfigWindow);
-        WindowSystem.AddWindow(DashboardWindow);
-        WindowSystem.AddWindow(DetailWindow);
-        WindowSystem.AddWindow(FilterWindow);
-        WindowSystem.AddWindow(ShoppingListWindow);
+        foreach (IWindow window in GetWindows())
+        {
+            WindowSystem.AddWindow(window);
+        }
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -138,4 +138,13 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ToggleConfigUi() => ConfigWindow.Toggle();
     public void ToggleMainUi() => DashboardWindow.Toggle();
+
+    private IEnumerable<IWindow> GetWindows()
+    {
+        yield return ConfigWindow;
+        yield return DashboardWindow;
+        yield return DetailWindow;
+        yield return FilterWindow;
+        yield return ShoppingListWindow;
+    }
 }
