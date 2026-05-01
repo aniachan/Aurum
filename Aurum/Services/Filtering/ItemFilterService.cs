@@ -123,6 +123,7 @@ public class ItemFilterService
         if (!criteria.IncludeFurniture && recipe.MainCategory == ItemMainCategory.Furniture) return false;
         if (!criteria.IncludeConsumables && recipe.MainCategory == ItemMainCategory.Consumable) return false;
         if (!criteria.IncludeMaterials && recipe.MainCategory == ItemMainCategory.Material) return false;
+        if (!criteria.IncludeOther && (recipe.MainCategory == ItemMainCategory.Other || recipe.MainCategory == ItemMainCategory.Unknown)) return false;
         
         // Additional Property Filtering
         if (criteria.IsDyeableOnly && !recipe.IsDyeable) return false;

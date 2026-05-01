@@ -60,4 +60,32 @@ public class ItemFilterServiceFurnitureTests
         Assert.Equal(2, result.Count);
         Assert.Contains(result, x => x.Recipe.MainCategory == ItemMainCategory.Furniture);
     }
+
+    [Fact]
+    public void FilterItems_ShouldOnlyIncludeFurniture_WhenOtherCategoriesAreFalse()
+    {
+        // Arrange
+        _criteria.IncludeCombatGear = false;
+        _criteria.IncludeCraftingGatheringGear = false;
+        _criteria.IncludeConsumables = false;
+        _criteria.IncludeMaterials = false;
+        _criteria.IncludeOther = false;
+        _criteria.IncludeFurniture = true;
+
+        var items = new List<ProfitCalculation>
+        {
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Furniture, ItemName = "Table", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Material, ItemName = "Ingredient", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Consumable, ItemName = "Food", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Other, ItemName = "Misc", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true },
+            new() { Recipe = new RecipeData { MainCategory = ItemMainCategory.Unknown, ItemName = "Unknown", ClassJobLevel = 90, RecipeLevel = 580, ItemLevel = 580 }, RawProfit = 1000, IsDataComplete = true }
+        };
+
+        // Act
+        var result = _filterService.FilterItems(items, _criteria);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(ItemMainCategory.Furniture, result[0].Recipe.MainCategory);
+    }
 }

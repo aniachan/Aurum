@@ -272,6 +272,13 @@ public class ConfigWindow : Window, IDisposable
             configuration.Save();
         }
 
+        var includeOther = configuration.FilterIncludeOther;
+        if (ImGui.Checkbox("Other", ref includeOther))
+        {
+            configuration.FilterIncludeOther = includeOther;
+            configuration.Save();
+        }
+
         ImGui.Separator();
         
         // Sort Mode

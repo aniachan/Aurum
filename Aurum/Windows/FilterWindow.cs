@@ -366,6 +366,13 @@ public class FilterWindow : Window, IDisposable
                     criteria.IncludeFurniture = furniture;
                     changed = true;
                 }
+
+                bool other = criteria.IncludeOther;
+                if (ImGui.Checkbox("Other", ref other))
+                {
+                    criteria.IncludeOther = other;
+                    changed = true;
+                }
                 
                 ImGui.TreePop();
             }

@@ -280,12 +280,12 @@ public class RecipeService
         }
 
         // 3. Consumables
-        // 44=Medicine, 45=Ingredient, 46=Meal, 47=Seafood
+        // 44=Medicine, 46=Meal, 47=Seafood
         if (uiCategoryId == 44 || uiCategoryId == 46 || uiCategoryId == 47) return ItemMainCategory.Consumable;
         
         // 4. Materials
-        // 48-60ish are materials
-        if (uiCategoryId >= 48 && uiCategoryId <= 60) return ItemMainCategory.Material;
+        // 45=Ingredient, 48-60ish are materials
+        if (uiCategoryId == 45 || (uiCategoryId >= 48 && uiCategoryId <= 60)) return ItemMainCategory.Material;
 
         return ItemMainCategory.Other;
     }

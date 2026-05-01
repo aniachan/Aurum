@@ -51,6 +51,7 @@ public class Configuration : IPluginConfiguration, Aurum.Services.ICacheConfig
     public bool FilterIncludeFurniture { get; set; } = true;
     public bool FilterIncludeConsumables { get; set; } = true;
     public bool FilterIncludeMaterials { get; set; } = true;
+    public bool FilterIncludeOther { get; set; } = true;
 
     public SortMode DefaultSortMode { get; set; } = SortMode.RecommendationScore;
     public List<uint> FavoriteItems { get; set; } = new();

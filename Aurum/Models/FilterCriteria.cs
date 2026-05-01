@@ -51,6 +51,7 @@ public class FilterCriteria
     public bool IncludeFurniture { get; set; } = true;
     public bool IncludeConsumables { get; set; } = true;
     public bool IncludeMaterials { get; set; } = true;
+    public bool IncludeOther { get; set; } = true;
     
     // Additional Properties
     public bool IsDyeableOnly { get; set; } = false;

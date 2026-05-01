@@ -693,6 +693,13 @@ public class DashboardWindow : Window, IDisposable
                 changed = true;
             }
 
+            var includeOther = plugin.Configuration.FilterIncludeOther;
+            if (ImGui.Checkbox("Other", ref includeOther))
+            {
+                plugin.Configuration.FilterIncludeOther = includeOther;
+                changed = true;
+            }
+
             if (changed)
             {
                 plugin.Configuration.Save();
@@ -1351,6 +1358,8 @@ public class DashboardWindow : Window, IDisposable
                     if (!plugin.Configuration.FilterIncludeFurniture && p.Recipe.MainCategory == ItemMainCategory.Furniture) return false;
                     if (!plugin.Configuration.FilterIncludeConsumables && p.Recipe.MainCategory == ItemMainCategory.Consumable) return false;
                     if (!plugin.Configuration.FilterIncludeMaterials && p.Recipe.MainCategory == ItemMainCategory.Material) return false;
+                    if (!plugin.Configuration.FilterIncludeOther &&
+                        (p.Recipe.MainCategory == ItemMainCategory.Other || p.Recipe.MainCategory == ItemMainCategory.Unknown)) return false;
                 }
 
                 return true;
