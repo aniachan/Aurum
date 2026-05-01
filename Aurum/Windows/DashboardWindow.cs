@@ -34,6 +34,7 @@ public class DashboardWindow : Window, IDisposable
     private int minProfit = 0;
     private SortMode currentSort = SortMode.RecommendationScore;
     private bool showOnlyProfitable = false; // Changed from true - show all items by default
+    private bool housingBoomMode = false;
     private DateTime lastRefresh = DateTime.MinValue;
     
     // Expansion filter
@@ -548,7 +549,32 @@ public class DashboardWindow : Window, IDisposable
         }
         
         ImGui.SameLine();
-        
+
+        if (ImGui.Checkbox("Housing Boom", ref housingBoomMode))
+        {
+            if (housingBoomMode)
+            {
+                searchText = string.Empty;
+                selectedClass = "All";
+                minLevel = 1;
+                maxLevel = 100;
+                minItemLevel = 1;
+                maxItemLevel = 999;
+                minProfit = 0;
+                showOnlyProfitable = true;
+                sortColumn = null;
+                currentSort = SortMode.HousingBoom;
+            }
+
+            ApplyFilters();
+        }
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Focuses on profitable furnishing crafts and ranks them by housing-patch demand, profit, and low competition.");
+        }
+
+        ImGui.SameLine();
+
         // Expansion filter
         if (ImGui.Checkbox("Expansion Filter", ref useExpansionFilter))
         {
@@ -1313,6 +1339,12 @@ public class DashboardWindow : Window, IDisposable
                 // Only apply class filter if not "All"
                 if (selectedClass != "All" && p.Recipe.CraftingClassName != selectedClass)
                     return false;
+
+                if (housingBoomMode)
+                {
+                    if (!PassesHousingBoomFilter(p))
+                        return false;
+                }
                 
                 return true;
             }).ToList();
@@ -1348,6 +1380,9 @@ public class DashboardWindow : Window, IDisposable
                 // Min profit filter
                 if (p.RawProfit < minProfit)
                     return false;
+
+                if (housingBoomMode)
+                    return PassesHousingBoomFilter(p);
                 
                 // Category Filters
                 if (p.Recipe != null)
@@ -1412,9 +1447,40 @@ public class DashboardWindow : Window, IDisposable
                 SortMode.FastestSelling => filteredResults.OrderByDescending(p => p.MarketData?.SaleVelocity ?? 0).ToList(),
                 SortMode.LowestCompetition => filteredResults.OrderBy(p => p.MarketData?.CurrentListings ?? int.MaxValue).ToList(),
                 SortMode.RecommendationScore => filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
+                SortMode.HousingBoom => filteredResults
+                    .OrderByDescending(GetHousingBoomScore)
+                    .ThenByDescending(p => p.MarketData?.SaleVelocity ?? 0)
+                    .ThenByDescending(p => p.RawProfit)
+                    .ToList(),
                 _ => filteredResults
             };
         }
+    }
+
+    private static bool PassesHousingBoomFilter(ProfitCalculation profit)
+    {
+        return profit.Recipe.MainCategory == ItemMainCategory.Furniture
+            && profit.RawProfit > 0
+            && profit.IsDataComplete;
+    }
+
+    private static float GetHousingBoomScore(ProfitCalculation profit)
+    {
+        var market = profit.MarketData;
+        var saleVelocity = Math.Max(0, market?.SaleVelocity ?? 0);
+        var recentSales = Math.Max(0, market?.RecentSales ?? 0);
+        var currentListings = Math.Max(0, market?.CurrentListings ?? 0);
+        var scarcityMultiplier = currentListings == 0
+            ? 2.5f
+            : Math.Clamp(8f / currentListings, 0.5f, 2.5f);
+
+        var profitScore = MathF.Log10(Math.Max(0, profit.RawProfit) + 1) * 18f;
+        var velocityScore = MathF.Log10(saleVelocity + 1) * 35f;
+        var recentSalesScore = MathF.Log10(recentSales + 1) * 12f;
+        var recommendationScore = profit.RecommendationScore * 0.45f;
+        var riskPenalty = profit.RiskScore * 0.25f;
+
+        return (profitScore + velocityScore + recentSalesScore + recommendationScore) * scarcityMultiplier - riskPenalty;
     }
     
     private static string FormatGil(int amount)

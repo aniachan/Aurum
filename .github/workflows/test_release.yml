@@ -76,7 +76,7 @@ jobs:
           $plugin = @($json)[0]
           $plugin.TestingAssemblyVersion = $ver
           $plugin.DownloadLinkTesting = $plugin.DownloadLinkTesting -replace '[^/]+/Aurum.zip',"$verT/Aurum.zip"
-          $content = @($plugin) | ConvertTo-Json -Depth 10
+          $content = @($plugin) | ConvertTo-Json -Depth 10 -AsArray
           set-content -Path $path -Value $content
 
       - name: Commit repo.json

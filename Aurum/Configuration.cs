@@ -89,6 +89,7 @@ public enum SortMode
     FastestSelling,
     LowestCompetition,
     RecommendationScore,
+    HousingBoom,
 }
 
 public enum Theme
