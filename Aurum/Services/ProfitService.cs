@@ -209,7 +209,13 @@ public class ProfitService
             Dictionary<uint, MarketData> marketDataDict;
             try
             {
-                marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, allFetchIds);
+                marketDataDict = await universalisService.GetMarketDataBatchAsync(worldName, allFetchIds)
+                    .WaitAsync(TimeSpan.FromSeconds(45), cancellationToken);
+            }
+            catch (TimeoutException ex)
+            {
+                log.Warning(ex, $"Timed out fetching market data batch for chunk {chunkIndex}; skipping chunk");
+                continue;
             }
             catch (Exception ex)
             {
@@ -240,9 +246,11 @@ public class ProfitService
                     {
                         marketAnalysisService.AnalyzeMarket(marketData);
                         log.Debug($"Building ingredient tree for: {recipe.ItemName}");
-                        var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName);
+                        var ingredientTree = await BuildIngredientTreeAsync(recipe, worldName)
+                            .WaitAsync(TimeSpan.FromSeconds(30), linkedCts.Token);
                         log.Debug($"Calculating profit for: {recipe.ItemName}");
-                        var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName);
+                        var profit = await CalculateProfitAsync(recipe, marketData, ingredientTree, worldName)
+                            .WaitAsync(TimeSpan.FromSeconds(30), linkedCts.Token);
                         log.Debug($"Completed profit calc for: {recipe.ItemName}");
                     
                     if (profit != null)
@@ -1047,4 +1055,3 @@ public class ProfitService
         return marketData;
     }
 }
-

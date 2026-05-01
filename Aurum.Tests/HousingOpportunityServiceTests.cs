@@ -43,6 +43,25 @@ public class HousingOpportunityServiceTests
         Assert.Same(fastScarce, ranked[0]);
     }
 
+    [Fact]
+    public void SelectHousingRecipes_ReturnsOnlyHousingAndAppliesLimit()
+    {
+        var recipes = new List<RecipeData>
+        {
+            new() { ItemName = "Ingredient", MainCategory = ItemMainCategory.Material, ItemCategory = 45, ClassJobLevel = 100, RecipeLevel = 100 },
+            new() { ItemName = "Low Level Chair", MainCategory = ItemMainCategory.Furniture, ItemCategory = 57, ClassJobLevel = 20, RecipeLevel = 20 },
+            new() { ItemName = "Outdoor Fixture", MainCategory = ItemMainCategory.Other, ItemCategory = 76, ClassJobLevel = 90, RecipeLevel = 90 },
+            new() { ItemName = "Tabletop", MainCategory = ItemMainCategory.Other, ItemCategory = 78, ClassJobLevel = 80, RecipeLevel = 80 }
+        };
+
+        var selected = HousingOpportunityService.SelectHousingRecipes(recipes, maxRecipes: 2);
+
+        Assert.Equal(2, selected.Count);
+        Assert.DoesNotContain(selected, r => r.ItemName == "Ingredient");
+        Assert.Equal("Outdoor Fixture", selected[0].ItemName);
+        Assert.Equal("Tabletop", selected[1].ItemName);
+    }
+
     private static ProfitCalculation CreateProfit(
         ItemMainCategory category,
         int rawProfit,

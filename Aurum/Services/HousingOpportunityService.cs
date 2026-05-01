@@ -1,10 +1,27 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Aurum.Models;
 
 namespace Aurum.Services;
 
 public static class HousingOpportunityService
 {
+    public const int DefaultMaxHousingRecipes = 250;
+
+    public static List<RecipeData> SelectHousingRecipes(IEnumerable<RecipeData> recipes, int maxRecipes = DefaultMaxHousingRecipes)
+    {
+        var limit = Math.Max(1, maxRecipes);
+
+        return recipes
+            .Where(IsHousingRecipe)
+            .OrderByDescending(r => r.ClassJobLevel)
+            .ThenByDescending(r => r.RecipeLevel)
+            .ThenBy(r => r.ItemName)
+            .Take(limit)
+            .ToList();
+    }
+
     public static bool IsHousingRecipe(RecipeData recipe)
     {
         return recipe.MainCategory == ItemMainCategory.Furniture

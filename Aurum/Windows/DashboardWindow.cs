@@ -59,6 +59,7 @@ public class DashboardWindow : Window, IDisposable
     private string lastErrorMessage = string.Empty;
     private string lastErrorSuggestion = string.Empty;
     private DateTime lastErrorTime = DateTime.MinValue;
+    private string refreshStatus = string.Empty;
 
     public DashboardWindow(Plugin plugin) 
         : base("Aurum - Crafting Profit Calculator by aniachan##Dashboard", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
@@ -263,7 +264,13 @@ public class DashboardWindow : Window, IDisposable
 
         if (isLoading)
         {
-            ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), "Loading...");
+            ImGui.TextColored(new Vector4(1f, 1f, 0f, 1f), string.IsNullOrEmpty(refreshStatus) ? "Loading..." : refreshStatus);
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                refreshCts?.Cancel();
+                refreshStatus = "Cancelling...";
+            }
         }
         else if (ImGui.Button("🔄 Refresh"))
         {
@@ -1139,13 +1146,14 @@ public class DashboardWindow : Window, IDisposable
         }
         
         isLoading = true;
+        refreshStatus = "Starting...";
         profitResults.Clear();
         filteredResults.Clear();
         
         // Cancel previous refresh if any
         refreshCts?.Cancel();
         refreshCts?.Dispose();
-        refreshCts = new CancellationTokenSource();
+        refreshCts = new CancellationTokenSource(TimeSpan.FromMinutes(housingBoomMode ? 5 : 10));
         
         try
         {
@@ -1201,11 +1209,15 @@ public class DashboardWindow : Window, IDisposable
 
                 try
                 {
-                    recipes = plugin.RecipeService
-                        .GetRecipesByLevel(1, 100)
-                        .Where(HousingOpportunityService.IsHousingRecipe)
-                        .Take(plugin.Configuration.MaxRecipesToAnalyze)
-                        .ToList();
+                    refreshStatus = "Finding housing recipes...";
+
+                    var maxHousingRecipes = Math.Min(
+                        Math.Max(1, plugin.Configuration.MaxRecipesToAnalyze),
+                        HousingOpportunityService.DefaultMaxHousingRecipes);
+
+                    recipes = HousingOpportunityService.SelectHousingRecipes(
+                        plugin.RecipeService.GetRecipesByLevel(1, 100),
+                        maxHousingRecipes);
 
                     Plugin.Log.Information($"Housing Boom mode: Analyzing {recipes.Count} housing recipes for {worldName}...");
 
@@ -1218,9 +1230,12 @@ public class DashboardWindow : Window, IDisposable
                         return;
                     }
 
+                    var processed = 0;
                     await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
                     {
                         profitResults.Add(profit);
+                        processed++;
+                        refreshStatus = $"Housing Boom: {processed}/{recipes.Count}";
 
                         if (profitResults.Count % 10 == 0)
                         {
@@ -1263,6 +1278,7 @@ public class DashboardWindow : Window, IDisposable
                     await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
                     {
                         profitResults.Add(profit);
+                        refreshStatus = $"Cached: {profitResults.Count}/{recipes.Count}";
                         
                         if (profit.MarketData?.IsCachedData == true || profit.IsStale)
                             cachedCount++;
@@ -1308,6 +1324,7 @@ public class DashboardWindow : Window, IDisposable
                 await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
                 {
                     profitResults.Add(profit);
+                    refreshStatus = $"Expansion: {profitResults.Count}/{recipes.Count}";
                     
                     // Only re-apply filters periodically to avoid UI stutter on every item
                     // or just do it if list is small enough
@@ -1328,6 +1345,7 @@ public class DashboardWindow : Window, IDisposable
                 await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
                 {
                     profitResults.Add(profit);
+                    refreshStatus = $"Live: {profitResults.Count}/{recipes.Count}";
                     
                     if (profitResults.Count % 10 == 0) 
                     {
@@ -1347,6 +1365,9 @@ public class DashboardWindow : Window, IDisposable
         catch (OperationCanceledException)
         {
             Plugin.Log.Information("Refresh cancelled by user or timeout");
+            lastErrorMessage = "Refresh cancelled or timed out";
+            lastErrorSuggestion = "Try Cached mode if live Universalis requests are slow, or reduce Max Recipes to Analyze.";
+            lastErrorTime = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
@@ -1359,6 +1380,7 @@ public class DashboardWindow : Window, IDisposable
         {
             Plugin.Log.Debug("RefreshDataAsync finally block - resetting isLoading");
             isLoading = false;
+            refreshStatus = string.Empty;
             refreshCts?.Dispose();
             refreshCts = null;
         }
