@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Aurum\Models\EquipSlot.cs" Link="Aurum\Models\EquipSlot.cs" />
+    <Compile Include="..\Aurum\Models\ItemMainCategory.cs" Link="Aurum\Models\ItemMainCategory.cs" />
+    <Compile Include="..\Aurum\Models\MarketData.cs" Link="Aurum\Models\MarketData.cs" />
+    <Compile Include="..\Aurum\Models\MarketWarning.cs" Link="Aurum\Models\MarketWarning.cs" />
+    <Compile Include="..\Aurum\Models\PriceTrend.cs" Link="Aurum\Models\PriceTrend.cs" />
+    <Compile Include="..\Aurum\Models\ProfitCalculation.cs" Link="Aurum\Models\ProfitCalculation.cs" />
+    <Compile Include="..\Aurum\Models\RecipeData.cs" Link="Aurum\Models\RecipeData.cs" />
+    <Compile Include="..\Aurum\Services\ItemCategoryClassifier.cs" Link="Aurum\Services\ItemCategoryClassifier.cs" />
+    <Compile Include="..\Aurum\Services\HousingOpportunityService.cs" Link="Aurum\Services\HousingOpportunityService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

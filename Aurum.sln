@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aurum", "Aurum\Aurum.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aurum.IntegrationTests", "Aurum.IntegrationTests\Aurum.IntegrationTests.csproj", "{641A4B16-718C-4677-9D79-12E62F1FB6AC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aurum.Tests", "Aurum.Tests\Aurum.Tests.csproj", "{57C74FC6-5E52-4557-820D-D49834E6883B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,18 @@ Global
 		{641A4B16-718C-4677-9D79-12E62F1FB6AC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{641A4B16-718C-4677-9D79-12E62F1FB6AC}.Release|x86.ActiveCfg = Release|Any CPU
 		{641A4B16-718C-4677-9D79-12E62F1FB6AC}.Release|x86.Build.0 = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|x64.Build.0 = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Debug|x86.Build.0 = Debug|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|x64.ActiveCfg = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|x64.Build.0 = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|x86.ActiveCfg = Release|Any CPU
+		{57C74FC6-5E52-4557-820D-D49834E6883B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -220,15 +220,16 @@ public class RecipeService
     {
         var uiCategoryId = item.ItemUICategory.RowId;
 
+        var simpleCategory = ItemCategoryClassifier.FromItemUiCategory(uiCategoryId);
+
         // 1. Weapons / Tools
-        if (uiCategoryId >= 1 && uiCategoryId <= 11) return ItemMainCategory.Combat; // Combat Weapons
-        if (uiCategoryId >= 84 && uiCategoryId <= 89) return ItemMainCategory.Combat; // New Jobs (RPR, SGE, VPR, PCT) - expanded range for safety
+        if (simpleCategory == ItemMainCategory.Combat) return ItemMainCategory.Combat; // Combat Weapons
         
         // DoH/DoL Tools
         // 12=CRP, 13=BSM, 14=ARM, 15=GSM, 16=LTW, 17=WVR, 18=ALC, 19=CUL
         // 20=MIN, 21=BTN, 22=FSH
         // 23=CRP_OFF ... 30=FSH_OFF
-        if (uiCategoryId >= 12 && uiCategoryId <= 33) return ItemMainCategory.Crafting; // Tools (Crafting & Gathering)
+        if (simpleCategory == ItemMainCategory.Crafting) return ItemMainCategory.Crafting; // Tools (Crafting & Gathering)
 
         // 2. Armor & Accessories
         // 34=Head, 35=Body, 36=Legs, 37=Hands, 38=Feet, 39=Waist(RIP)
@@ -279,13 +280,7 @@ public class RecipeService
             return ItemMainCategory.Combat; // Default to combat for armor/accessories
         }
 
-        // 3. Consumables
-        // 44=Medicine, 46=Meal, 47=Seafood
-        if (uiCategoryId == 44 || uiCategoryId == 46 || uiCategoryId == 47) return ItemMainCategory.Consumable;
-        
-        // 4. Materials
-        // 45=Ingredient, 48-60ish are materials
-        if (uiCategoryId == 45 || (uiCategoryId >= 48 && uiCategoryId <= 60)) return ItemMainCategory.Material;
+        if (simpleCategory != ItemMainCategory.Unknown) return simpleCategory;
 
         return ItemMainCategory.Other;
     }

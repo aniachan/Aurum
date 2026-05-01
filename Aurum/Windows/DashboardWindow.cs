@@ -11,6 +11,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Aurum.Models;
+using Aurum.Services;
 using Aurum.Utils;
 using Dalamud.Interface;
 
@@ -1193,7 +1194,46 @@ public class DashboardWindow : Window, IDisposable
             List<RecipeData> recipes;
             
             // In cached mode, we use expansion filter and work offline
-            if (useCachedDataMode)
+            if (housingBoomMode)
+            {
+                var originalOfflineMode = plugin.Configuration.WorkOffline;
+                plugin.Configuration.WorkOffline = useCachedDataMode;
+
+                try
+                {
+                    recipes = plugin.RecipeService
+                        .GetRecipesByLevel(1, 100)
+                        .Where(HousingOpportunityService.IsHousingRecipe)
+                        .Take(plugin.Configuration.MaxRecipesToAnalyze)
+                        .ToList();
+
+                    Plugin.Log.Information($"Housing Boom mode: Analyzing {recipes.Count} housing recipes for {worldName}...");
+
+                    if (recipes.Count == 0)
+                    {
+                        lastErrorMessage = "No housing recipes found";
+                        lastErrorSuggestion = "Recipe categories may need updating for the current game data.";
+                        lastErrorTime = DateTime.UtcNow;
+                        isLoading = false;
+                        return;
+                    }
+
+                    await foreach (var profit in plugin.ProfitService.CalculateProfitsStreamAsync(recipes, worldName, refreshCts.Token))
+                    {
+                        profitResults.Add(profit);
+
+                        if (profitResults.Count % 10 == 0)
+                        {
+                            ApplyFilters();
+                        }
+                    }
+                }
+                finally
+                {
+                    plugin.Configuration.WorkOffline = originalOfflineMode;
+                }
+            }
+            else if (useCachedDataMode)
             {
                 Plugin.Log.Information($"Cached data mode: Loading ALL recipes from {selectedExpansion.GetDisplayName()} using pre-downloaded data...");
                 
@@ -1342,7 +1382,7 @@ public class DashboardWindow : Window, IDisposable
 
                 if (housingBoomMode)
                 {
-                    if (!PassesHousingBoomFilter(p))
+                    if (!HousingOpportunityService.PassesHousingBoomFilter(p))
                         return false;
                 }
                 
@@ -1382,7 +1422,7 @@ public class DashboardWindow : Window, IDisposable
                     return false;
 
                 if (housingBoomMode)
-                    return PassesHousingBoomFilter(p);
+                    return HousingOpportunityService.PassesHousingBoomFilter(p);
                 
                 // Category Filters
                 if (p.Recipe != null)
@@ -1448,7 +1488,7 @@ public class DashboardWindow : Window, IDisposable
                 SortMode.LowestCompetition => filteredResults.OrderBy(p => p.MarketData?.CurrentListings ?? int.MaxValue).ToList(),
                 SortMode.RecommendationScore => filteredResults.OrderByDescending(p => p.RecommendationScore).ToList(),
                 SortMode.HousingBoom => filteredResults
-                    .OrderByDescending(GetHousingBoomScore)
+                    .OrderByDescending(HousingOpportunityService.GetHousingBoomScore)
                     .ThenByDescending(p => p.MarketData?.SaleVelocity ?? 0)
                     .ThenByDescending(p => p.RawProfit)
                     .ToList(),
@@ -1457,32 +1497,6 @@ public class DashboardWindow : Window, IDisposable
         }
     }
 
-    private static bool PassesHousingBoomFilter(ProfitCalculation profit)
-    {
-        return profit.Recipe.MainCategory == ItemMainCategory.Furniture
-            && profit.RawProfit > 0
-            && profit.IsDataComplete;
-    }
-
-    private static float GetHousingBoomScore(ProfitCalculation profit)
-    {
-        var market = profit.MarketData;
-        var saleVelocity = Math.Max(0, market?.SaleVelocity ?? 0);
-        var recentSales = Math.Max(0, market?.RecentSales ?? 0);
-        var currentListings = Math.Max(0, market?.CurrentListings ?? 0);
-        var scarcityMultiplier = currentListings == 0
-            ? 2.5f
-            : Math.Clamp(8f / currentListings, 0.5f, 2.5f);
-
-        var profitScore = MathF.Log10(Math.Max(0, profit.RawProfit) + 1) * 18f;
-        var velocityScore = MathF.Log10(saleVelocity + 1) * 35f;
-        var recentSalesScore = MathF.Log10(recentSales + 1) * 12f;
-        var recommendationScore = profit.RecommendationScore * 0.45f;
-        var riskPenalty = profit.RiskScore * 0.25f;
-
-        return (profitScore + velocityScore + recentSalesScore + recommendationScore) * scarcityMultiplier - riskPenalty;
-    }
-    
     private static string FormatGil(int amount)
     {
         if (amount >= 1000000)
