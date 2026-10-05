@@ -24,7 +24,7 @@ jobs:
       - name: Restore dependencies
         shell: pwsh
         run: |
-          $restoreOutput = & dotnet restore .\Aurum\Aurum.csproj --verbosity minimal 2>&1
+          $restoreOutput = & dotnet restore .\Aurum\Aurum.csproj --verbosity minimal -p:RestorePackagesWithLockFile=false 2>&1
           $restoreExitCode = $LASTEXITCODE
           foreach ($line in $restoreOutput) {
             $text = $line.ToString()
