@@ -22,7 +22,7 @@ jobs:
               10.x.x
               9.x.x
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore .\Aurum\Aurum.csproj
       - name: Download Dalamud
         run: |
           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
@@ -30,7 +30,7 @@ jobs:
       - name: Build
         run: |
           $ver = '${{ github.ref_name }}'
-          invoke-expression 'dotnet build --no-restore --configuration Release --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
+          invoke-expression 'dotnet build .\Aurum\Aurum.csproj --no-restore --configuration Release --nologo -p:Version=$ver -p:FileVersion=$ver -p:AssemblyVersion=$ver'
       - name: write version into jsons
         run: |
           $ver = '${{ github.ref_name }}'

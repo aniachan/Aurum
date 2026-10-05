@@ -20,14 +20,14 @@ jobs:
               10.x.x
               9.x.x
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore .\Aurum\Aurum.csproj
       - name: Download Dalamud
         run: |
           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev\"
       - name: Build
         run: |
-          dotnet build --no-restore --configuration Release --nologo
+          dotnet build .\Aurum\Aurum.csproj --no-restore --configuration Release --nologo
       - name: Archive
         run: Compress-Archive -Path Aurum/bin/Release/* -DestinationPath Aurum.zip
       - name: Upload a Build Artifact
