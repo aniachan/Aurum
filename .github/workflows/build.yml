@@ -1,4 +1,4 @@
-name: .NET Build
+name: Build Aurum Plugin
 
 on:
   push:
